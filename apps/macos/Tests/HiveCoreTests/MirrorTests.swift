@@ -189,4 +189,19 @@ private func bytes(_ s: String) -> Data { Data(s.utf8) }
         m.feed(Data("\u{1b}[?1000l".utf8))
         #expect(!m.tracksMouse)
     }
+
+    /// Option composes characters on a Mac (– on ⌥-, — on ⌥⇧-), and Ghostty
+    /// sends those characters: Option was used up composing them (consumed),
+    /// so it isn't Alt. Claude Code turns on kitty flags 5, where an Alt key
+    /// would be sent as an escape sequence instead of the dash.
+    @Test(arguments: [0, 1, 3, 5])
+    func optionComposedCharactersAreSentAsText(flags: Int) throws {
+        let m = try Mirror(cols: 10, rows: 2)
+        if flags > 0 { m.feed(Data("\u{1b}[>\(flags)u".utf8)) }
+        // pt-PT: - is on the key US keyboards label / (0x2C).
+        let enDash = KeyInput(key: .mac(0x2C), mods: [.alt], text: "–", unshifted: "-", consumed: [.alt])
+        #expect(m.encodeKey(enDash) == Data("–".utf8))
+        let emDash = KeyInput(key: .mac(0x2C), mods: [.alt, .shift], text: "—", unshifted: "-", consumed: [.alt, .shift])
+        #expect(m.encodeKey(emDash) == Data("—".utf8))
+    }
 }

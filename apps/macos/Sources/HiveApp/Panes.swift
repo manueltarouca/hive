@@ -290,7 +290,10 @@ final class PaneView: MTKView, NSTextInputClient {
         if f.contains(.capsLock) { mods.insert(.capsLock) }
         var t = text ?? ""
         if t.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F || (0xF700...0xF8FF).contains($0.value) }) { t = "" }
-        return KeyInput(key: .mac(event.keyCode), mods: mods, text: t, unshifted: event.charactersIgnoringModifiers?.lowercased().first)
+        // As Ghostty: the modifiers that composed the text (Shift, Option
+        // making – or ã) are consumed; Ctrl and ⌘ never are.
+        return KeyInput(key: .mac(event.keyCode), mods: mods, text: t, unshifted: event.charactersIgnoringModifiers?.lowercased().first,
+                        consumed: mods.intersection([.shift, .alt, .capsLock]))
     }
 
     override func doCommand(by selector: Selector) {}

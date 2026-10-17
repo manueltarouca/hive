@@ -124,8 +124,8 @@ size_t hive_row_cells(GhosttyRenderStateRowIterator it, GhosttyRenderStateRowCel
   return n;
 }
 
-size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, const char *utf8, size_t utf8_len,
-                       uint32_t unshifted, uint8_t *out, size_t cap, size_t *needed) {
+size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, GhosttyMods consumed, const char *utf8,
+                       size_t utf8_len, uint32_t unshifted, uint8_t *out, size_t cap, size_t *needed) {
   *needed = 0;
   GhosttyKeyEncoder enc = NULL;
   if (ghostty_key_encoder_new(NULL, &enc) != GHOSTTY_SUCCESS) return 0;
@@ -135,6 +135,7 @@ size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, cons
   ghostty_key_event_set_action(ev, GHOSTTY_KEY_ACTION_PRESS);
   ghostty_key_event_set_key(ev, key);
   ghostty_key_event_set_mods(ev, mods);
+  ghostty_key_event_set_consumed_mods(ev, consumed);
   if (utf8_len > 0) ghostty_key_event_set_utf8(ev, utf8, utf8_len);
   ghostty_key_event_set_unshifted_codepoint(ev, unshifted);
   size_t written = 0;
@@ -279,7 +280,7 @@ int hive_wheel(GhosttyTerminal t, intptr_t rows, bool shift, float x, float y, H
   if (screen != GHOSTTY_TERMINAL_SCREEN_ALTERNATE || !hive_mode(t, 1007, false)) return 0;
   for (size_t i = 0; i < n; i++) {
     size_t needed = 0;
-    size_t w = hive_encode_key(t, rows < 0 ? GHOSTTY_KEY_ARROW_UP : GHOSTTY_KEY_ARROW_DOWN, 0, "", 0, 0,
+    size_t w = hive_encode_key(t, rows < 0 ? GHOSTTY_KEY_ARROW_UP : GHOSTTY_KEY_ARROW_DOWN, 0, 0, "", 0, 0,
                                out + *written, cap - *written, &needed);
     if (w == 0) break;
     *written += w;

@@ -68,9 +68,13 @@ public struct KeyInput: Sendable {
     /// The character the key produces without modifiers, for kitty and
     /// ctrl/alt encodings.
     public var unshifted: Character?
+    /// The modifiers used up producing text (Shift, and Option composing
+    /// characters such as – or ã), as Ghostty reports them: the encoder
+    /// doesn't treat them as modifiers of the text.
+    public var consumed: KeyMods
 
-    public init(key: Key, mods: KeyMods = [], text: String = "", unshifted: Character? = nil) {
-        self.key = key; self.mods = mods; self.text = text; self.unshifted = unshifted
+    public init(key: Key, mods: KeyMods = [], text: String = "", unshifted: Character? = nil, consumed: KeyMods = []) {
+        self.key = key; self.mods = mods; self.text = text; self.unshifted = unshifted; self.consumed = consumed
     }
 
     /// Text an input method committed, such as ~ from a dead key then Space:
@@ -230,7 +234,7 @@ public final class Mirror {
             var out = [UInt8](repeating: 0, count: cap)
             var needed = 0
             let n = k.text.withCString { s in
-                hive_encode_key(term, k.key.raw, k.mods.rawValue, s, k.text.utf8.count, unshifted, &out, out.count, &needed)
+                hive_encode_key(term, k.key.raw, k.mods.rawValue, k.consumed.rawValue, s, k.text.utf8.count, unshifted, &out, out.count, &needed)
             }
             if needed == 0 { return Data(out.prefix(n)) }
             cap = needed

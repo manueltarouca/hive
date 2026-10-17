@@ -42,7 +42,7 @@ void hive_row_set_clean(GhosttyRenderStateRowIterator it);
 // Encodes a key press for the terminal's current modes into out (cap bytes).
 // Returns the bytes written; if cap was too small, returns 0 and sets
 // *needed to the size required.
-size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, const char *utf8, size_t utf8_len,
+size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, GhosttyMods consumed, const char *utf8, size_t utf8_len,
                        uint32_t unshifted, uint8_t *out, size_t cap, size_t *needed);
 // Whether pasting data is safe: always when the program asked for
 // bracketed paste, otherwise only without newlines and control bytes.
