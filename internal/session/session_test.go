@@ -143,3 +143,15 @@ func TestMoveBlock(t *testing.T) {
 		t.Fatal("moving a block beside itself must fail")
 	}
 }
+
+// B5: a move with a bad side must not take the block out of the layout.
+func TestMoveWithBadSideKeepsBlock(t *testing.T) {
+	w := newWin("block:a")
+	w.Split("block:a", "right", 0.5, leaf("block:b"), "split:1")
+	if err := w.Move("block:b", "block:a", "diagonal", 0.5, "split:2"); err == nil {
+		t.Fatal("want an error")
+	}
+	if !w.Has("block:b") {
+		t.Fatal("block:b was orphaned")
+	}
+}

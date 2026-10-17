@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/manueltarouca/hive/internal/api"
@@ -28,7 +29,27 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /v1/call", s.handleCall)
 	mux.HandleFunc("GET /v1/events", s.handleEvents)
 	mux.HandleFunc("GET /v1/attach", s.handleAttach)
-	return mux
+	return noBrowsers(mux)
+}
+
+// noBrowsers refuses anything a web page could send. Browsers always send an
+// Origin on cross-site requests, and a form or "simple" fetch can't set a
+// JSON content type. The socket is local today; this keeps it safe when
+// hive listens on a network.
+func noBrowsers(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Origin") != "" {
+			http.Error(w, "browser origins are not allowed", http.StatusForbidden)
+			return
+		}
+		if r.Method == http.MethodPost {
+			if ct, _, _ := strings.Cut(r.Header.Get("Content-Type"), ";"); strings.TrimSpace(ct) != "application/json" {
+				http.Error(w, "content type must be application/json", http.StatusUnsupportedMediaType)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

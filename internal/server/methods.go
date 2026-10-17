@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/manueltarouca/hive/internal/agents"
 	"github.com/manueltarouca/hive/internal/api"
 	"github.com/manueltarouca/hive/internal/block"
 	"github.com/manueltarouca/hive/internal/id"
@@ -910,6 +911,9 @@ func (s *Server) registerTerminalMethods() {
 					continue
 				}
 				out = append(out, map[string]any{"name": e.Name(), "path": full})
+				if len(out) >= 2000 {
+					break
+				}
 			}
 			return map[string]any{"path": path, "entries": out}, nil
 		})
@@ -984,6 +988,17 @@ func (s *Server) registerAgentMethods() {
 	}
 	api.Register(s.reg, "agent.report", "hive: Report an agent's identity and state from its hooks. Saved to disk at once.",
 		func(ctx context.Context, in reportIn) (*persist.Agent, error) {
+			// What a hook reports is untrusted: it ends up in a command line
+			// at the next restore and in notifications.
+			if in.SessionID != "" && !agents.ValidSessionID(in.SessionID) {
+				return nil, api.BadRequest("session_id: letters, digits, '.', '-' and '_' only, not starting with '-'")
+			}
+			if in.Cwd != "" && !filepath.IsAbs(in.Cwd) {
+				return nil, api.BadRequest("cwd must be an absolute path")
+			}
+			if r := []rune(in.Message); len(r) > 400 {
+				in.Message = string(r[:400]) + "…"
+			}
 			s.mu.Lock()
 			rr, err := s.needBlock(in.BlockID)
 			if err != nil {

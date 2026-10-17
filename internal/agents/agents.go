@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -16,8 +17,8 @@ import (
 // hive doesn't know how. HIVE_RESUME_<HARNESS>, a JSON list such as
 // ["claude","--resume","{id}"], overrides the built-in command.
 func ResumeArgv(harness, sessionID string) []string {
-	if sessionID == "" {
-		return nil
+	if !ValidSessionID(sessionID) {
+		return nil // never let a reported ID become a flag or split into words
 	}
 	if tmpl := os.Getenv("HIVE_RESUME_" + strings.ToUpper(harness)); tmpl != "" {
 		var argv []string
@@ -42,6 +43,12 @@ func ResumeArgv(harness, sessionID string) []string {
 	}
 	return nil
 }
+
+var sessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+
+// ValidSessionID reports whether id can be passed to an agent's command
+// line: letters, digits, dot, dash and underscore, not starting with a dash.
+func ValidSessionID(id string) bool { return sessionIDPattern.MatchString(id) }
 
 // Report is what one hook call says.
 type Report struct {

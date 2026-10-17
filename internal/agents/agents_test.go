@@ -142,3 +142,9 @@ func TestInstallFollowsSymlinkedSettings(t *testing.T) {
 		t.Fatalf("target not updated: %s", data)
 	}
 }
+
+func TestResumeArgvRefusesFlagLikeIDs(t *testing.T) {
+	if ResumeArgv("claude", "-x") != nil || ResumeArgv("claude", "--resume") != nil || ResumeArgv("claude", "a b") != nil {
+		t.Fatal("flag-like or spaced session IDs must not reach a command line")
+	}
+}

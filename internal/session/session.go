@@ -186,6 +186,9 @@ func (w *Window) Move(blockID, target, side string, ratio float64, splitID strin
 	if !w.Has(blockID) || !w.Has(target) {
 		return fmt.Errorf("both blocks must be in window %s", w.ID)
 	}
+	if _, _, err := SideDirection(side); err != nil {
+		return err // before anything is taken out of the layout
+	}
 	focus := w.Focus
 	w.Remove(blockID)
 	if _, err := w.Split(target, side, ratio, &Node{Type: "block", BlockID: blockID}, splitID); err != nil {

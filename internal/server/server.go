@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/manueltarouca/hive/internal/agents"
@@ -126,6 +127,8 @@ func New(cfg Config) (*Server, error) {
 		quit: make(chan struct{}), stopped: make(chan struct{}),
 	}
 	s.registerMethods()
+	// Built here, not in Serve, so a Shutdown racing a starting Serve sees it.
+	s.srv = &http.Server{Handler: s.handler(), ReadHeaderTimeout: 10 * time.Second}
 	if !cfg.Fresh {
 		if err := s.restore(); err != nil {
 			s.log.Error("restore failed; starting empty", "err", err)
@@ -150,13 +153,18 @@ func (s *Server) Serve() error {
 		return fmt.Errorf("a server is already listening on %s", s.cfg.Socket)
 	}
 	_ = os.Remove(s.cfg.Socket)
+	// Owner-only from the moment it exists, not after a chmod.
+	old := syscall.Umask(0o077)
 	ln, err := net.Listen("unix", s.cfg.Socket)
+	syscall.Umask(old)
 	if err != nil {
 		return err
 	}
-	_ = os.Chmod(s.cfg.Socket, 0o600)
+	if err := os.Chmod(s.cfg.Socket, 0o600); err != nil {
+		ln.Close()
+		return fmt.Errorf("socket permissions: %w", err)
+	}
 	s.ln = ln
-	s.srv = &http.Server{Handler: s.handler(), ReadHeaderTimeout: 10 * time.Second}
 	go s.persistLoop()
 	s.log.Info("listening", "socket", s.cfg.Socket, "state", s.cfg.StateDir)
 	err = s.srv.Serve(ln)
