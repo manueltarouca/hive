@@ -106,7 +106,14 @@ final class Atlas {
         var s = shelves[which]
         let pw = w + 1, ph = h + 1 // 1 px padding against bleeding
         if s.x + pw > size { s.x = 0; s.y += s.rowHeight; s.rowHeight = 0 }
-        guard s.y + ph <= size else { return nil } // full; TODO: evict
+        guard s.y + ph <= size else {
+            guard !slots.isEmpty else { return nil } // too big even for an empty atlas
+            // Full: start the atlas over. Glyphs in use are re-rasterized on
+            // the next frame; one frame may draw stale tiles.
+            slots.removeAll()
+            shelves = [Shelf(), Shelf()]
+            return place(w: w, h: h, color: color, draw: draw)
+        }
         let slot = GlyphSlot(x: s.x, y: s.y, w: w, h: h, color: color)
         s.x += pw
         s.rowHeight = max(s.rowHeight, ph)

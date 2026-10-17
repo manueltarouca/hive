@@ -15,6 +15,8 @@ struct Style: Equatable {
     var accent: NSColor
     var blocked: NSColor, done: NSColor
     var sidebar: NSColor
+    /// Claude Code's own coral, for its icon tiles.
+    var claude: NSColor { Style.hex(0xD97857) }
     var terminal: Theme
 
     /// "Hive Night": warm charcoal, Tomorrow Night terminal colors.

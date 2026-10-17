@@ -35,7 +35,8 @@ public enum JSON: Equatable, Sendable, Codable, CustomStringConvertible {
     public subscript(i: Int) -> JSON { if case .array(let a) = self, a.indices.contains(i) { return a[i] }; return .null }
     public var string: String? { if case .string(let s) = self { return s }; return nil }
     public var double: Double? { if case .number(let n) = self { return n }; return nil }
-    public var int: Int? { double.map { Int($0) } }
+    /// nil for values that aren't whole numbers an Int can hold, instead of trapping.
+    public var int: Int? { double.flatMap { $0.isFinite ? Int(exactly: $0.rounded()) : nil } }
     public var bool: Bool? { if case .bool(let b) = self { return b }; return nil }
     public var array: [JSON] { if case .array(let a) = self { return a }; return [] }
     public var object: [String: JSON] { if case .object(let o) = self { return o }; return [:] }

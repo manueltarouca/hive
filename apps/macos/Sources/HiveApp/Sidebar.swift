@@ -94,7 +94,7 @@ struct AgentRow: View {
         let selected = model.focusedBlock == agent.blockID
         let claude = agent.harness == "claude"
         HStack(alignment: .top, spacing: 10) {
-            AppTile(symbol: claude ? "sparkle" : "hexagon", tint: claude ? Color(red: 0.85, green: 0.47, blue: 0.34) : s.accent.swiftUI,
+            AppTile(symbol: claude ? "sparkle" : "hexagon", tint: claude ? s.claude.swiftUI : s.accent.swiftUI,
                     style: s, badge: agent.state == "blocked" || agent.state == "done" ? agent.state : nil)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -157,7 +157,7 @@ struct TabRow: View {
         let s = model.style
         let active = window.id == model.active?.id
         let info = window.focused.flatMap { model.blocks[$0] }
-        let parts: (primary: String, secondary: String) = window.label.isEmpty ? (info?.titleParts ?? ("shell", "")) : (window.label, "")
+        let parts = window.titleParts(model.blocks)
         HStack(spacing: 10) {
             AppTile(symbol: info?.symbol ?? "apple.terminal", tint: active ? s.accent.swiftUI : s.secondary.swiftUI, style: s)
             VStack(alignment: .leading, spacing: 1) {

@@ -46,12 +46,33 @@ extension ISO8601DateFormatter {
     }()
 }
 
+/// An agent's task from its terminal title: leading status glyphs and
+/// invisible formatting removed. Titles come from programs, so text-direction
+/// overrides are stripped too: they could make a title read as something else.
+func taskName(title: String, harness: String) -> String? {
+    let t = cleanTitle(title).drop { !$0.isLetter && !$0.isNumber }.trimmingCharacters(in: .whitespaces)
+    let name = BlockInfo.harnessNames[harness] ?? harness.capitalized
+    return t.isEmpty || t == name ? nil : t
+}
+
+/// Removes bidi overrides, isolates and marks from text a program supplied.
+func cleanTitle(_ s: String) -> String {
+    String(s.unicodeScalars.filter { !(0x202A...0x202E).contains($0.value) && !(0x2066...0x2069).contains($0.value)
+        && $0.value != 0x200E && $0.value != 0x200F })
+}
+
 struct WindowInfo: Identifiable, Equatable {
     let id: String
     var label: String
     var layout: Layout?
     var focused: String?
     var zoomed: Bool
+
+    /// A tab's title: its label, else its focused block's.
+    func titleParts(_ blocks: [String: BlockInfo]) -> (primary: String, secondary: String) {
+        if !label.isEmpty { return (label, "") }
+        return focused.flatMap { blocks[$0] }?.titleParts ?? ("shell", "")
+    }
 }
 
 struct SessionInfo: Identifiable, Equatable {
@@ -74,11 +95,7 @@ struct AgentInfo: Identifiable, Equatable {
     var updatedAt: Date?
 
     /// The task the agent is on, from its title, else the harness name.
-    var task: String {
-        let t = title.drop { !$0.isLetter && !$0.isNumber }.trimmingCharacters(in: .whitespaces)
-        let name = BlockInfo.harnessNames[harness] ?? harness.capitalized
-        return t.isEmpty || t == name ? name : t
-    }
+    var task: String { taskName(title: title, harness: harness) ?? (BlockInfo.harnessNames[harness] ?? harness.capitalized) }
 }
 
 struct BlockInfo: Equatable {
@@ -101,11 +118,7 @@ struct BlockInfo: Equatable {
     }
 
     /// An agent's task, from the title it sets ("✳ Arch review" → "Arch review").
-    var task: String? {
-        guard harness != nil else { return nil }
-        let t = title.drop { !$0.isLetter && !$0.isNumber }.trimmingCharacters(in: .whitespaces)
-        return t.isEmpty || t == program ? nil : t
-    }
+    var task: String? { harness.flatMap { taskName(title: title, harness: $0) } }
 
     var shortDir: String {
         guard var d = cwd, !d.isEmpty else { return "" }
@@ -148,9 +161,12 @@ struct BlockInfo: Equatable {
 @MainActor
 final class AppModel: ObservableObject {
     let vt = DispatchQueue(label: "hive.vt", qos: .userInteractive)
-    let client: HiveClient
-    let engine: Engine
+    /// Replaced on every reconnect.
+    private(set) var client: HiveClient
+    private(set) var engine: Engine
     let socket: String
+    /// Preferences: a separate suite for test runs, so they never touch yours.
+    static let defaults = ProcessInfo.processInfo.environment["HIVE_DEFAULTS_SUITE"].flatMap { UserDefaults(suiteName: $0) } ?? .standard
 
     @Published var status = "Connecting…"
     @Published var connected = false
@@ -163,8 +179,8 @@ final class AppModel: ObservableObject {
     @Published var blocks: [String: BlockInfo] = [:]
     @Published var style: Style = .light
     /// The agents sidebar (the reference app's vertical tabs, organized around agents).
-    @Published var sidebar = UserDefaults.standard.bool(forKey: "sidebar") {
-        didSet { UserDefaults.standard.set(sidebar, forKey: "sidebar") }
+    @Published var sidebar = AppModel.defaults.bool(forKey: "sidebar") {
+        didSet { AppModel.defaults.set(sidebar, forKey: "sidebar") }
     }
     @Published var host = Host.current().localizedName ?? "This Mac"
     var clientID: String?
@@ -206,10 +222,27 @@ final class AppModel: ObservableObject {
 
     // MARK: connection
 
+    private var reconnectDelay: TimeInterval = 0.5
+    private var closing = false
+
     func start() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        connect()
+    }
+
+    /// Connects, or reconnects with a fresh client and engine. Panes are
+    /// attached again and state is re-read, so nothing is stale afterwards.
+    private func connect() {
         ensureServer()
+        let theme = engine.theme
+        client = HiveClient(socketPath: socket, queue: vt)
+        engine = Engine(client: client)
+        attached.removeAll()
         let engine = engine
         vt.async { [weak self] in
+            engine.theme = theme
+            // Some events were missed: re-read everything.
+            engine.client.onEventsResync = { Task { @MainActor in self?.reloadSessions(); self?.reloadView() } }
             engine.log = { msg in NSLog("hive: %@", msg) }
             engine.client.onEvent = { ev in Task { @MainActor in self?.handleEvent(ev) } }
             engine.client.onClose = { err in Task { @MainActor in self?.disconnected(err) } }
@@ -218,6 +251,7 @@ final class AppModel: ObservableObject {
                 Task { @MainActor in
                     switch result {
                     case .success(let id):
+                        self?.reconnectDelay = 0.5
                         self?.clientID = id
                         self?.connected = true
                         self?.status = "Connected"
@@ -229,12 +263,12 @@ final class AppModel: ObservableObject {
                 }
             }
         }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    /// Starts the server if nothing listens on the socket.
+    /// Starts the server if nothing answers on the socket. A socket file can
+    /// outlive its server, so this connects rather than checking the file.
     private func ensureServer() {
-        guard !FileManager.default.fileExists(atPath: socket), let bin = AppModel.hiveBinary() else { return }
+        guard !AppModel.canConnect(socket), let bin = AppModel.hiveBinary() else { return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: bin)
         p.arguments = ["server", "start"]
@@ -244,7 +278,29 @@ final class AppModel: ObservableObject {
 
     private func disconnected(_ err: Error?) {
         connected = false
-        status = "Disconnected\(err.map { ": \($0)" } ?? "")"
+        status = "Reconnecting…"
+        guard !closing else { return }
+        // Back off: 0.5s, 1s, 2s… up to 10s.
+        let delay = reconnectDelay
+        reconnectDelay = min(reconnectDelay * 2, 10)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.connect() }
+    }
+
+    static func canConnect(_ path: String) -> Bool {
+        let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { Darwin.close(fd) }
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        let bytes = Array(path.utf8)
+        guard bytes.count < MemoryLayout.size(ofValue: addr.sun_path) else { return false }
+        withUnsafeMutableBytes(of: &addr.sun_path) { buf in
+            for (i, b) in bytes.enumerated() { buf[i] = b }
+        }
+        let len = socklen_t(MemoryLayout<sockaddr_un>.size)
+        return withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, len) == 0 }
+        }
     }
 
     func call(_ method: String, _ params: JSON = [:], then: (@MainActor (JSON) -> Void)? = nil) {
@@ -276,7 +332,7 @@ final class AppModel: ObservableObject {
             }
             if self.currentSession == nil || !self.sessions.contains(where: { $0.id == self.currentSession }) {
                 // Like the reference app: come back to the session you were in.
-                let last = UserDefaults.standard.string(forKey: "lastSession")
+                let last = AppModel.defaults.string(forKey: "lastSession")
                 select(session: sessions.first { $0.id == last }?.id ?? sessions.first?.id)
             }
         }
@@ -312,7 +368,7 @@ final class AppModel: ObservableObject {
 
     func select(session id: String?) {
         currentSession = id
-        if let id { UserDefaults.standard.set(id, forKey: "lastSession") }
+        if let id { AppModel.defaults.set(id, forKey: "lastSession") }
         reloadView()
     }
 
@@ -360,10 +416,13 @@ final class AppModel: ObservableObject {
         for b in want.subtracting(attached) {
             vt.async {
                 engine.attach(block: b) { frame in
+                    #if DEBUG
+                    // Terminal content in the log: debug builds only.
                     if ProcessInfo.processInfo.environment["HIVE_DEBUG"] != nil {
                         let rows = (0..<min(frame.rows, 4)).map { frame.rowText($0) }
                         NSLog("hive frame %@ %dx%d cursor=%d,%d rows=%@", b, frame.cols, frame.rows, frame.cursor.x, frame.cursor.y, rows.description)
                     }
+                    #endif
                     Task { @MainActor [weak self] in
                         self?.frames[b] = frame
                         self?.onFrame?(b)
@@ -534,6 +593,15 @@ final class AppModel: ObservableObject {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
             }
+        }
+    }
+
+    /// Checks on the vt queue whether pasting s is safe, then answers on main.
+    func pasteChecked(block: String, _ s: String, then: @escaping @MainActor (Bool) -> Void) {
+        let engine = engine
+        vt.async {
+            let safe = engine.mirror(block: block)?.isPasteSafe(s) ?? true
+            Task { @MainActor in then(safe) }
         }
     }
 

@@ -1,15 +1,22 @@
 #!/bin/sh
 # Visual check: run Hive.app against a fixture session and capture it.
-# Usage: script/shot.sh [light|dark]  ->  /tmp/hive-shot/<style>.png + crops
+# Usage: script/shot.sh [light|dark] [palette|picker|select]  ->  build/shots/<style>.png + crops
 set -eu
 style="${1:-dark}"
 overlay="${2:-}"   # palette | picker
 here="$(cd "$(dirname "$0")/.." && pwd)"
 root="$(cd "$here/../.." && pwd)"
-out=/tmp/hive-shot; mkdir -p "$out"
-tools=/tmp/hive-tools
-D="$(mktemp -d /tmp/hive-fixture.XXXX)"
+# Everything lives in the repo's build dir, owned by you: nothing runs from
+# a shared, world-writable place.
+out="$here/build/shots"; mkdir -p "$out"
+tools="$here/build/tools"; mkdir -p "$tools"
+for t in winid; do
+  [ "$tools/$t" -nt "$here/script/tools/$t.swift" ] || swiftc -O "$here/script/tools/$t.swift" -o "$tools/$t"
+done
+D="$(mktemp -d "${TMPDIR:-/tmp}/hive-fixture.XXXX")"
 export HIVE_SERVER="$D/s.sock" HIVE_STATE_DIR="$D/state"
+# Fixture agents report made-up sessions: never resume a real agent.
+export HIVE_RESUME_CLAUDE='["sh","-c","echo resumed {id}; exec cat"]'
 H="$root/bin/hive"
 
 $H new hive-demo --cwd "$root" >/dev/null
@@ -35,15 +42,22 @@ printf '{"session_id":"a2","cwd":"%s","hook_event_name":"Stop"}' "$root" | HIVE_
 sleep 2
 
 pkill -f 'Hive.app/Contents/MacOS/Hive' 2>/dev/null || true
-defaults delete xyz.matm.hive >/dev/null 2>&1 || true
-[ "${SIDEBAR:-0}" = 1 ] && defaults write xyz.matm.hive sidebar -bool true
-open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" --env HIVE_OPEN="$overlay" \
+# The app keeps its preferences in a separate suite for these runs.
+suite=xyz.matm.hive.shots
+defaults delete "$suite" >/dev/null 2>&1 || true
+[ "${SIDEBAR:-0}" = 1 ] && defaults write "$suite" sidebar -bool true
+# Leave nothing running behind: the fixture server and its programs.
+cleanup() { [ "${KEEP:-0}" = 1 ] || { "$H" server stop >/dev/null 2>&1 || true; }; }
+trap cleanup EXIT
+open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
   --stdout "$out/app.log" --stderr "$out/app.log" "$here/build/Hive.app"
 sleep 4
 W=$($tools/winid Hive)
 # Only Hive's own windows are captured (by window ID), never a screen
 # region, so nothing else on the screen can end up in a shot.
 screencapture -x -o -l "$W" "$out/$style.png"
+# With the native window shadow and corners, for the website.
+screencapture -x -l "$W" "$out/$style-shadow.png"
 if [ -n "$overlay" ]; then
   P=$($tools/winid Hive small)
   screencapture -x -o -l "$P" "$out/$style-$overlay.png"

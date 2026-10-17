@@ -110,3 +110,22 @@ private func bytes(_ s: String) -> Data { Data(s.utf8) }
         #expect(m.selectedText() == "world")
     }
 }
+
+@Suite struct ReviewFixTests {
+    // S2: a multi-line paste into a shell without bracketed paste runs every line.
+    @Test func pasteSafety() throws {
+        let m = try Mirror(cols: 20, rows: 4)
+        #expect(m.isPasteSafe("echo hello"))
+        #expect(!m.isPasteSafe("ls\nrm -rf ~/important"))
+        m.feed(Data("\u{1b}[?2004h".utf8)) // bracketed: the program sees it as one paste
+        #expect(m.isPasteSafe("ls\nrm -rf ~/important"))
+    }
+
+    // B2: a long committed IME string must not vanish.
+    @Test func longKeyTextIsNotDropped() throws {
+        let m = try Mirror(cols: 20, rows: 4)
+        let text = String(repeating: "日本語の文章", count: 20) // 360 bytes
+        let out = m.encodeKey(KeyInput(key: .unidentified, text: text))
+        #expect(out == Data(text.utf8))
+    }
+}

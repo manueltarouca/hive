@@ -89,7 +89,7 @@ struct TabPill: View {
     var body: some View {
         let s = model.style
         let info = window.focused.flatMap { model.blocks[$0] }
-        let parts: (primary: String, secondary: String) = window.label.isEmpty ? (info?.titleParts ?? ("shell", "")) : (window.label, "")
+        let parts = window.titleParts(model.blocks)
         let status = model.status(of: window)
         HStack(spacing: 7) {
             ZStack {

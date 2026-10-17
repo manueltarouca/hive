@@ -130,7 +130,20 @@ final class PaneView: MTKView, NSTextInputClient {
     override func doCommand(by selector: Selector) {}
 
     @objc func paste(_ sender: Any?) {
-        if let s = NSPasteboard.general.string(forType: .string) { model.paste(s) }
+        guard let s = NSPasteboard.general.string(forType: .string), !s.isEmpty else { return }
+        model.pasteChecked(block: blockID, s) { [weak self] safe in
+            guard !safe, let window = self?.window else { self?.model.paste(s); return }
+            // Outside bracketed paste every line runs as soon as it arrives.
+            let alert = NSAlert()
+            let lines = s.split(whereSeparator: \.isNewline).count
+            alert.messageText = "Paste \(lines) line\(lines == 1 ? "" : "s")?"
+            alert.informativeText = "This program didn't ask for bracketed paste, so each line runs as soon as it's pasted."
+            alert.addButton(withTitle: "Paste")
+            alert.addButton(withTitle: "Cancel")
+            alert.beginSheetModal(for: window) { r in
+                if r == .alertFirstButtonReturn { self?.model.paste(s) }
+            }
+        }
     }
 
     // MARK: NSTextInputClient
@@ -169,7 +182,7 @@ struct PaneHeader: View {
         let s = model.style
         HStack(spacing: 7) {
             Image(systemName: info?.symbol ?? "apple.terminal").font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(info?.harness == "claude" ? Color(red: 0.85, green: 0.47, blue: 0.34) : s.text.swiftUI)
+                .foregroundStyle(info?.harness == "claude" ? s.claude.swiftUI : s.text.swiftUI)
             (Text(parts.primary).foregroundColor(s.text.swiftUI)
                 + Text(parts.secondary.isEmpty ? "" : "  " + parts.secondary).foregroundColor(s.secondary.swiftUI).fontWeight(.regular))
                 .font(.system(size: 12.5, weight: .semibold))

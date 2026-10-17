@@ -133,3 +133,23 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         #expect(hex.contains("03 68 69 1b 5b 41"), "got: \(screen)") // ^C, "hi", up arrow
     }
 }
+
+@Suite(.serialized) struct HoldTimeoutTests {
+    // B1: a program that starts synchronized output and stalls must still be
+    // drawn once the hold limit passes, without waiting for more output.
+    @Test func stalledHoldIsRedrawn() async throws {
+        let server = try Server(); defer { server.stop() }
+        let rig = Rig(server)
+        try await rig.connect()
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf 'before'; sleep 0.5; printf '\\033[?2026h\\033[2J\\033[Hstalled-frame'; exec sleep 30"]])
+        let block = try #require(created["block_ids"][0].string)
+        let last = Box("")
+        await rig.onQueue { rig.engine.attach(block: block) { f in last.value = f.rowText(0) } }
+        var saw = false
+        for _ in 0..<60 {
+            if last.value.contains("stalled-frame") { saw = true; break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        #expect(saw, "last frame: \(last.value)")
+    }
+}

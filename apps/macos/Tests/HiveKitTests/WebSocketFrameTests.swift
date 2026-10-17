@@ -72,3 +72,17 @@ func serverFrame(opcode: UInt8, payload: [UInt8], fin: Bool = true) -> [UInt8] {
         #expect(rest == Data(serverFrame(opcode: 1, payload: Array("x".utf8))))
     }
 }
+
+@Suite struct ParserLimitTests {
+    @Test func oversizedFramesAreRejected() {
+        var p = WebSocketParser()
+        p.maxMessage = 1024
+        #expect(throws: WebSocketError.self) { _ = try p.feed(Data(serverFrame(opcode: 2, payload: [UInt8](repeating: 0, count: 2048)))) }
+    }
+
+    @Test func jsonIntDoesNotTrap() throws {
+        #expect(JSON.number(.infinity).int == nil)
+        #expect(JSON.number(1e300).int == nil)
+        #expect(JSON.number(42).int == 42)
+    }
+}

@@ -103,10 +103,17 @@ public final class Engine {
     private func scheduleFrame(_ pane: Pane) {
         guard !pane.framePending else { return }
         pane.framePending = true
-        queue.async { [weak pane] in
-            guard let pane, let m = pane.mirror else { return }
+        queue.async { [weak self, weak pane] in
+            guard let self, let pane, let m = pane.mirror else { return }
             pane.framePending = false
             pane.onFrame(m.frame())
+            // A program can start synchronized output and stall. Draw again
+            // once the hold limit passes, even with no more output.
+            if m.isHeld {
+                self.queue.asyncAfter(deadline: .now() + m.holdLimit + 0.05) { [weak self, weak pane] in
+                    if let self, let pane { self.scheduleFrame(pane) }
+                }
+            }
         }
     }
 

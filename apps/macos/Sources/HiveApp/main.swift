@@ -114,7 +114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         model.start()
         NSApp.activate(ignoringOtherApps: true)
-        // For the screenshot loop: open an overlay once connected.
+        #if DEBUG
+        // For the screenshot loop: open an overlay once connected. Debug
+        // builds only: one of these logs selected terminal text.
         if let what = ProcessInfo.processInfo.environment["HIVE_OPEN"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
                 if what == "palette" { self?.showPalette() } else if what == "picker" { self?.showSessionPicker() }
@@ -130,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
         }
+        #endif
     }
 
     // MARK: appearance

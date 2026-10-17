@@ -116,7 +116,8 @@ size_t hive_row_cells(GhosttyRenderStateRowIterator it, GhosttyRenderStateRowCel
 }
 
 size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, const char *utf8, size_t utf8_len,
-                       uint32_t unshifted, uint8_t *out, size_t cap) {
+                       uint32_t unshifted, uint8_t *out, size_t cap, size_t *needed) {
+  *needed = 0;
   GhosttyKeyEncoder enc = NULL;
   if (ghostty_key_encoder_new(NULL, &enc) != GHOSTTY_SUCCESS) return 0;
   ghostty_key_encoder_setopt_from_terminal(enc, t);
@@ -128,7 +129,9 @@ size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, cons
   if (utf8_len > 0) ghostty_key_event_set_utf8(ev, utf8, utf8_len);
   ghostty_key_event_set_unshifted_codepoint(ev, unshifted);
   size_t written = 0;
-  if (ghostty_key_encoder_encode(enc, ev, (char *)out, cap, &written) != GHOSTTY_SUCCESS) written = 0;
+  GhosttyResult r = ghostty_key_encoder_encode(enc, ev, (char *)out, cap, &written);
+  if (r == GHOSTTY_OUT_OF_SPACE) { *needed = written; written = 0; }
+  else if (r != GHOSTTY_SUCCESS) written = 0;
   ghostty_key_event_free(ev);
   ghostty_key_encoder_free(enc);
   return written;
@@ -138,6 +141,11 @@ bool hive_mode(GhosttyTerminal t, uint16_t number, bool ansi) {
   GhosttyTerminalModeConfig m = {.mode = ghostty_mode_new(number, ansi), .value = false};
   ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_MODE, &m);
   return m.value;
+}
+
+bool hive_paste_is_safe(GhosttyTerminal t, const char *data, size_t len) {
+  if (hive_mode(t, 2004, false)) return true;
+  return ghostty_paste_is_safe(data, len);
 }
 
 GhosttyResult hive_encode_paste(GhosttyTerminal t, char *data, size_t len, uint8_t *out, size_t cap, size_t *written) {
@@ -183,6 +191,7 @@ void hive_gesture_free(GhosttySelectionGesture g, GhosttyTerminal t) {
 void hive_select(GhosttyTerminal t, GhosttySelectionGesture g, int type, uint16_t col, uint16_t row,
                  double x, double y, uint32_t cols, uint32_t cell_width, uint32_t screen_height, uint64_t time_ns,
                  uint64_t repeat_interval_ns, double repeat_distance) {
+  if (type < 0 || type > 2) return;
   GhosttySelectionGestureEventType types[] = {
     GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_PRESS, GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_RELEASE,
     GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_DRAG,

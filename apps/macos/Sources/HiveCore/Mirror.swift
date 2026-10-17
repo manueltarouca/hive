@@ -155,6 +155,8 @@ public final class Mirror {
     }
 
     deinit {
+        // The hold callback holds an unretained self: detach it first.
+        hive_set_render_hold(term, nil, nil)
         if let gesture { hive_gesture_free(gesture, term) }
         if let rowCells { ghostty_render_state_row_cells_free(rowCells) }
         if let rowIter { ghostty_render_state_row_iterator_free(rowIter) }
@@ -184,12 +186,25 @@ public final class Mirror {
 
     /// Encodes a key press for the program's current modes.
     public func encodeKey(_ k: KeyInput) -> Data {
-        var out = [UInt8](repeating: 0, count: 128)
         let unshifted = k.unshifted?.unicodeScalars.first.map { $0.value } ?? 0
-        let n = k.text.withCString { s in
-            hive_encode_key(term, k.key.raw, k.mods.rawValue, s, k.text.utf8.count, unshifted, &out, out.count)
+        var cap = 128
+        // Retry once at the size the encoder asks for: long IME text.
+        for _ in 0..<2 {
+            var out = [UInt8](repeating: 0, count: cap)
+            var needed = 0
+            let n = k.text.withCString { s in
+                hive_encode_key(term, k.key.raw, k.mods.rawValue, s, k.text.utf8.count, unshifted, &out, out.count, &needed)
+            }
+            if needed == 0 { return Data(out.prefix(n)) }
+            cap = needed
         }
-        return Data(out.prefix(n))
+        return Data()
+    }
+
+    /// Whether pasting text could run commands the user didn't mean to: a
+    /// newline or control byte outside bracketed paste.
+    public func isPasteSafe(_ text: String) -> Bool {
+        text.withCString { hive_paste_is_safe(term, $0, text.utf8.count) }
     }
 
     /// Encodes pasted text: newlines become CR, and it is bracketed if the

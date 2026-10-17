@@ -36,7 +36,7 @@ struct WebSocketParser {
 
     private mutating func next() throws -> WebSocketMessage? {
         while true {
-            let b = [UInt8](buffer.prefix(14))
+            let b = [UInt8](buffer.prefix(14)) // prefix is index-relative: works after removeFirst
             guard b.count >= 2 else { return nil }
             let fin = b[0] & 0x80 != 0
             let opcode = b[0] & 0x0f
@@ -62,7 +62,7 @@ struct WebSocketParser {
                 payload = Data(payload.enumerated().map { $0.element ^ mask[$0.offset % 4] })
             }
             buffer.removeFirst(header + Int(len))
-            buffer = Data(buffer) // reset indices so prefix() starts at 0
+            if buffer.isEmpty { buffer = Data() } // keep indices at 0 without copying every frame
 
             switch opcode {
             case 0x8:

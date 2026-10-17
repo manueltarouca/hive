@@ -4,7 +4,7 @@
 // one flat struct so a row costs one call instead of a dozen per cell.
 
 typedef struct {
-  uint8_t text[32];  // UTF-8 grapheme cluster
+  uint8_t text[64];  // UTF-8 grapheme cluster (family emoji run long)
   uint8_t text_len;
   uint8_t wide;      // GhosttyCellWide
   uint8_t has_fg, has_bg;
@@ -37,8 +37,13 @@ bool hive_row_dirty(GhosttyRenderStateRowIterator it);
 void hive_row_set_clean(GhosttyRenderStateRowIterator it);
 
 // Encodes a key press for the terminal's current modes into out (cap bytes).
+// Returns the bytes written; if cap was too small, returns 0 and sets
+// *needed to the size required.
 size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, const char *utf8, size_t utf8_len,
-                       uint32_t unshifted, uint8_t *out, size_t cap);
+                       uint32_t unshifted, uint8_t *out, size_t cap, size_t *needed);
+// Whether pasting data is safe: always when the program asked for
+// bracketed paste, otherwise only without newlines and control bytes.
+bool hive_paste_is_safe(GhosttyTerminal t, const char *data, size_t len);
 // Encodes pasted text, bracketed when the program enabled mode 2004.
 GhosttyResult hive_encode_paste(GhosttyTerminal t, char *data, size_t len, uint8_t *out, size_t cap, size_t *written);
 bool hive_mode(GhosttyTerminal t, uint16_t number, bool ansi);
