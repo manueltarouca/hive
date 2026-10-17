@@ -4,3 +4,4 @@ third_party/
 apps/macos/.build/
 apps/macos/.swiftpm/
 *.xcodeproj/xcuserdata/
+apps/macos/build/

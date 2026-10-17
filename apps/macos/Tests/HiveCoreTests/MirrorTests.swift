@@ -73,3 +73,15 @@ private func bytes(_ s: String) -> Data { Data(s.utf8) }
         #expect(f.cols == 10 && f.rowText(0) == "0123456789" && f.rowText(2) == "0123456789")
     }
 }
+
+@Suite struct MacKeyTests {
+    @Test func physicalKeysEncodeLikeAKeyboard() throws {
+        let m = try Mirror(cols: 10, rows: 2)
+        #expect(Key.mac(0x7E) == .arrowUp)
+        #expect(m.encodeKey(KeyInput(key: .mac(0x24))) == Data([0x0D]))                    // return
+        #expect(m.encodeKey(KeyInput(key: .mac(0x08), mods: [.ctrl], unshifted: "c")) == Data([0x03]))
+        #expect(m.encodeKey(KeyInput(key: .mac(0x00), text: "a", unshifted: "a")) == Data("a".utf8))
+        #expect(m.encodeKey(KeyInput(key: .mac(0x33))) == Data([0x7F]))                    // backspace
+        #expect(Key.mac(0xFF) == .unidentified)
+    }
+}

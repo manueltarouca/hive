@@ -13,7 +13,10 @@ let vtLink: [LinkerSetting] = [.unsafeFlags(["\(vt)/lib/libghostty-vt.a"])]
 let package = Package(
     name: "Hive",
     platforms: [.macOS(.v14)],
+    products: [.executable(name: "Hive", targets: ["HiveApp"])],
     targets: [
+        .executableTarget(name: "HiveApp", dependencies: ["HiveKit", "HiveCore", "HiveRender"],
+                          swiftSettings: vtSwift + [.swiftLanguageMode(.v5)], linkerSettings: vtLink),
         .target(name: "CGhosttyVT", cSettings: vtC),
         // The protocol client: WebSocket over the unix socket, calls, events,
         // block streams. No libghostty, no AppKit.

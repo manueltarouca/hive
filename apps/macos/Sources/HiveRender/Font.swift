@@ -20,7 +20,7 @@ public final class FontSet {
         self.scale = scale
         let px = pointSize * scale
         func load(_ name: String) -> CTFont? {
-            guard let url = Bundle.module.url(forResource: name, withExtension: "ttf", subdirectory: "fonts"),
+            guard let url = FontSet.resources?.url(forResource: name, withExtension: "ttf", subdirectory: "fonts"),
                   let descs = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
                   let d = descs.first else { return nil }
             return CTFontCreateWithFontDescriptor(d, px, nil)
@@ -43,6 +43,18 @@ public final class FontSet {
         underlineThickness = max(1, CTFontGetUnderlineThickness(regular).rounded())
         underlinePosition = max(1, (baseline + CTFontGetUnderlinePosition(regular)).rounded())
     }
+
+    /// The resource bundle, found without Bundle.module, which crashes when
+    /// the bundle isn't where SwiftPM expects it (inside an .app).
+    static let resources: Bundle? = {
+        let name = "Hive_HiveRender.bundle"
+        let candidates = [Bundle.main.resourceURL, Bundle.main.bundleURL, Bundle(for: FontSet.self).resourceURL,
+                          Bundle(for: FontSet.self).bundleURL.deletingLastPathComponent()]
+        for case let dir? in candidates {
+            if let b = Bundle(url: dir.appendingPathComponent(name)) { return b }
+        }
+        return nil
+    }()
 
     func face(bold b: Bool, italic i: Bool) -> CTFont {
         switch (b, i) {
