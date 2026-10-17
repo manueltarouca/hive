@@ -20,5 +20,11 @@ let package = Package(
         .target(name: "HiveKit", swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(name: "HiveKitTests", dependencies: ["HiveKit"],
                     swiftSettings: [.swiftLanguageMode(.v5)]),
+        // Mirrors of blocks: libghostty terminals fed by the attach stream,
+        // all confined to one serial queue, publishing immutable frames.
+        .target(name: "HiveCore", dependencies: ["CGhosttyVT", "HiveKit"],
+                swiftSettings: vtSwift + [.swiftLanguageMode(.v5)], linkerSettings: vtLink),
+        .testTarget(name: "HiveCoreTests", dependencies: ["HiveCore", "HiveKit"],
+                    swiftSettings: vtSwift + [.swiftLanguageMode(.v5)], linkerSettings: vtLink),
     ]
 )

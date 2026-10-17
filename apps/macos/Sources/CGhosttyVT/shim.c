@@ -1,1 +1,160 @@
+#include "CGhosttyVT.h"
+#include <string.h>
 
+static void configure(GhosttyTerminal t) {
+  // The mirror never draws images (cut from M2) and keeps the same
+  // scrollback cap as the server.
+  uint64_t no_images = 0;
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_STORAGE_LIMIT, &no_images);
+  size_t scrollback = 16u << 20;
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_BYTES, &scrollback);
+}
+
+GhosttyResult hive_terminal_new(uint16_t cols, uint16_t rows, GhosttyTerminal *out) {
+  GhosttyResult r = ghostty_terminal_new(NULL, out, cols, rows);
+  if (r == GHOSTTY_SUCCESS) configure(*out);
+  return r;
+}
+
+GhosttyResult hive_terminal_from_snapshot(const uint8_t *data, size_t len, GhosttyTerminal *out) {
+  GhosttySnapshotDecoder d = NULL;
+  GhosttyResult r = ghostty_snapshot_decoder_new_buf(NULL, &d, data, len);
+  if (r != GHOSTTY_SUCCESS) return r;
+  r = ghostty_snapshot_decoder_decode(d, out);
+  ghostty_snapshot_decoder_free(d);
+  if (r == GHOSTTY_SUCCESS) configure(*out);
+  return r;
+}
+
+GhosttyResult hive_snapshot(GhosttyTerminal t, uint8_t **out, size_t *len) {
+  return ghostty_snapshot_encode_alloc(t, NULL, out, len);
+}
+
+GhosttyResult hive_format_plain(GhosttyTerminal t, uint8_t **out, size_t *len) {
+  GhosttyFormatterTerminalOptions o = GHOSTTY_INIT_SIZED(GhosttyFormatterTerminalOptions);
+  o.emit = GHOSTTY_FORMATTER_FORMAT_PLAIN;
+  o.trim = true;
+  o.extra = (GhosttyFormatterTerminalExtra)GHOSTTY_INIT_SIZED(GhosttyFormatterTerminalExtra);
+  o.extra.screen = (GhosttyFormatterScreenExtra)GHOSTTY_INIT_SIZED(GhosttyFormatterScreenExtra);
+  GhosttyFormatter f = NULL;
+  GhosttyResult r = ghostty_formatter_terminal_new(NULL, &f, t, o);
+  if (r != GHOSTTY_SUCCESS) return r;
+  r = ghostty_formatter_format_alloc(f, NULL, out, len);
+  ghostty_formatter_free(f);
+  return r;
+}
+
+void hive_free(uint8_t *ptr, size_t len) { ghostty_free(NULL, ptr, len); }
+
+GhosttyResult hive_frame_meta(GhosttyRenderState rs, HiveFrameMeta *out) {
+  memset(out, 0, sizeof(*out));
+  ghostty_render_state_get(rs, GHOSTTY_RENDER_STATE_DATA_COLS, &out->cols);
+  ghostty_render_state_get(rs, GHOSTTY_RENDER_STATE_DATA_ROWS, &out->rows);
+  GhosttyRenderStateDirty dirty = GHOSTTY_RENDER_STATE_DIRTY_FALSE;
+  ghostty_render_state_get(rs, GHOSTTY_RENDER_STATE_DATA_DIRTY, &dirty);
+  out->dirty = (uint8_t)dirty;
+  GhosttyRenderStateColors colors = GHOSTTY_INIT_SIZED(GhosttyRenderStateColors);
+  GhosttyResult r = ghostty_render_state_get(rs, GHOSTTY_RENDER_STATE_DATA_COLORS, &colors);
+  if (r != GHOSTTY_SUCCESS) return r;
+  out->background = colors.background;
+  out->foreground = colors.foreground;
+  GhosttyRenderStateCursor c = GHOSTTY_INIT_SIZED(GhosttyRenderStateCursor);
+  r = ghostty_render_state_get(rs, GHOSTTY_RENDER_STATE_DATA_CURSOR, &c);
+  if (r != GHOSTTY_SUCCESS) return r;
+  out->cursor_visible = c.visible;
+  out->cursor_in_viewport = c.viewport_has_value;
+  out->cursor_blinking = c.blinking;
+  out->cursor_x = c.viewport_x;
+  out->cursor_y = c.viewport_y;
+  out->cursor_style = (uint8_t)c.visual_style;
+  return GHOSTTY_SUCCESS;
+}
+
+bool hive_row_dirty(GhosttyRenderStateRowIterator it) {
+  bool d = false;
+  ghostty_render_state_row_get(it, GHOSTTY_RENDER_STATE_ROW_DATA_DIRTY, &d);
+  return d;
+}
+
+void hive_row_set_clean(GhosttyRenderStateRowIterator it) {
+  bool d = false;
+  ghostty_render_state_row_set(it, GHOSTTY_RENDER_STATE_ROW_OPTION_DIRTY, &d);
+}
+
+size_t hive_row_cells(GhosttyRenderStateRowIterator it, GhosttyRenderStateRowCells cells, HiveCell *out, size_t cap) {
+  if (ghostty_render_state_row_get(it, GHOSTTY_RENDER_STATE_ROW_DATA_CELLS, &cells) != GHOSTTY_SUCCESS) return 0;
+  size_t n = 0;
+  while (n < cap && ghostty_render_state_row_cells_next(cells)) {
+    HiveCell *c = &out[n++];
+    memset(c, 0, sizeof(*c));
+    GhosttyBuffer buf = {.ptr = c->text, .cap = sizeof(c->text) - 1, .len = 0};
+    if (ghostty_render_state_row_cells_get(cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_GRAPHEMES_UTF8, &buf) == GHOSTTY_SUCCESS)
+      c->text_len = (uint8_t)buf.len;
+    GhosttyCell raw = 0;
+    if (ghostty_render_state_row_cells_get(cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_RAW, &raw) == GHOSTTY_SUCCESS) {
+      GhosttyCellWide w = GHOSTTY_CELL_WIDE_NARROW;
+      ghostty_cell_get(raw, GHOSTTY_CELL_DATA_WIDE, &w);
+      c->wide = (uint8_t)w;
+    }
+    c->has_fg = ghostty_render_state_row_cells_get(cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_FG_COLOR, &c->fg) == GHOSTTY_SUCCESS;
+    c->has_bg = ghostty_render_state_row_cells_get(cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_BG_COLOR, &c->bg) == GHOSTTY_SUCCESS;
+    bool styled = false;
+    ghostty_render_state_row_cells_get(cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_HAS_STYLING, &styled);
+    if (styled) {
+      GhosttyStyle s = GHOSTTY_INIT_SIZED(GhosttyStyle);
+      if (ghostty_render_state_row_cells_get(cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_STYLE, &s) == GHOSTTY_SUCCESS) {
+        c->bold = s.bold; c->italic = s.italic; c->faint = s.faint; c->inverse = s.inverse;
+        c->invisible = s.invisible; c->strikethrough = s.strikethrough; c->blink = s.blink;
+        c->underline = (uint8_t)s.underline;
+      }
+    }
+    bool sel = false;
+    ghostty_render_state_row_cells_get(cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_SELECTED, &sel);
+    c->selected = sel;
+  }
+  return n;
+}
+
+size_t hive_encode_key(GhosttyTerminal t, GhosttyKey key, GhosttyMods mods, const char *utf8, size_t utf8_len,
+                       uint32_t unshifted, uint8_t *out, size_t cap) {
+  GhosttyKeyEncoder enc = NULL;
+  if (ghostty_key_encoder_new(NULL, &enc) != GHOSTTY_SUCCESS) return 0;
+  ghostty_key_encoder_setopt_from_terminal(enc, t);
+  GhosttyKeyEvent ev = NULL;
+  if (ghostty_key_event_new(NULL, &ev) != GHOSTTY_SUCCESS) { ghostty_key_encoder_free(enc); return 0; }
+  ghostty_key_event_set_action(ev, GHOSTTY_KEY_ACTION_PRESS);
+  ghostty_key_event_set_key(ev, key);
+  ghostty_key_event_set_mods(ev, mods);
+  if (utf8_len > 0) ghostty_key_event_set_utf8(ev, utf8, utf8_len);
+  ghostty_key_event_set_unshifted_codepoint(ev, unshifted);
+  size_t written = 0;
+  if (ghostty_key_encoder_encode(enc, ev, (char *)out, cap, &written) != GHOSTTY_SUCCESS) written = 0;
+  ghostty_key_event_free(ev);
+  ghostty_key_encoder_free(enc);
+  return written;
+}
+
+bool hive_mode(GhosttyTerminal t, uint16_t number, bool ansi) {
+  GhosttyTerminalModeConfig m = {.mode = ghostty_mode_new(number, ansi), .value = false};
+  ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_MODE, &m);
+  return m.value;
+}
+
+GhosttyResult hive_encode_paste(GhosttyTerminal t, char *data, size_t len, uint8_t *out, size_t cap, size_t *written) {
+  return ghostty_paste_encode(data, len, hive_mode(t, 2004, false), (char *)out, cap, written);
+}
+
+void hive_set_render_hold(GhosttyTerminal t, GhosttyTerminalRenderHoldFn fn, void *userdata) {
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_USERDATA, userdata);
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_RENDER_HOLD, (const void *)fn);
+}
+
+void hive_scroll_delta(GhosttyTerminal t, intptr_t rows) {
+  GhosttyTerminalScrollViewport s = {.tag = GHOSTTY_SCROLL_VIEWPORT_DELTA, .value = {.delta = rows}};
+  ghostty_terminal_scroll_viewport(t, s);
+}
+
+void hive_scroll_bottom(GhosttyTerminal t) {
+  GhosttyTerminalScrollViewport s = {.tag = GHOSTTY_SCROLL_VIEWPORT_BOTTOM};
+  ghostty_terminal_scroll_viewport(t, s);
+}
