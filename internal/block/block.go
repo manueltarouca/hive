@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -296,11 +297,19 @@ func (b *Block) hooks() vt.Hooks {
 	}
 }
 
+// Reads and bytes read from every block's pty, for benchmarks.
+var readCount, readBytes atomic.Uint64
+
+// ReadStats returns how many pty reads all blocks have done, and the bytes.
+func ReadStats() (reads, bytes uint64) { return readCount.Load(), readBytes.Load() }
+
 func (b *Block) readLoop() {
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := b.ptmx.Read(buf)
 		if n > 0 {
+			readCount.Add(1)
+			readBytes.Add(uint64(n))
 			data := append([]byte(nil), buf[:n]...)
 			b.pubMu.Lock()
 			b.term.Feed(data)

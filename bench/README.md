@@ -11,7 +11,12 @@ PKG_CONFIG_PATH=$PWD/third_party/ghostty-vt/share/pkgconfig go build -o /tmp/hiv
 /tmp/hivebench flush            # saves × busy panes × scrollback
 /tmp/hivebench flush --panes 32 --profile /tmp/flush32   # cpu, heap, mutex and block profiles of one step
 /tmp/hivebench output           # output rate → latency and throughput to an attach client
+/tmp/hivebench ptyread --max 32  # busy panes → pty read cost alone (process CPU via getrusage)
 ```
+
+On macOS, CPU profiles over-count threads blocked in syscalls: a pane's
+reader waiting in `read` shows up as CPU it doesn't use. Trust `cpu_cores`
+(getrusage) for how much, and the profile only for where.
 
 Each run writes `bench/results/<time>-<scenario>.json` with the machine,
 versions, commit, power source, load average, pty limits and every step. A
@@ -28,6 +33,7 @@ profile doesn't see.
 | Scenario | Ramps | Limit |
 | --- | --- | --- |
 | `flush` | busy panes (100 KB/s each), empty and full scrollback, with snapshot saves running back to back | `agent.report` p99 above 50 ms |
+| `ptyread` | busy panes (100 KB/s each), no clients, no saves | under 90% of the offered bytes read |
 | `output` | output rate per pane (64 KB/s to 128 MB/s), stamped by the emitter, read by an attach client as the app does | latency p99 above 50 ms, under 90% of the bytes delivered, or a resync |
 
 ## Findings
@@ -62,6 +68,13 @@ cache flush behind 1.5 GB of snapshots; it also counts `s.mu`, encoding
 and writing), then state saves stuck behind `s.mu`, which
 `saveState` held while `Term.Size` waited ~150 ms for a snapshot's encode.
 Full scrollback at 128 panes stays degraded (p99 85–107 ms, p50 under
-1 ms). The CPU profile there is 86% pty `read` syscalls (128 readers at
-100 KB/s): the next thing to look at. Memory: ~12 MB native per busy pane
+1 ms). The CPU profile there said 86% pty `read` syscalls, but measured
+with getrusage (`ptyread`), reading costs 0.10 cores at 32 busy panes
+(3.3 MB/s, ~536 bytes and 16 µs a read): the profile was the macOS
+sampling bias, not the bottleneck. What does cost CPU is encoding
+snapshots: `flush` at 32 full panes uses 1.44 cores with saves back to
+back, against 0.40 with empty scrollback. At 128 that's several cores on a
+machine already at load ~8, which likely explains the tail; the probe's
+back-to-back saves are far harsher than the real 30 s tick. To confirm on
+a quiet machine. Memory: ~12 MB native per busy pane
 (16 MB scrollback filling), 1.6 GB at 128 panes.

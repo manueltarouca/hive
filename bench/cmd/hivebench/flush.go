@@ -25,11 +25,13 @@ type flushStep struct {
 	SaveWait   Dist   `json:"save_wait"`
 	// The reports' own saves (state.json only): waiting for the save locks,
 	// and the rest (s.mu, encoding, writing and syncing).
-	StateWait Dist   `json:"state_save_wait"`
-	StateIO   Dist   `json:"state_save_io"`
-	Snapshots int    `json:"snapshots_per_save_max"`
-	Memory    Memory `json:"memory"`
-	Degraded  bool   `json:"degraded"`
+	StateWait Dist `json:"state_save_wait"`
+	StateIO   Dist `json:"state_save_io"`
+	Snapshots int  `json:"snapshots_per_save_max"`
+	// The process\'s own CPU (getrusage), not the profile\'s guess.
+	CPUCores float64 `json:"cpu_cores"`
+	Memory   Memory  `json:"memory"`
+	Degraded bool    `json:"degraded"`
 }
 
 type flushResult struct {
@@ -84,8 +86,8 @@ func flushProbe(args []string) error {
 			}
 			st.Scrollback = scroll.name
 			res.Steps = append(res.Steps, st)
-			fmt.Printf("%-28s panes %4d  report p50 %6.1f p99 %7.1f max %7.1f ms | save p50 %6.1f p99 %7.1f ms, ≤%d snapshots | report's save: wait p99 %6.1f, io p99 %6.1f ms | rss %5.0f MB (go %4.0f, native %5.0f)%s\n",
-				scroll.name, panes, st.Report.P50, st.Report.P99, st.Report.Max, st.Save.P50, st.Save.P99, st.Snapshots, st.StateWait.P99, st.StateIO.P99,
+			fmt.Printf("%-28s panes %4d  report p50 %6.1f p99 %7.1f max %7.1f ms | save p50 %6.1f p99 %7.1f ms, ≤%d snapshots | report's save: wait p99 %6.1f, io p99 %6.1f ms | cpu %4.2f cores | rss %5.0f MB (go %4.0f, native %5.0f)%s\n",
+				scroll.name, panes, st.Report.P50, st.Report.P99, st.Report.Max, st.Save.P50, st.Save.P99, st.Snapshots, st.StateWait.P99, st.StateIO.P99, st.CPUCores,
 				st.Memory.ResidentMB, st.Memory.GoHeapMB, st.Memory.NativeMB, map[bool]string{true: "  DEGRADED", false: ""}[st.Degraded])
 			if st.Degraded {
 				degradedRun++
@@ -166,6 +168,7 @@ func flushStepRun(exe string, panes, prefill, rate, secs int, limit time.Duratio
 		}
 	}()
 	var reports []time.Duration
+	c0, t0 := cpuTime(), time.Now()
 	tick := time.NewTicker(20 * time.Millisecond)
 	end := time.Now().Add(time.Duration(secs) * time.Second)
 	for time.Now().Before(end) {
@@ -177,6 +180,7 @@ func flushStepRun(exe string, panes, prefill, rate, secs int, limit time.Duratio
 		reports = append(reports, time.Since(t0))
 	}
 	tick.Stop()
+	cores := (cpuTime() - c0).Seconds() / time.Since(t0).Seconds()
 	close(stopSaves)
 	if err := <-savesDone; err != nil {
 		return flushStep{}, err
@@ -184,7 +188,7 @@ func flushStepRun(exe string, panes, prefill, rate, secs int, limit time.Duratio
 	mem := memory()
 	mu.Lock()
 	defer mu.Unlock()
-	st := flushStep{Panes: panes, Report: dist(reports), Save: dist(saves), SaveWait: dist(waits), StateWait: dist(stateWaits), StateIO: dist(stateIO), Snapshots: maxSnaps, Memory: mem}
+	st := flushStep{Panes: panes, Report: dist(reports), Save: dist(saves), SaveWait: dist(waits), StateWait: dist(stateWaits), StateIO: dist(stateIO), Snapshots: maxSnaps, CPUCores: cores, Memory: mem}
 	st.Degraded = st.Report.P99 > float64(limit)/float64(time.Millisecond)
 	return st, nil
 }

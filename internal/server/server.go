@@ -131,7 +131,7 @@ type Server struct {
 	stateSave chan struct{}
 	// sealed, under stateMu: Shutdown's final save is done, and no later
 	// save may write (blocks are closing, so their state would be lost).
-	sealed bool
+	sealed   bool
 	quit     chan struct{}
 	stopped  chan struct{}
 	stopOnce sync.Once
