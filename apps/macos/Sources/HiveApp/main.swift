@@ -125,6 +125,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
                 if what == "palette" { self?.showPalette() } else if what == "picker" { self?.showSessionPicker() }
                 if what == "shortcuts" { self?.toggleShortcuts() }
+                if what == "preedit", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
+                    // A dead key waiting for the next key, as ~ on a Portuguese layout.
+                    card.pane.setMarkedText("~", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                }
                 if what == "select", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
                     // The mouse path, driven by hand: press, drag along row 1.
                     let p = card.pane, cw = Double(p.renderer.fonts.cellWidth), ch = Double(p.renderer.fonts.cellHeight)

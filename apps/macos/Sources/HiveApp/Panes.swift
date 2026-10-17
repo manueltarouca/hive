@@ -13,7 +13,10 @@ final class PaneView: MTKView, NSTextInputClient {
     var focused = false { didSet { if focused != oldValue { needsDisplay = true } } }
     var style: Style { model.style }
 
-    private var marked = NSAttributedString()
+    private var marked = NSAttributedString() { didSet { showPreedit() } }
+    /// The accent or IME text being composed, drawn at the cursor until it's
+    /// committed, as Ghostty draws it: underlined, in the terminal's colours.
+    private let preedit = PreeditView()
     private var composedText: String?
     private var inKeyDown = false
 
@@ -28,6 +31,23 @@ final class PaneView: MTKView, NSTextInputClient {
         enableSetNeedsDisplay = true
         autoResizeDrawable = false
         layer?.isOpaque = true
+        preedit.isHidden = true
+        addSubview(preedit)
+    }
+
+    private func showPreedit() {
+        guard marked.length > 0, let c = model.frames[blockID]?.cursor else { preedit.isHidden = true; return }
+        let t = style.terminal
+        func color(_ c: RGB) -> NSColor { NSColor(srgbRed: CGFloat(c.r) / 255, green: CGFloat(c.g) / 255, blue: CGFloat(c.b) / 255, alpha: 1) }
+        let font = NSFont(descriptor: CTFontCopyFontDescriptor(renderer.fonts.regular), size: CTFontGetSize(renderer.fonts.regular) / scale)
+            ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        preedit.text = NSAttributedString(string: marked.string, attributes: [.font: font, .foregroundColor: color(t.foreground)])
+        preedit.background = color(t.background)
+        preedit.baseline = (CGFloat(renderer.fonts.cellHeight) - renderer.fonts.baseline) / scale
+        let width = max(cellSize.width, ceil(preedit.text.size().width))
+        preedit.frame = NSRect(x: CGFloat(c.x) * cellSize.width, y: CGFloat(c.y) * cellSize.height, width: width, height: cellSize.height)
+        preedit.isHidden = false
+        preedit.needsDisplay = true
     }
 
     required init(coder: NSCoder) { fatalError() }
@@ -443,4 +463,24 @@ final class PanesView: NSView {
     }
 
     func redraw(_ block: String) { cards[block]?.pane.needsDisplay = true }
+}
+
+/// Composing text over the cursor's cell: the cell's background, the text on
+/// the grid's baseline, and an underline across it.
+final class PreeditView: NSView {
+    var text = NSAttributedString()
+    var background = NSColor.black
+    /// From the cell's top, in points.
+    var baseline: CGFloat = 0
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        background.setFill()
+        bounds.fill()
+        let font = text.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+        text.draw(at: NSPoint(x: 0, y: baseline - (font?.ascender ?? 0)))
+        (text.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor ?? .white).setFill()
+        NSRect(x: 0, y: baseline + 2, width: bounds.width, height: 1).fill()
+    }
 }
