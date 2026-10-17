@@ -26,10 +26,17 @@ agent=$($H -s hive-demo split --split right --ratio 45 --cwd "$root" --keep-open
 printf '{"session_id":"7f3c2a10-demo","cwd":"%s","hook_event_name":"UserPromptSubmit"}' "$root" | HIVE_BLOCK=$agent $H agent hook claude
 $H -s hive-demo split -b "$agent" --split below --ratio 40 --label tests --cwd "$root" -- sh -c 'cd internal/session && go test -v -run "Split|Resolve" . 2>&1 | tail -12; exec cat' >/dev/null
 $H -s hive-demo run --label logs --focus=false --cwd "$root" -- sh -c 'echo serving on :8080; exec cat' >/dev/null
+# A second session with a blocked agent and a finished one.
+$H new api-gateway --cwd "$root" -- sh -c 'printf "\033]2;✳ Migrate rate limiter to Redis\007"; exec cat' >/dev/null
+blocked=$($H -s api-gateway block inspect --json | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["block_id"])')
+printf '{"session_id":"a1","cwd":"%s","hook_event_name":"Notification","notification_type":"permission_prompt","message":"Claude needs your permission to use Bash"}' "$root" | HIVE_BLOCK=$blocked $H agent hook claude
+done_b=$($H -s api-gateway split --json --cwd "$root" -- sh -c 'printf "\033]2;✳ Write changelog\007"; exec cat' | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["block_ids"][0])')
+printf '{"session_id":"a2","cwd":"%s","hook_event_name":"Stop"}' "$root" | HIVE_BLOCK=$done_b $H agent hook claude
 sleep 2
 
 pkill -f 'Hive.app/Contents/MacOS/Hive' 2>/dev/null || true
 defaults delete xyz.matm.hive >/dev/null 2>&1 || true
+[ "${SIDEBAR:-0}" = 1 ] && defaults write xyz.matm.hive sidebar -bool true
 open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" --env HIVE_OPEN="$overlay" "$here/build/Hive.app"
 sleep 4
 W=$($tools/winid Hive)

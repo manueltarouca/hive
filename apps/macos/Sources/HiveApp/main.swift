@@ -6,6 +6,7 @@ import SwiftUI
 /// The window's background: a soft vertical gradient from the style.
 final class RootView: NSView {
     let gradient = CAGradientLayer()
+    var sidebarWidth: () -> CGFloat = { 0 }
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
@@ -22,13 +23,17 @@ final class RootView: NSView {
         CATransaction.setDisableActions(true)
         gradient.frame = bounds
         CATransaction.commit()
+        let side = sidebarWidth()
         for v in subviews {
-            if v is NSHostingView<TitleBar> || v is TitleBarHost<TitleBar> {
-                v.frame = NSRect(x: 0, y: 0, width: bounds.width, height: TitleBar.height)
+            if v is TitleBarHost<TitleBar> {
+                v.frame = NSRect(x: side, y: 0, width: bounds.width - side, height: TitleBar.height)
+            } else if v is TitleBarHost<AgentSidebar> {
+                v.isHidden = side == 0
+                v.frame = NSRect(x: 0, y: 0, width: AgentSidebar.width, height: bounds.height)
             } else if v is PanesView {
                 // Cards start just under the bar, clear of the tabs.
                 let top = TitleBar.height + 4
-                v.frame = NSRect(x: 0, y: top, width: bounds.width, height: bounds.height - top)
+                v.frame = NSRect(x: side, y: top, width: bounds.width - side, height: bounds.height - top)
             }
         }
     }
@@ -70,8 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                                                   openPalette: { [weak self] in self?.showPalette() }))
         // It sits in the title bar on purpose: no safe-area inset.
         bar.safeAreaRegions = []
+        let sidebar = TitleBarHost(rootView: AgentSidebar(model: model))
+        sidebar.safeAreaRegions = []
+        root.sidebarWidth = { [weak self] in (self?.model.sidebar ?? false) ? AgentSidebar.width : 0 }
         root.addSubview(panes)
         root.addSubview(bar)
+        root.addSubview(sidebar)
         window.contentView = root
 
         window.setFrameAutosaveName("HiveMain")
@@ -86,6 +95,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.panes.claimSizes()
         }
         model.$style.sink { [weak self] s in self?.applyStyle(s) }.store(in: &bag)
+        model.$sidebar.dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.root.needsLayout = true
+                self?.root.layoutSubtreeIfNeeded()
+                self?.panes.sync()
+                self?.panes.claimSizes()
+            }
+        }.store(in: &bag)
         followSystemAppearance()
 
         buildMenu()
@@ -168,6 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let m = model
         return [
             PaletteItem(title: "New Tab", detail: "⌘T", symbol: "plus.square") { m.newTab() },
+            PaletteItem(title: m.sidebar ? "Hide Agents Sidebar" : "Show Agents Sidebar", detail: "⇧⌘S", symbol: "sidebar.left") { m.sidebar.toggle() },
             PaletteItem(title: "New Session", detail: "⇧⌘N", symbol: "plus.rectangle.on.rectangle") { m.newSession() },
             PaletteItem(title: "Change Session…", detail: "⌘K", symbol: "rectangle.stack") { [weak self] in
                 DispatchQueue.main.async { self?.showSessionPicker() }
@@ -226,6 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSMenuItem(title: "About Hive", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""),
             .separator(),
             item("Command Palette…", "p", [.command, .shift]) { [weak self] in self?.showPalette() },
+            item("Toggle Agents Sidebar", "s", [.command, .shift]) { m.sidebar.toggle() },
             .separator(),
             NSMenuItem(title: "Hide Hive", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"),
             NSMenuItem(title: "Quit Hive", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"),

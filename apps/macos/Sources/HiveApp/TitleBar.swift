@@ -15,15 +15,20 @@ struct TitleBar: View {
     var body: some View {
         let s = model.style
         HStack(spacing: 10) {
+            if !model.sidebar {
+                BarButton(symbol: "sidebar.left", help: "Show agents (⇧⌘S)", style: s) { model.sidebar = true }
+                    .padding(.trailing, -4)
+            }
             SessionChip(model: model, action: openPicker)
-            Tabs(model: model)
+            // With the sidebar open, tabs live there, as in the reference app's vertical tabs.
+            if !model.sidebar { Tabs(model: model) }
             Spacer(minLength: 4)
             HStack(spacing: 2) {
                 BarButton(symbol: "command", help: "Command palette (⇧⌘P)", style: s, action: openPalette)
                 BarButton(symbol: "plus", help: "New tab (⌘T)", style: s) { model.newTab() }
             }
         }
-        .padding(.leading, TitleBar.leading)
+        .padding(.leading, model.sidebar ? 12 : TitleBar.leading)
         .padding(.trailing, 10)
         .frame(height: TitleBar.height)
     }

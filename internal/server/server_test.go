@@ -217,7 +217,7 @@ func TestRestoreAfterRestart(t *testing.T) {
 	h.waitScreen(sid, shell, "before-restart-marker\n")
 
 	split := h.call("session.new_split", map[string]any{"session_id": sid, "block_id": shell, "direction": "vertical",
-		"layout": map[string]any{"command": []string{"cat"}, "label": "agent"}})
+		"layout": map[string]any{"command": []string{"sh", "-c", "printf '\\033]2;✳ Fix login\\007'; exec cat"}, "label": "agent"}})
 	agentBlock := strs(split["block_ids"])[0]
 	h.call("agent.report", map[string]any{"block_id": agentBlock, "harness": "claude", "state": "idle",
 		"session_id": "11111111-2222", "cwd": os.TempDir(), "event": "SessionStart"})
@@ -252,7 +252,7 @@ func TestRestoreAfterRestart(t *testing.T) {
 		t.Fatalf("agents = %v", agents)
 	}
 	raw, _ := json.Marshal(agents[0])
-	if !strings.Contains(string(raw), "33333333-4444") {
+	if !strings.Contains(string(raw), "33333333-4444") || !strings.Contains(string(raw), "Fix login") {
 		t.Fatalf("agent = %s", raw)
 	}
 }

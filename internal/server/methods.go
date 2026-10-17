@@ -1022,6 +1022,7 @@ func (s *Server) registerAgentMethods() {
 		SessionLabel string         `json:"session_label,omitempty"`
 		WindowID     string         `json:"window_id,omitempty"`
 		Label        string         `json:"label,omitempty"`
+		Title        string         `json:"title,omitempty"`
 		Agent        *persist.Agent `json:"agent"`
 		Status       any            `json:"program_status,omitempty"`
 		Foreground   *block.Process `json:"foreground,omitempty"`
@@ -1038,7 +1039,7 @@ func (s *Server) registerAgentMethods() {
 						continue
 					}
 					a := *rr.st.Agent
-					row := agentRow{BlockID: bid, SessionID: ss.ID, SessionLabel: ss.Label, Label: rr.st.Label,
+					row := agentRow{BlockID: bid, SessionID: ss.ID, SessionLabel: ss.Label, Label: rr.st.Label, Title: rr.st.Title,
 						Agent: &a, Foreground: rr.st.Foreground}
 					if w := ss.WindowOf(bid); w != nil {
 						row.WindowID = w.ID

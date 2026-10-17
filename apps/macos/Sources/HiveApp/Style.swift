@@ -14,6 +14,7 @@ struct Style: Equatable {
     /// Honey: focus, active tab, working agents.
     var accent: NSColor
     var blocked: NSColor, done: NSColor
+    var sidebar: NSColor
     var terminal: Theme
 
     /// "Hive Night": warm charcoal, Tomorrow Night terminal colors.
@@ -22,7 +23,7 @@ struct Style: Equatable {
         windowTop: hex(0x141317), windowBottom: hex(0x0F0E12),
         card: hex(0x1B1A1F), cardUnfocused: hex(0x17161A),
         text: hex(0xECE8E1), secondary: hex(0x8D877E), border: hex(0x2B2930), tabActive: hex(0x26242B),
-        accent: hex(0xF2A93B), blocked: hex(0xE5645B), done: hex(0x7DBE8F),
+        accent: hex(0xF2A93B), blocked: hex(0xE5645B), done: hex(0x7DBE8F), sidebar: hex(0x111014),
         terminal: Theme(
             foreground: RGB(0xE3, 0xDF, 0xD8), background: RGB(0x1B, 0x1A, 0x1F), cursor: RGB(0xF2, 0xA9, 0x3B),
             selection: RGB(0x3A, 0x33, 0x26),
@@ -34,7 +35,7 @@ struct Style: Equatable {
         windowTop: hex(0xF4EFE6), windowBottom: hex(0xEDE6D9),
         card: hex(0xFDFBF7), cardUnfocused: hex(0xF6F2EA),
         text: hex(0x231F1A), secondary: hex(0x8C8478), border: hex(0xE4DCCD), tabActive: hex(0xFFFFFF),
-        accent: hex(0xD98A12), blocked: hex(0xD24E45), done: hex(0x4E9A64),
+        accent: hex(0xD98A12), blocked: hex(0xD24E45), done: hex(0x4E9A64), sidebar: hex(0xEFE8DC),
         terminal: Theme(
             foreground: RGB(0x23, 0x1F, 0x1A), background: RGB(0xFD, 0xFB, 0xF7), cursor: RGB(0xD9, 0x8A, 0x12),
             selection: RGB(0xF6, 0xE3, 0xBF),

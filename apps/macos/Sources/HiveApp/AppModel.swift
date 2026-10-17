@@ -38,6 +38,14 @@ indirect enum Layout: Equatable {
     }
 }
 
+extension ISO8601DateFormatter {
+    static let hive: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+}
+
 struct WindowInfo: Identifiable, Equatable {
     let id: String
     var label: String
@@ -62,6 +70,15 @@ struct AgentInfo: Identifiable, Equatable {
     var state: String
     var message: String
     var cwd: String
+    var title: String = ""
+    var updatedAt: Date?
+
+    /// The task the agent is on, from its title, else the harness name.
+    var task: String {
+        let t = title.drop { !$0.isLetter && !$0.isNumber }.trimmingCharacters(in: .whitespaces)
+        let name = BlockInfo.harnessNames[harness] ?? harness.capitalized
+        return t.isEmpty || t == name ? name : t
+    }
 }
 
 struct BlockInfo: Equatable {
@@ -145,6 +162,10 @@ final class AppModel: ObservableObject {
     @Published var activeWindow: String?
     @Published var blocks: [String: BlockInfo] = [:]
     @Published var style: Style = .light
+    /// The agents sidebar (the reference app's vertical tabs, organized around agents).
+    @Published var sidebar = UserDefaults.standard.bool(forKey: "sidebar") {
+        didSet { UserDefaults.standard.set(sidebar, forKey: "sidebar") }
+    }
     @Published var host = Host.current().localizedName ?? "This Mac"
     var clientID: String?
 
@@ -269,7 +290,8 @@ final class AppModel: ObservableObject {
                 AgentInfo(blockID: a["block_id"].string ?? "", sessionID: a["session_id"].string ?? "",
                           sessionLabel: a["session_label"].string ?? "", harness: a["agent"]["harness"].string ?? "",
                           state: a["agent"]["state"].string ?? "", message: a["agent"]["message"].string ?? "",
-                          cwd: a["agent"]["cwd"].string ?? "")
+                          cwd: a["agent"]["cwd"].string ?? "", title: a["title"].string ?? "",
+                          updatedAt: a["agent"]["updated_at"].string.flatMap { ISO8601DateFormatter.hive.date(from: $0) })
             }
             let order = ["blocked": 0, "done": 1, "working": 2, "idle": 3]
             agents = list.sorted { (order[$0.state] ?? 9) < (order[$1.state] ?? 9) }
