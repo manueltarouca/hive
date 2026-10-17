@@ -1,0 +1,43 @@
+/* hive: the reference's scale and restraint, hive's own palette. */
+@font-face { font-family: Inter; src: url('./lib/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: Inter; src: url('./lib/fonts/InterVariable-Italic.woff2') format('woff2'); font-weight: 100 900; font-style: italic; font-display: swap; }
+@font-face { font-family: 'JetBrains Mono'; src: url('./lib/fonts/JetBrainsMono-Regular.ttf') format('truetype'); font-display: swap; }
+
+:root {
+  --paper: #f6f2ea;
+  --card: #fdfbf7;
+  --ink: #231f1a;
+  --ink-62: rgb(35 31 26 / 0.64);
+  --muted: #a39b8f;
+  --rule: rgb(35 31 26 / 0.12);
+  --tint: rgb(35 31 26 / 0.05);
+  --honey: #d98a12;
+  --honey-soft: rgb(217 138 18 / 0.14);
+  --sans: Inter, -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #141317;
+    --card: #1b1a1f;
+    --ink: #ece8e1;
+    --ink-62: rgb(236 232 225 / 0.66);
+    --muted: #7d776f;
+    --rule: rgb(236 232 225 / 0.12);
+    --tint: rgb(236 232 225 / 0.06);
+    --honey: #f2a93b;
+    --honey-soft: rgb(242 169 59 / 0.16);
+    color-scheme: dark;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body { margin: 0; font: 300 16px/1.5 var(--sans); font-feature-settings: 'cv11', 'ss01'; }
+a { color: inherit; }
+::selection { background: var(--honey-soft); }
+img { max-width: 100%; display: block; }
+code, pre, kbd { font-family: var(--mono); }

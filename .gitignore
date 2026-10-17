@@ -1,7 +1,10 @@
-bin/
-third_party/
 .envrc.local
+*.xcodeproj/xcuserdata/
 apps/macos/.build/
 apps/macos/.swiftpm/
-*.xcodeproj/xcuserdata/
 apps/macos/build/
+bin/
+site/.svelte-kit/
+site/build/
+site/node_modules/
+third_party/

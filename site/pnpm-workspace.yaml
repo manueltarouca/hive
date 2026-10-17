@@ -1,0 +1,2 @@
+# Supply-chain hygiene: never install a version published in the last day.
+minimumReleaseAge: 1440

@@ -1,0 +1,21 @@
+{
+  "name": "hive-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "4.0.0",
+    "@sveltejs/kit": "3.1.0",
+    "@sveltejs/vite-plugin-svelte": "latest",
+    "marked": "18.1.1",
+    "svelte": "5.57.2",
+    "vite": "latest"
+  },
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  }
+}
