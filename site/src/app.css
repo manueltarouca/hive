@@ -8,7 +8,7 @@
   --card: #fdfbf7;
   --ink: #231f1a;
   --ink-62: rgb(35 31 26 / 0.64);
-  --muted: #a39b8f;
+  --muted: #8c8478;
   --rule: rgb(35 31 26 / 0.12);
   --tint: rgb(35 31 26 / 0.05);
   --honey: #d98a12;
@@ -21,13 +21,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #141317;
-    --card: #1b1a1f;
-    --ink: #ece8e1;
-    --ink-62: rgb(236 232 225 / 0.66);
-    --muted: #7d776f;
-    --rule: rgb(236 232 225 / 0.12);
-    --tint: rgb(236 232 225 / 0.06);
+    /* Tomorrow Night, as in the app's dark mode (see BRAND.md). */
+    --paper: #1d1f21;
+    --card: #282c34;
+    --ink: #e2e3e1;
+    --ink-62: rgb(197 200 198 / 0.9);
+    --muted: #969896;
+    --rule: rgb(197 200 198 / 0.14);
+    --tint: rgb(197 200 198 / 0.07);
     --honey: #f2a93b;
     --honey-soft: rgb(242 169 59 / 0.16);
     color-scheme: dark;

@@ -170,6 +170,10 @@ hive stands on [Ghostty](https://ghostty.org)'s terminal engine, and uses
 [JetBrains Mono](https://www.jetbrains.com/lp/mono/) and
 [Inter](https://rsms.me/inter/).
 
+## Brand
+
+The mark, colours, type and voice are in [BRAND.md](BRAND.md).
+
 ## License
 
 [MIT](LICENSE)

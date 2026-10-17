@@ -13,3 +13,6 @@ pixel ratio of 2, take a screenshot, and scale it down:
 | `.github/assets/social-preview.jpg` | 1280×640 | GitHub's social preview (upload it in the repo settings) |
 
 The layout uses viewport units, so the same file works at both sizes.
+
+`brand-sheet.html` is the image at the top of `BRAND.md`. Capture it the
+same way at 1600×848, then save it as `.github/assets/brand/sheet.webp`.

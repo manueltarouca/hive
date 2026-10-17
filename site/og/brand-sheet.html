@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- hive's brand on one page, for BRAND.md. Capture at 1600×848, device
+     pixel ratio 2 (see README.md here). Values match the app (Style.swift),
+     the site (app.css) and the icon (icon.swift). -->
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Inter; src: url(../src/lib/fonts/InterVariable.woff2) format('woff2'); font-weight: 100 900; }
+  @font-face { font-family: 'JetBrains Mono'; src: url(../src/lib/fonts/JetBrainsMono-Regular.ttf); }
+  html, body { margin: 0; }
+  body { width: 1600px; height: 848px; background: #f6f2ea; color: #231f1a; font: 400 15px/1.4 Inter, sans-serif;
+         -webkit-font-smoothing: antialiased; display: grid; grid-template-columns: 560px 1fr; }
+  .night { background: #1d1f21; color: #c5c8c6; }
+  section { padding: 56px; }
+  .label { font-size: 13px; letter-spacing: 0.02em; color: #8c8478; margin: 0 0 14px; text-transform: uppercase; }
+  .night .label { color: #969896; }
+  .night .sw i { box-shadow: inset 0 0 0 1px rgb(197 200 198 / 0.22); }
+  .mark { display: flex; align-items: center; gap: 18px; margin-bottom: 44px; }
+  .mark img { width: 96px; height: 96px; }
+  .mark b { font: 600 64px/1 Inter; letter-spacing: -0.035em; }
+  .icon { display: flex; align-items: end; gap: 22px; margin-bottom: 44px; }
+  .icon img:nth-child(1) { width: 160px; } .icon img:nth-child(2) { width: 64px; } .icon img:nth-child(3) { width: 32px; } .icon img:nth-child(4) { width: 16px; }
+  .swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 36px; }
+  .sw i { display: block; height: 64px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(35 31 26 / 0.14); margin-bottom: 8px; }
+  .sw b { display: block; font-weight: 500; font-size: 13px; }
+  .sw span { font: 12px/1.3 'JetBrains Mono', monospace; opacity: 0.75; }
+  .status { display: flex; gap: 28px; margin-bottom: 36px; font-size: 14px; }
+  .status div { display: flex; align-items: center; gap: 8px; }
+  .hex { width: 14px; height: 14px; clip-path: polygon(50% 0, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%); }
+  .type h1 { font: 500 34px/1.15 Inter; letter-spacing: -0.02em; margin: 0 0 10px; }
+  .type h1 span { color: #f2a93b; }
+  .type h1 + p { margin: 0 0 18px; font-weight: 300; font-size: 19px; letter-spacing: -0.01em; color: rgb(197 200 198 / 0.9); }
+  .type code { font: 14px/1.6 'JetBrains Mono', monospace; color: #fff; background: #282c34; border: 1px solid #373b41; border-radius: 10px; padding: 12px 16px; display: block; }
+  .type code em { color: #969896; font-style: normal; }
+  .day h2 { font: 500 26px/1.15 Inter; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .day h2 span { color: #d98a12; }
+  .day h2 + p { margin: 0; font-weight: 300; font-size: 17px; color: rgb(35 31 26 / 0.64); }
+</style>
+
+<section class="day">
+  <p class="label">Mark</p>
+  <div class="mark"><img src="../../.github/assets/brand/mark-on-light.svg" alt=""><b>hive</b></div>
+  <p class="label">App icon at 160, 64, 32 and 16 px</p>
+  <div class="icon">
+    <img src="../../.github/assets/brand/icon-512.png" alt=""><img src="../../.github/assets/brand/icon-512.png" alt=""><img src="../../.github/assets/brand/icon-512.png" alt=""><img src="../../.github/assets/brand/icon-512.png" alt="">
+  </div>
+  <p class="label">Hive Day</p>
+  <div class="swatches">
+    <div class="sw"><i style="background:#d98a12"></i><b>Honey</b><span>#D98A12</span></div>
+    <div class="sw"><i style="background:#f6f2ea"></i><b>Paper</b><span>#F6F2EA</span></div>
+    <div class="sw"><i style="background:#fdfbf7"></i><b>Card</b><span>#FDFBF7</span></div>
+    <div class="sw"><i style="background:#231f1a"></i><b>Ink</b><span>#231F1A</span></div>
+    <div class="sw"><i style="background:#8c8478"></i><b>Muted</b><span>#8C8478</span></div>
+  </div>
+  <div class="status">
+    <div><i class="hex" style="background:#d98a12"></i>Working</div>
+    <div><i class="hex" style="background:#d24e45"></i>Blocked</div>
+    <div><i class="hex" style="background:#4e9a64"></i>Done</div>
+  </div>
+  <h2>Sessions that survive restarts. <span>Agents you can see.</span></h2>
+  <p>Inter for words. JetBrains Mono for terminals and code.</p>
+</section>
+
+<section class="night">
+  <p class="label">Mark on night</p>
+  <div class="mark"><img src="../../.github/assets/brand/mark-on-dark.svg" alt=""><b style="color:#e2e3e1">hive</b></div>
+  <p class="label">Hive Night: Tomorrow Night surfaces, honey accent</p>
+  <div class="swatches">
+    <div class="sw"><i style="background:#f2a93b"></i><b>Honey</b><span>#F2A93B</span></div>
+    <div class="sw"><i style="background:#1d1f21"></i><b>Night</b><span>#1D1F21</span></div>
+    <div class="sw"><i style="background:#282c34"></i><b>Surface</b><span>#282C34</span></div>
+    <div class="sw"><i style="background:#373b41"></i><b>Line</b><span>#373B41</span></div>
+    <div class="sw"><i style="background:#c5c8c6"></i><b>Text</b><span>#C5C8C6</span></div>
+  </div>
+  <div class="status">
+    <div><i class="hex" style="background:#f2a93b"></i>Working</div>
+    <div><i class="hex" style="background:#cc6666"></i>Blocked</div>
+    <div><i class="hex" style="background:#b5bd68"></i>Done</div>
+  </div>
+  <div class="type">
+    <p class="label">Type</p>
+    <h1>A terminal multiplexer for <span>agent-heavy work.</span></h1>
+    <p>Short sentences. Common words. Only what exists.</p>
+    <code>hive -s work run --label tests --wait -- go test ./... <em># exits with the tests' status</em></code>
+  </div>
+</section>

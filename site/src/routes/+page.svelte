@@ -116,7 +116,7 @@ make vt build
            background: linear-gradient(160deg, #f6d9a3 0%, #f3e6d1 48%, #efe9df 100%); }
   .panel img { position: absolute; top: 50%; left: 8%; width: 165%; max-width: none; height: auto; transform: translateY(-50%); }
   @media (prefers-color-scheme: dark) {
-    .panel { background: linear-gradient(160deg, #3b2c17 0%, #1e1b1f 52%, #151418 100%); }
+    .panel { background: linear-gradient(160deg, #3d3020 0%, #26282d 52%, #1d1f21 100%); }
   }
   header { margin-bottom: 18vh; }
 
