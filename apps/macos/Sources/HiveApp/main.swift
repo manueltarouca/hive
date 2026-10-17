@@ -1,4 +1,5 @@
 import AppKit
+import HiveCore
 import Combine
 import HiveRender
 import SwiftUI
@@ -49,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let palette = PalettePanel()
     var bag: Set<AnyCancellable> = []
     var appearanceObserver: NSKeyValueObservation?
+    var appearanceItems: [(Appearance, NSMenuItem)] = []
 
     func applicationDidFinishLaunching(_ note: Notification) {
         let scale = NSScreen.main?.backingScaleFactor ?? 2
@@ -103,9 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self?.panes.claimSizes()
             }
         }.store(in: &bag)
-        followSystemAppearance()
-
         buildMenu()
+        followSystemAppearance()
         window.makeKeyAndOrderFront(nil)
         if ProcessInfo.processInfo.environment["HIVE_DEBUG"] != nil, let b = window.standardWindowButton(.closeButton) {
             let f = b.convert(b.bounds, to: nil)
@@ -138,15 +139,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: appearance
 
     private func followSystemAppearance() {
-        let update = { [weak self] in
-            guard let self else { return }
-            let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let s: Style = ProcessInfo.processInfo.environment["HIVE_STYLE"] == "light" ? .light
-                : ProcessInfo.processInfo.environment["HIVE_STYLE"] == "dark" ? .dark : (dark ? .dark : .light)
-            if model.style != s { model.style = s }
+        updateAppearance()
+        appearanceObserver = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in Task { @MainActor in self?.updateAppearance() } }
+        model.$appearance.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.updateAppearance() } }.store(in: &bag)
+    }
+
+    /// Applies the theme setting. Day and Night set the app's appearance, so
+    /// alerts, menus and panels follow too; System leaves it to macOS.
+    private func updateAppearance() {
+        let env = ProcessInfo.processInfo.environment["HIVE_STYLE"]
+        let forced = env == "dark" || env == "light" || model.appearance != .system
+        if !forced, NSApp.appearance != nil { NSApp.appearance = nil }
+        let systemDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let night = model.appearance.isNight(env: env, systemDark: systemDark)
+        if forced {
+            let want = NSAppearance(named: night ? .darkAqua : .aqua)
+            if NSApp.appearance?.name != want?.name { NSApp.appearance = want }
         }
-        update()
-        appearanceObserver = NSApp.observe(\.effectiveAppearance) { _, _ in Task { @MainActor in update() } }
+        let s: Style = night ? .dark : .light
+        if model.style != s { model.style = s }
+        for (a, item) in appearanceItems { item.state = a == model.appearance ? .on : .off }
     }
 
     private func applyStyle(_ s: Style) {
@@ -212,7 +224,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             PaletteItem(title: "Previous Tab", detail: "⇧⌘[", symbol: "arrow.left") { m.selectWindow(offset: -1) },
             PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
-        ]
+        ] + Appearance.allCases.map { a in
+            PaletteItem(title: "Theme: \(a.title)", symbol: a == .night ? "moon" : a == .day ? "sun.max" : "circle.lefthalf.filled",
+                        checked: m.appearance == a) { m.appearance = a }
+        }
     }
 
     private func prompt(_ title: String, _ value: String, done: @escaping (String) -> Void) {
@@ -257,7 +272,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSMenuItem(title: "About Hive", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""),
             .separator(),
             item("Command Palette…", "p", [.command, .shift]) { [weak self] in self?.showPalette() },
-            item("Toggle Agents Sidebar", "s", [.command, .shift]) { m.sidebar.toggle() },
             .separator(),
             NSMenuItem(title: "Hide Hive", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"),
             NSMenuItem(title: "Quit Hive", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"),
@@ -276,6 +290,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSMenuItem(title: "Copy", action: #selector(PaneView.copy(_:)), keyEquivalent: "c"),
             NSMenuItem(title: "Paste", action: #selector(PaneView.paste(_:)), keyEquivalent: "v"),
         ])
+        appearanceItems = Appearance.allCases.map { a in (a, item(a.title, "") { m.appearance = a }) }
+        menu("View", [item("Toggle Agents Sidebar", "s", [.command, .shift]) { m.sidebar.toggle() }, .separator()]
+             + appearanceItems.map(\.1))
         var paneItems: [NSMenuItem] = [item("Zoom Pane", "\r", [.command, .shift]) { m.toggleZoom() }, .separator()]
         for (name, key) in arrows {
             paneItems.append(item("Focus \(name)", key, [.command, .option]) { m.focus(name.lowercased()) })

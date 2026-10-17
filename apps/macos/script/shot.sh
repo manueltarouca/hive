@@ -45,6 +45,10 @@ sleep 2
 suite=xyz.matm.hive.shots
 defaults delete "$suite" >/dev/null 2>&1 || true
 [ "${SIDEBAR:-0}" = 1 ] && defaults write "$suite" sidebar -bool true
+# APPEARANCE=system|day|night stores the theme setting. Use the style
+# "system" to test it: then HIVE_STYLE isn't set and the setting decides.
+[ -n "${APPEARANCE:-}" ] && defaults write "$suite" appearance -string "$APPEARANCE"
+envstyle="$style"; [ "$style" = system ] && envstyle=""
 # Start our own copy of the app and track its PID, so we never touch a Hive
 # window the maintainer is using. `open -n` makes it the active app, as a real launch
 # would; the PID comes from the log file only our copy has open. Leave
@@ -57,7 +61,7 @@ cleanup() {
   "$H" server stop >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
-open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
+open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$envstyle" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
   --stdout "$out/app.log" --stderr "$out/app.log" "$here/build/Hive.app"
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   app=$(lsof -t "$out/app.log" 2>/dev/null | head -1)

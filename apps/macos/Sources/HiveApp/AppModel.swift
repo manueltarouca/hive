@@ -181,6 +181,10 @@ final class AppModel: ObservableObject {
     @Published var activeWindow: String?
     @Published var blocks: [String: BlockInfo] = [:]
     @Published var style: Style = .light
+    /// The theme: Hive Day, Hive Night, or follow macOS.
+    @Published var appearance = Appearance(stored: AppModel.defaults.string(forKey: "appearance")) {
+        didSet { AppModel.defaults.set(appearance.rawValue, forKey: "appearance") }
+    }
     /// The agents sidebar: vertical tabs, organized around agents.
     @Published var sidebar = AppModel.defaults.bool(forKey: "sidebar") {
         didSet { AppModel.defaults.set(sidebar, forKey: "sidebar") }
