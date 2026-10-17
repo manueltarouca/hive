@@ -17,7 +17,7 @@ struct TitleBar: View {
         let s = model.style
         HStack(spacing: 10) {
             if !model.sidebar {
-                BarButton(symbol: "sidebar.left", help: "Show agents (⇧⌘S)", style: s) { model.sidebar = true }
+                BarButton(symbol: "sidebar.left", help: "Show sidebar (⇧⌘S)", style: s) { model.sidebar = true }
                     .padding(.trailing, -4)
             }
             SessionChip(model: model, action: openPicker)
@@ -90,15 +90,21 @@ struct Tabs: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
+        // Pills share the room between the chip and the buttons: they shrink
+        // (their titles fade) rather than push the chip or the buttons out.
         HStack(spacing: 4) {
             ForEach(Array(model.windows.enumerated()), id: \.element.id) { i, w in
                 TabPill(model: model, window: w, index: i, active: w.id == model.active?.id)
             }
         }
+        .frame(minWidth: 0, alignment: .leading)
+        .clipped()
     }
 }
 
 struct TabPill: View {
+    /// The icon and a few letters.
+    static let minWidth: CGFloat = 64
     @ObservedObject var model: AppModel
     let window: WindowInfo
     let index: Int
@@ -118,18 +124,24 @@ struct TabPill: View {
                     .foregroundStyle(active ? s.accent.swiftUI : s.secondary.swiftUI)
             }
             .frame(width: 20, height: 16)
-            (Text(parts.primary).foregroundColor(active ? s.text.swiftUI : s.secondary.swiftUI)
-                + Text(parts.secondary.isEmpty ? "" : " " + parts.secondary).foregroundColor(s.secondary.swiftUI.opacity(0.8)))
-                .font(.system(size: 12.5, weight: active ? .medium : .regular))
-                .lineLimit(1)
-                .fixedSize()                      // never an ellipsis…
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading) // minWidth 0: may be narrower than the text
-                .clipped()
-                .mask(FadeMask())                 // …the end fades instead
+            let name = Text(parts.primary).foregroundColor(active ? s.text.swiftUI : s.secondary.swiftUI)
+            let font = Font.system(size: 12.5, weight: active ? .medium : .regular)
+            // Name and folder if they fit, else the name, else the name fading
+            // out: never an ellipsis, and never a stray faded folder.
+            ViewThatFits(in: .horizontal) {
+                (name + Text(parts.secondary.isEmpty ? "" : " " + parts.secondary).foregroundColor(s.secondary.swiftUI.opacity(0.8)))
+                    .font(font).lineLimit(1).fixedSize()
+                name.font(font).lineLimit(1).fixedSize()
+                name.font(font).lineLimit(1).fixedSize()
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading) // may be narrower than the text
+                    .clipped()
+                    .mask(FadeMask())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             if let status { StatusBadge(state: status == "blocked" ? "blocked-dot" : status, style: s) }
         }
         .padding(.leading, 6).padding(.trailing, 10)
-        .frame(width: 210, height: 28, alignment: .leading)
+        .frame(minWidth: TabPill.minWidth, maxWidth: 210, minHeight: 28, maxHeight: 28, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(active ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear))

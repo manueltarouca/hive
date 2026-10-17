@@ -41,6 +41,10 @@ done_b=$($H -s api-gateway split --json --cwd "$root" -- sh -c 'printf "\033]2;â
 printf '{"session_id":"a2","cwd":"%s","hook_event_name":"Stop"}' "$root" | HIVE_BLOCK=$done_b $H agent hook claude
 sleep 2
 
+# EXTRA_TABS=n adds plain tabs, to check the title bar with many tabs.
+i=1; while [ "$i" -le "${EXTRA_TABS:-0}" ]; do  # not seq: on macOS, seq 1 0 counts down
+  $H -s hive-demo run --label "extra-tab-$i" --focus=false >/dev/null; i=$((i + 1))
+done
 # The app keeps its preferences in a separate suite for these runs.
 suite=xyz.matm.hive.shots
 defaults delete "$suite" >/dev/null 2>&1 || true
