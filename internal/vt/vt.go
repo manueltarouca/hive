@@ -71,10 +71,11 @@ type Term struct {
 	t       *ghostty.Terminal
 	hooks   Hooks
 
-	cols, rows uint16
-	pending    []func()
-	reply      []byte
-	closed     bool
+	cols, rows   uint16
+	cellW, cellH uint32
+	pending      []func()
+	reply        []byte
+	closed       bool
 }
 
 // Options for a new terminal.
@@ -125,7 +126,7 @@ func wrap(t *ghostty.Terminal, hooks Hooks) (*Term, error) {
 		t.Close()
 		return nil, err
 	}
-	vt := &Term{t: t, hooks: hooks, cols: cols, rows: rows}
+	vt := &Term{t: t, hooks: hooks, cols: cols, rows: rows, cellW: 8, cellH: 16}
 	vt.install()
 	return vt, nil
 }
@@ -148,7 +149,7 @@ func (v *Term) install() {
 		return da, true
 	})
 	t.SetEffectSize(func(*ghostty.Terminal) (ghostty.SizeReportSize, bool) {
-		return ghostty.SizeReportSize{Rows: v.rows, Columns: v.cols, CellWidth: 8, CellHeight: 16}, true
+		return ghostty.SizeReportSize{Rows: v.rows, Columns: v.cols, CellWidth: v.cellW, CellHeight: v.cellH}, true
 	})
 	t.SetEffectColorScheme(func(*ghostty.Terminal) (ghostty.ColorScheme, bool) {
 		return ghostty.ColorSchemeDark, true
@@ -292,15 +293,34 @@ func (v *Term) Feed(data []byte) {
 	})
 }
 
-// Resize changes the terminal's size in cells.
+// Resize changes the terminal's size in cells, keeping the cell size.
 func (v *Term) Resize(cols, rows uint16) error {
+	v.mu.Lock()
+	cw, ch := v.cellW, v.cellH
+	v.mu.Unlock()
+	return v.ResizePx(cols, rows, cw, ch)
+}
+
+// ResizePx changes the size in cells and the size of a cell in pixels, which
+// programs can ask for (CSI 14 t, SGR-pixel mouse reports).
+func (v *Term) ResizePx(cols, rows uint16, cellW, cellH uint32) error {
+	if cellW == 0 || cellH == 0 {
+		cellW, cellH = 8, 16
+	}
 	return v.do(func(t *ghostty.Terminal) error {
-		if err := t.Resize(cols, rows, 8, 16); err != nil {
+		if err := t.Resize(cols, rows, cellW, cellH); err != nil {
 			return err
 		}
-		v.cols, v.rows = cols, rows
+		v.cols, v.rows, v.cellW, v.cellH = cols, rows, cellW, cellH
 		return nil
 	})
+}
+
+// CellSize returns the size of a cell in pixels.
+func (v *Term) CellSize() (w, h uint32) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.cellW, v.cellH
 }
 
 // Size returns the terminal's size in cells.

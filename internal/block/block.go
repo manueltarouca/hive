@@ -50,6 +50,11 @@ type Frame struct {
 	Seq     uint64 // byte offset of Data[0] in the block's output
 	Data    []byte
 	Resync  bool // the subscriber fell behind; re-attach for a new snapshot
+	// Resize marks where in the stream the terminal was resized. A mirror
+	// applies it before the bytes that follow.
+	Resize       bool
+	Cols, Rows   uint16
+	CellW, CellH uint16
 }
 
 // Sub is one attached subscriber.
@@ -437,18 +442,38 @@ func (b *Block) SendKey(name string) error {
 	return b.Write(data)
 }
 
-// Resize changes the size of the terminal and the pseudo-terminal.
+// Resize changes the size of the terminal and the pseudo-terminal, keeping
+// the cell size.
 func (b *Block) Resize(cols, rows uint16) error {
+	cw, ch := b.term.CellSize()
+	return b.ResizePx(cols, rows, cw, ch)
+}
+
+// ResizePx changes the size in cells and the cell size in pixels. The
+// resize is published in the output stream at its position, before the
+// program learns of it, so mirrors reflow at the same point.
+func (b *Block) ResizePx(cols, rows uint16, cellW, cellH uint32) error {
 	if cols == 0 || rows == 0 {
 		return errors.New("size must be at least 1x1")
 	}
+	if cellW == 0 || cellH == 0 {
+		cellW, cellH = b.term.CellSize()
+	}
 	b.pubMu.Lock()
 	defer b.pubMu.Unlock()
-	if err := b.term.Resize(cols, rows); err != nil {
+	if err := b.term.ResizePx(cols, rows, cellW, cellH); err != nil {
 		return err
 	}
-	return pty.Setsize(b.ptmx, &pty.Winsize{Cols: cols, Rows: rows})
+	f := Frame{BlockID: b.ID, Seq: b.seq, Resize: true, Cols: cols, Rows: rows, CellW: uint16(cellW), CellH: uint16(cellH)}
+	for s := range b.subs {
+		publish(s, f)
+	}
+	return pty.Setsize(b.ptmx, &pty.Winsize{Cols: cols, Rows: rows,
+		X: uint16(uint32(cols) * cellW), Y: uint16(uint32(rows) * cellH)})
 }
+
+// CellSize returns the size of a cell in pixels.
+func (b *Block) CellSize() (w, h uint32) { return b.term.CellSize() }
 
 // Size returns the terminal's size in cells.
 func (b *Block) Size() (cols, rows uint16) { return b.term.Size() }

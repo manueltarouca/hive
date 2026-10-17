@@ -365,6 +365,7 @@ func (s *Server) registerMethods() {
 		Ratio     float64     `json:"ratio,omitempty" desc:"The new part's share, 0 to 1. Default 0.5."`
 		Focus     *bool       `json:"focus,omitempty" desc:"Focus the new block. Default true."`
 		Layout    *LayoutSpec `json:"layout,omitempty" desc:"The blocks to create. Default: one shell."`
+		sizeIn
 	}
 	api.Register(r, "session.new_split", "Create a split beside an existing block.",
 		func(ctx context.Context, in newSplitIn) (newOut, error) {
@@ -391,6 +392,11 @@ func (s *Server) registerMethods() {
 			ac, ar, nc, nr := splitSize(dir, 1-newShare, cols, rows)
 			if !after {
 				nc, nr, ac, ar = splitSize(dir, newShare, cols, rows)
+			}
+			// A client that knows the pixel geometry passes the new part's
+			// size, so it doesn't start at a guess and reflow at once.
+			if in.Cols > 0 && in.Rows > 0 {
+				nc, nr = in.Cols, in.Rows
 			}
 			sub, blocks, splits, err := s.buildLayout(ss.ID, in.Layout, nc, nr)
 			if err != nil {
@@ -806,6 +812,8 @@ func (s *Server) registerTerminalMethods() {
 			a, err := args[struct {
 				Cols     uint16 `json:"cols"`
 				Rows     uint16 `json:"rows"`
+				CellW    uint32 `json:"cell_width_px"`
+				CellH    uint32 `json:"cell_height_px"`
 				ClientID string `json:"client_id"`
 				Take     bool   `json:"take"`
 			}](raw)
@@ -824,11 +832,13 @@ func (s *Server) registerTerminalMethods() {
 			}
 			r.owner = who
 			s.mu.Unlock()
-			if err := r.b.Resize(a.Cols, a.Rows); err != nil {
+			if err := r.b.ResizePx(a.Cols, a.Rows, a.CellW, a.CellH); err != nil {
 				return nil, api.BadRequest("%v", err)
 			}
+			cw, ch := r.b.CellSize()
 			s.mu.Lock()
-			s.bus.Block(r.st.SessionID, r.b.ID, "size_changed", map[string]any{"cols": a.Cols, "rows": a.Rows, "size_owner": who})
+			s.bus.Block(r.st.SessionID, r.b.ID, "size_changed", map[string]any{"cols": a.Cols, "rows": a.Rows,
+				"cell_width_px": cw, "cell_height_px": ch, "size_owner": who})
 			s.mu.Unlock()
 			s.markDirty()
 			return map[string]any{"cols": a.Cols, "rows": a.Rows, "size_owner": who}, nil

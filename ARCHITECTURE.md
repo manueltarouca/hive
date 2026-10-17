@@ -265,6 +265,60 @@ Line Tools.
 2. IME and dead keys.
 3. Notarization later needs Xcode (installing) and a Developer ID.
 
+## M2: adopted from the plan review (2026-10-17)
+
+These win over the M2 draft above where they conflict.
+
+1. **Resize is sequenced in the output stream.** Binary frame kind 3
+   `[3][idlen][id][seq][cols u16][rows u16][cell_w u16][cell_h u16]` is
+   emitted inside `Block.Resize`, under the output lock, before the PTY
+   resize. The mirror resizes exactly at that seq.
+2. **One serial queue `hive.vt` owns libghostty.** It owns every mirror,
+   RenderState and render-hold callback, and the `NWConnection` runs on that
+   queue. After each write batch it publishes an immutable
+   `PaneFrame` (cells, cursor, selection, colors) and `InputModes` (kitty
+   flags, DECCKM, keypad, bracketed paste, mouse tracking/format) to the main
+   thread. The renderer and key encoder never touch libghostty.
+3. **Mirror write-back.** `write_pty` drops bytes during `vt_write` and
+   captures them during `paste`; the capture is sent as input. The reply
+   callbacks are NULL. Clipboard comes from the `clipboard_written` event.
+4. **Server protocol additions:**
+   - `events_subscribed{seq}` and `events_resync` on gap
+   - errors carry `block_id` and the request `type`
+   - real cell pixel sizes in `resize` / `size_changed`
+   - `new_split` / `new_window` accept `cols` / `rows`
+   - `input.data_base64`
+5. **Size authority:** taken on key focus or interaction. The owner resizes
+   freely; others letterbox but still apply resize frames.
+6. **WebSocket:** one hand-rolled RFC 6455 client over `NWConnection` (unix
+   now, TCP/TLS in M4). It handles bytes trailing the 101, frames spanning
+   reads, 64-bit lengths, ping/close, and sends no extensions.
+7. **Render holds (mode 2026):** honored via the render-hold callback, with
+   a 1 s timeout.
+8. **Glyphs:**
+   - a grayscale A8 atlas plus a BGRA color-emoji atlas, 1 px padding,
+     grid-snapped positions
+   - fallback fonts via `CTFontCreateForString`, cached per cluster; real
+     bold faces
+   - procedural box/block/Powerline sprites (U+2500–259F, E0B0–E0B3)
+   - wide cells and spacer tails; the atlas keyed by grapheme cluster
+   - draw on demand (no continuous 120 Hz), triple-buffered instances,
+     dirty rows only
+9. **Included:** client-side scrollback and selection.
+10. **Cut from M2:** command palette, draggable dividers (keyboard resize
+    first).
+
+**Build order:**
+1. server additions
+2. HiveKit WebSocket + protocol
+3. Mirror on the vt queue
+4. offscreen renderer with golden images
+5. a window with one pane, input/IME, then splits, tabs, letterbox, sidebar
+
+**Exit criterion:** a full day of Claude Code in Hive.app, covering
+shift+enter, multi-line paste, scroll, copy, resize reflow, splits, and an
+app restart that reattaches with scrollback, with zero `resync` in the log.
+
 ## Building
 
 `make vt` builds libghostty-vt from the pinned Ghostty commit (needs `zig@0.16`).

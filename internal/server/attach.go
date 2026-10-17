@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -42,11 +43,13 @@ import (
 //
 // Server → client, binary frames:
 //
-//	byte 0      kind: 1 = output, 2 = snapshot
+//	byte 0      kind: 1 = output, 2 = snapshot, 3 = resize
 //	bytes 1-2   length of the block ID, big endian
 //	…           the block ID
 //	8 bytes     seq, big endian: the output position of the data's first byte
-//	…           data: output bytes, or a libghostty snapshot
+//	…           data: output bytes, a libghostty snapshot, or for a resize
+//	            cols, rows, cell width px, cell height px (u16 each, big
+//	            endian). A resize applies before any output at a later seq.
 //
 // A subscriber that feeds every output frame after a snapshot, in seq order,
 // into a terminal restored from that snapshot mirrors the server's terminal.
@@ -65,6 +68,7 @@ import (
 const (
 	frameOutput   = 1
 	frameSnapshot = 2
+	frameResize   = 3
 )
 
 type attachMsg struct {
@@ -74,6 +78,9 @@ type attachMsg struct {
 	Key     string          `json:"key,omitempty"`
 	Cols    uint16          `json:"cols,omitempty"`
 	Rows    uint16          `json:"rows,omitempty"`
+	CellW   uint32          `json:"cell_width_px,omitempty"`
+	CellH   uint32          `json:"cell_height_px,omitempty"`
+	Base64  string          `json:"data_base64,omitempty"`
 	Take    bool            `json:"take,omitempty"`
 	ID      int64           `json:"id,omitempty"`
 	Method  string          `json:"method,omitempty"`
@@ -241,6 +248,15 @@ func (c *attachConn) sendErr(e *api.Error) {
 	c.sendJSON(map[string]any{"type": "error", "error": e})
 }
 
+// sendErrFor reports an error about one request, naming its type and block.
+func (c *attachConn) sendErrFor(m attachMsg, e *api.Error) {
+	msg := map[string]any{"type": "error", "error": e, "for": m.Type}
+	if m.BlockID != "" {
+		msg["block_id"] = m.BlockID
+	}
+	c.sendJSON(msg)
+}
+
 func frame(kind byte, blockID string, seq uint64, data []byte) []byte {
 	b := make([]byte, 0, 1+2+len(blockID)+8+len(data))
 	b = append(b, kind)
@@ -248,6 +264,18 @@ func frame(kind byte, blockID string, seq uint64, data []byte) []byte {
 	b = append(b, blockID...)
 	b = binary.BigEndian.AppendUint64(b, seq)
 	return append(b, data...)
+}
+
+func frameFor(f block.Frame) []byte {
+	if f.Resize {
+		var p [8]byte
+		binary.BigEndian.PutUint16(p[0:], f.Cols)
+		binary.BigEndian.PutUint16(p[2:], f.Rows)
+		binary.BigEndian.PutUint16(p[4:], f.CellW)
+		binary.BigEndian.PutUint16(p[6:], f.CellH)
+		return frame(frameResize, f.BlockID, f.Seq, p[:])
+	}
+	return frame(frameOutput, f.BlockID, f.Seq, f.Data)
 }
 
 // ParseFrame splits a binary attach frame. Exported for clients and tests.
@@ -277,20 +305,27 @@ func (c *attachConn) handle(m attachMsg) {
 	case "input", "key":
 		r, err := c.block(m.BlockID)
 		if err == nil {
-			if m.Type == "input" {
-				err = r.b.Write([]byte(m.Data))
-			} else {
+			switch {
+			case m.Type == "key":
 				err = r.b.SendKey(m.Key)
+			case m.Base64 != "":
+				var data []byte
+				if data, err = base64.StdEncoding.DecodeString(m.Base64); err == nil {
+					err = r.b.Write(data)
+				}
+			default:
+				err = r.b.Write([]byte(m.Data))
 			}
 		}
 		if err != nil {
-			c.sendErr(asAPI(err))
+			c.sendErrFor(m, asAPI(err))
 		}
 	case "resize":
-		args, _ := json.Marshal(map[string]any{"cols": m.Cols, "rows": m.Rows, "client_id": c.client.ID, "take": m.Take})
+		args, _ := json.Marshal(map[string]any{"cols": m.Cols, "rows": m.Rows, "client_id": c.client.ID, "take": m.Take,
+			"cell_width_px": m.CellW, "cell_height_px": m.CellH})
 		raw, _ := json.Marshal(blockCall{BlockID: m.BlockID, Args: args})
 		if _, err := c.s.reg.Call(c.ctx, terminalPrefix+"resize", raw); err != nil {
-			c.sendErr(asAPI(err))
+			c.sendErrFor(m, asAPI(err))
 		}
 	case "call":
 		// Calls run on their own, so a slow one (a wait) doesn't hold up
@@ -317,6 +352,10 @@ func (c *attachConn) handle(m attachMsg) {
 		sub := c.s.bus.Subscribe(events.Filter{SessionID: m.SessionID, All: m.All}, since, 1024)
 		c.evs = sub
 		c.mu.Unlock()
+		c.sendJSON(map[string]any{"type": "events_subscribed", "seq": c.s.bus.Seq()})
+		if sub.Gap {
+			c.sendJSON(map[string]any{"type": "events_resync", "reason": "since is older than the event history"})
+		}
 		go func() {
 			for e := range sub.C {
 				c.sendJSON(map[string]any{"type": "event", "event": e})
@@ -326,7 +365,7 @@ func (c *attachConn) handle(m attachMsg) {
 			}
 		}()
 	default:
-		c.sendErr(api.BadRequest("unknown message type %q", m.Type))
+		c.sendErrFor(m, api.BadRequest("unknown message type %q", m.Type))
 	}
 }
 
@@ -347,7 +386,7 @@ func (c *attachConn) block(blockID string) (*rec, error) {
 func (c *attachConn) subscribe(blockID string) {
 	r, err := c.block(blockID)
 	if err != nil {
-		c.sendErr(asAPI(err))
+		c.sendErrFor(attachMsg{Type: "subscribe", BlockID: blockID}, asAPI(err))
 		return
 	}
 	c.mu.Lock()
@@ -384,7 +423,7 @@ func (c *attachConn) subscribe(blockID string) {
 					select {
 					case f := <-sub.C:
 						if !f.Resync {
-							c.send(outMsg{binary: frame(frameOutput, blockID, f.Seq, f.Data)})
+							c.send(outMsg{binary: frameFor(f)})
 						}
 						continue
 					default:
@@ -404,7 +443,7 @@ func (c *attachConn) subscribe(blockID string) {
 					c.mu.Unlock()
 					return
 				}
-				if !c.send(outMsg{binary: frame(frameOutput, blockID, f.Seq, f.Data)}) {
+				if !c.send(outMsg{binary: frameFor(f)}) {
 					return
 				}
 			}
