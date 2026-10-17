@@ -7,7 +7,8 @@ export default defineConfig({
     sveltekit({
       adapter: adapter({ fallback: '404.html' }),
       // GitHub Pages serves the project at /hive.
-      paths: { base: process.env.BASE_PATH ?? '' },
+      // origin: absolute links in prerendered files (llms.txt) use the public address.
+      paths: { base: process.env.BASE_PATH ?? '', origin: process.env.SITE_ORIGIN ?? 'https://manueltarouca.github.io' },
       prerender: { handleHttpError: 'fail' }
     })
   ],
