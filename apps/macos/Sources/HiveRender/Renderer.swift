@@ -42,10 +42,10 @@ struct Uniforms {
 /// cell is at most a background quad, a glyph quad and a decoration quad.
 public final class Renderer {
     public let device: MTLDevice
-    public let fonts: FontSet
+    public private(set) var fonts: FontSet
     let queue: MTLCommandQueue
     let pipeline: MTLRenderPipelineState
-    let atlas: Atlas
+    private(set) var atlas: Atlas
     public var theme: Theme
     public var pixelFormat: MTLPixelFormat
 
@@ -53,6 +53,15 @@ public final class Renderer {
     private var buffers: [MTLBuffer] = []
     private var bufferIndex = 0
     private let inflight = DispatchSemaphore(value: 3)
+
+    /// Changes the font (font-family, font-size): waits for the frames the
+    /// GPU still draws, then swaps the font and its glyph atlas.
+    public func setFonts(_ f: FontSet) {
+        for _ in 0..<3 { inflight.wait() }
+        fonts = f
+        atlas = Atlas(device: device, fonts: f)
+        for _ in 0..<3 { inflight.signal() }
+    }
 
     public init(device: MTLDevice? = nil, fonts: FontSet = FontSet(), theme: Theme = .ghostty,
                 pixelFormat: MTLPixelFormat = .bgra8Unorm) throws {

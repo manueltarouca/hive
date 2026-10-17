@@ -13,6 +13,8 @@ final class SettingsStore: ObservableObject {
     @Published private(set) var fileExists: Bool
     /// The last write that failed, such as a read-only dotfiles checkout.
     @Published var writeError: String?
+    /// Why font-family isn't used (not installed, not monospaced), if so.
+    @Published var fontProblem: String?
 
     private var sources: [DispatchSourceFileSystemObject] = []
     private var pending: DispatchWorkItem?

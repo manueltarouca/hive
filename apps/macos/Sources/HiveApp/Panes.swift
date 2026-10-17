@@ -511,8 +511,8 @@ final class PanesView: NSView {
 
     /// Takes size authority for the visible panes at their current sizes:
     /// on key focus and layout changes, never from a collapsed window.
-    func claimSizes() {
-        guard window?.isKeyWindow ?? false, bounds.width >= 200, bounds.height >= 100 else { return }
+    func claimSizes(force: Bool = false) {
+        guard force || window?.isKeyWindow ?? false, bounds.width >= 200, bounds.height >= 100 else { return }
         layoutSubtreeIfNeeded()
         var sizes: [String: (cols: Int, rows: Int)] = [:]
         for (id, c) in cards { sizes[id] = c.pane.grid }
@@ -527,6 +527,16 @@ final class PanesView: NSView {
     }
 
     func redraw(_ block: String) { cards[block]?.pane.needsDisplay = true }
+
+    /// The font changed: every pane's grid changes size, so lay out again and
+    /// claim the new sizes once.
+    func fontChanged() {
+        sync()
+        for c in cards.values { c.pane.needsDisplay = true }
+        // A deliberate local change: claim even if this window isn't key
+        // (the Settings window usually is).
+        claimSizes(force: true)
+    }
 }
 
 /// Composing text over the cursor's cell: the cell's background, the text on

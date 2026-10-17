@@ -61,7 +61,7 @@ struct SettingsView: View {
                         in: 8...32, step: 0.5) {
                     HStack { Text("Font size"); Spacer(); Text("\(Self.number(s.fontSize)) pt").foregroundStyle(.secondary) }
                 }
-                Text("Font changes apply the next time hive opens.").font(.caption).foregroundStyle(.secondary)
+                if let p = store.fontProblem { Text(p).font(.caption).foregroundStyle(.red) }
             }
             Section("Terminal") {
                 Picker("Bell", selection: Binding(get: { s.bell }, set: { store.set("bell", $0) })) {

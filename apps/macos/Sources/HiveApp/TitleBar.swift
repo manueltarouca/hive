@@ -217,7 +217,7 @@ struct SettingsBanner: View {
     @State private var hover = false
 
     var body: some View {
-        if let text = store.writeError.map({ "Settings: " + $0 }) ?? store.settings.banner {
+        if let text = store.writeError.map({ "Settings: " + $0 }) ?? store.settings.banner ?? store.fontProblem.map({ "Settings: " + $0 }) {
             Button { store.openInEditor() } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10.5))

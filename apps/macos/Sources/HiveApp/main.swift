@@ -56,7 +56,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ note: Notification) {
         let scale = NSScreen.main?.backingScaleFactor ?? 2
-        renderer = try! Renderer(fonts: FontSet(pointSize: 13, scale: scale))
+        let s = model.settings
+        let fonts = FontSet(family: s.fontFamily, pointSize: s.fontSize, scale: scale)
+        model.settingsStore.fontProblem = fonts.problem
+        renderer = try! Renderer(fonts: fonts)
 
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -98,6 +101,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.onFrame = { [weak self] block in self?.panes.redraw(block) }
         model.openSettings = { [weak self] in self?.showSettings() }
         model.onFlash = { [weak self] block in self?.panes.card(block)?.flash() }
+        // font-family and font-size apply live; a burst of changes (the size
+        // stepper) swaps the font and re-sizes the panes once.
+        model.settingsStore.$settings
+            .map { "\($0.fontFamily)\u{1}\($0.fontSize)" }
+            .removeDuplicates()
+            .dropFirst()
+            .debounce(for: .milliseconds(250), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in self?.applyFont() }
+            .store(in: &bag)
         model.contextActions = { [weak self] in self?.paneContextActions() ?? [] }
         model.onLayout = { [weak self] in
             self?.panes.sync()
@@ -232,6 +244,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func toggleShortcuts() { shortcuts.toggle(over: window, style: model.style) }
 
     func showSettings() { settingsWindow.show(model: model) }
+
+    func applyFont() {
+        let s = model.settings
+        let fonts = FontSet(family: s.fontFamily, pointSize: s.fontSize, scale: window.backingScaleFactor)
+        model.settingsStore.fontProblem = fonts.problem
+        renderer.setFonts(fonts)
+        panes.fontChanged()
+        #if DEBUG
+        NSLog("hive font: %@ %.1f -> cell %dx%d", s.fontFamily.isEmpty ? "bundled" : s.fontFamily, s.fontSize,
+              renderer.fonts.cellWidth, renderer.fonts.cellHeight)
+        #endif
+    }
 
     /// The pane's context menu, after Copy and Paste: the menu bar's own
     /// items, so it shows the same keys.

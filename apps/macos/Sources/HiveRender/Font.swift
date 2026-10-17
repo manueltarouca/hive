@@ -12,24 +12,64 @@ public final class FontSet {
     /// Distance from the cell's bottom to the baseline, in pixels.
     public let baseline: CGFloat
     public let underlinePosition: CGFloat, underlineThickness: CGFloat
+    /// Why the requested family wasn't used, if it wasn't.
+    public let problem: String?
 
-    /// Loads the bundled JetBrains Mono, falling back to the system's
-    /// monospaced font if it can't be found.
-    public init(pointSize: CGFloat = 13, scale: CGFloat = 2) {
+    /// The bundled JetBrains Mono.
+    public convenience init(pointSize: CGFloat = 13, scale: CGFloat = 2) {
+        self.init(family: "", pointSize: pointSize, scale: scale)
+    }
+
+    /// A monospaced family installed here (font-family), else the bundled
+    /// JetBrains Mono. Either way the bundled font is in each face's cascade
+    /// list, so Nerd Font icons agent TUIs draw still have a glyph.
+    public init(family: String, pointSize: CGFloat, scale: CGFloat) {
         self.pointSize = pointSize
         self.scale = scale
         let px = pointSize * scale
-        func load(_ name: String) -> CTFont? {
+        func descriptor(_ name: String) -> CTFontDescriptor? {
             guard let url = FontSet.resources?.url(forResource: name, withExtension: "ttf", subdirectory: "fonts"),
-                  let descs = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
-                  let d = descs.first else { return nil }
-            return CTFontCreateWithFontDescriptor(d, px, nil)
+                  let descs = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] else { return nil }
+            return descs.first
         }
+        func load(_ name: String) -> CTFont? { descriptor(name).map { CTFontCreateWithFontDescriptor($0, px, nil) } }
         let system = CTFontCreateUIFontForLanguage(.userFixedPitch, px, nil) ?? CTFontCreateWithName("Menlo" as CFString, px, nil)
-        regular = load("JetBrainsMonoNerdFont-Regular") ?? system
-        bold = load("JetBrainsMonoNerdFont-Bold") ?? CTFontCreateCopyWithSymbolicTraits(regular, px, nil, .traitBold, .traitBold) ?? regular
-        italic = load("JetBrainsMonoNerdFont-Italic") ?? CTFontCreateCopyWithSymbolicTraits(regular, px, nil, .traitItalic, .traitItalic) ?? regular
-        boldItalic = load("JetBrainsMonoNerdFont-BoldItalic") ?? bold
+
+        var chosen: CTFont?
+        var problem: String?
+        if !family.isEmpty {
+            let attrs = [kCTFontFamilyNameAttribute: family] as CFDictionary
+            let f = CTFontCreateWithFontDescriptor(CTFontDescriptorCreateWithAttributes(attrs), px, nil)
+            if (CTFontCopyFamilyName(f) as String) != family {
+                problem = "font-family \"\(family)\" isn't installed here; using JetBrains Mono"
+            } else if !CTFontGetSymbolicTraits(f).contains(.traitMonoSpace) {
+                problem = "font-family \"\(family)\" isn't a monospaced font; using JetBrains Mono"
+            } else {
+                chosen = f
+            }
+        }
+        self.problem = problem
+        if let chosen {
+            // The bundled font last in the cascade: icons the family lacks.
+            let cascade = [descriptor("JetBrainsMonoNerdFont-Regular")].compactMap { $0 } as CFArray
+            func withIcons(_ f: CTFont) -> CTFont {
+                let d = CTFontDescriptorCreateCopyWithAttributes(CTFontCopyFontDescriptor(f),
+                                                                 [kCTFontCascadeListAttribute: cascade] as CFDictionary)
+                return CTFontCreateWithFontDescriptor(d, px, nil)
+            }
+            func styled(_ t: CTFontSymbolicTraits) -> CTFont {
+                CTFontCreateCopyWithSymbolicTraits(chosen, px, nil, t, t) ?? chosen
+            }
+            regular = withIcons(chosen)
+            bold = withIcons(styled(.traitBold))
+            italic = withIcons(styled(.traitItalic))
+            boldItalic = withIcons(styled([.traitBold, .traitItalic]))
+        } else {
+            regular = load("JetBrainsMonoNerdFont-Regular") ?? system
+            bold = load("JetBrainsMonoNerdFont-Bold") ?? CTFontCreateCopyWithSymbolicTraits(regular, px, nil, .traitBold, .traitBold) ?? regular
+            italic = load("JetBrainsMonoNerdFont-Italic") ?? CTFontCreateCopyWithSymbolicTraits(regular, px, nil, .traitItalic, .traitItalic) ?? regular
+            boldItalic = load("JetBrainsMonoNerdFont-BoldItalic") ?? bold
+        }
 
         var glyph = CGGlyph()
         var ch: UniChar = 0x4D // "M"
