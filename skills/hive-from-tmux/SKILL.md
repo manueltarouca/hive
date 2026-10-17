@@ -131,7 +131,11 @@ For each agent pane, in order:
    ("Do you want to proceed?", numbered options), a question, or a picker.
    Never send keys to a pane with a dialog open. Enter answers it, and an
    approval is the user's to give. Leave that window and tell the user.
-2. **Exit it in tmux:**
+2. **Exit it in tmux.** First make sure the input line is empty: a
+   half-typed prompt turns `/exit` into something else (`/exitif`). Note any
+   draft so you can type it back in hive, then clear the line from its end
+   (`tmux send-keys -t PANE C-e C-u`; the cursor may sit at the start), and
+   check the pane shows an empty `❯`. Then:
    `tmux send-keys -t PANE '/exit' Enter`
    Wait until the pane shows a shell again. On exit, Claude prints
    `claude --resume <id-or-name>`. That line is the most reliable source of
