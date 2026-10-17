@@ -161,3 +161,21 @@ import Testing
         #expect(AgentStatus.effective(hook: "ended", harness: "claude", records: records) == "ended")
     }
 }
+
+/// An agent finishing its turn rings hive's bell for its pane, as Claude
+/// Code rings the terminal bell in Ghostty (it doesn't in terminals it
+/// doesn't know).
+@Suite struct TurnEndTests {
+    @Test func aTurnEndsWhenWorkStops() {
+        #expect(AgentStatus.turnEnded(from: "working", to: "done"))
+        #expect(AgentStatus.turnEnded(from: "working", to: "blocked"))
+        #expect(!AgentStatus.turnEnded(from: "working", to: "idle"))  // you interrupted it: no news
+    }
+
+    @Test func otherChangesDont() {
+        #expect(!AgentStatus.turnEnded(from: nil, to: "done"))       // first seen: no news
+        #expect(!AgentStatus.turnEnded(from: "idle", to: "working"))
+        #expect(!AgentStatus.turnEnded(from: "done", to: "done"))
+        #expect(!AgentStatus.turnEnded(from: "working", to: "ended"))  // it quit
+    }
+}

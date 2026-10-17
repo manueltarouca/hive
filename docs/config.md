@@ -42,7 +42,7 @@ comment.
 | `theme` | `system` | `system`, `day` (Hive Day) or `night` (Hive Night) |
 | `font-family` | empty | A monospaced font installed on this Mac; empty is the bundled JetBrains Mono. A font that isn't installed or isn't monospaced falls back to JetBrains Mono, and the title bar says why. Nerd Font icons draw either way |
 | `font-size` | `13` | Points, 8 to 32 |
-| `bell` | `flash` | When a program rings the bell: `flash`, `sound`, `flash+sound` or `none`. Its tab also gets a bell until you look, and the Dock bounces once if hive is in the background; `none` turns all of that off |
+| `bell` | `flash` | When a program rings the bell, or an agent finishes its turn: `flash`, `sound`, `flash+sound` or `none`. Like Ghostty, the pane and its tab also show a bell until you focus that pane or type into it, and the Dock bounces once if hive is in the background; `none` turns all of that off |
 | `notify` | `background` | Agent notifications: `background` (when hive isn't in front), `always` or `never` |
 | `confirm-paste` | `true` | Ask before pasting lines into a program that would run each one |
 | `scrollback-limit` | `16m` | History kept per terminal, in bytes (`k`, `m`, `g`), at least `64k`. Read by the server; lowering it drops old lines at once |

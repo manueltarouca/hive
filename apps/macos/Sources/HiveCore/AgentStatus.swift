@@ -13,6 +13,13 @@ public enum AgentStatus {
         return states[status]
     }
 
+    /// Whether an agent just finished its turn (done) or stopped to ask
+    /// (blocked): hive rings its bell for that pane, as Claude Code rings the
+    /// terminal bell in Ghostty. An interrupt (idle) was the user's own doing.
+    public static func turnEnded(from old: String?, to new: String) -> Bool {
+        old == "working" && (new == "done" || new == "blocked")
+    }
+
     /// The state to show: the agent's own status when it reported one, else
     /// the last hook's. An ended agent stays ended.
     public static func effective(hook: String?, harness: String?, records: [(app: String, status: String)]) -> String? {

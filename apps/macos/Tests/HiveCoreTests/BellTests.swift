@@ -57,3 +57,42 @@ import Testing
         #expect(p.remembered == ["b"])
     }
 }
+
+/// Like Ghostty's bell `title` feature: a pane that rang shows a bell until
+/// it's focused again or typed into.
+@Suite struct BellMarkTests {
+    @Test func aRingMarksEvenTheFocusedPane() {
+        var m = BellMarks()
+        m.rang("a")
+        #expect(m.contains("a"))
+    }
+
+    @Test func typingIntoThePaneClearsIt() {
+        var m = BellMarks()
+        m.rang("a"); m.rang("b")
+        m.typed(into: "a")
+        #expect(!m.contains("a") && m.contains("b"))
+    }
+
+    @Test func focusingThePaneClearsIt() {
+        var m = BellMarks()
+        m.rang("a"); m.rang("b")
+        m.focused("b")
+        #expect(m.contains("a") && !m.contains("b"))
+    }
+
+    /// Coming back to hive is re-focusing its focused pane.
+    @Test func comingBackClearsTheFocusedPane() {
+        var m = BellMarks()
+        m.rang("a"); m.rang("b")
+        m.appActivated(focused: "a")
+        #expect(!m.contains("a") && m.contains("b"))
+    }
+
+    @Test func closedPanesAreForgotten() {
+        var m = BellMarks()
+        m.rang("a"); m.rang("b")
+        m.prune(keeping: ["b"])
+        #expect(m.blocks == ["b"])
+    }
+}

@@ -211,7 +211,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
-    func applicationDidBecomeActive(_ notification: Notification) { model.markSeen() }
+    func applicationDidBecomeActive(_ notification: Notification) {
+        model.markSeen()
+        model.appActivated()
+    }
 
     // MARK: palette and picker
 
