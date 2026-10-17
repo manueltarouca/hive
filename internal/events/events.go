@@ -12,7 +12,7 @@ import (
 
 // Event is one event. Session events wrap their inner event as
 // {"session_id", "event"}; block events wrap theirs again as
-// {"block_id", "creator_name", "name", "payload"}, the same nesting the reference app uses.
+// {"block_id", "creator_name", "name", "payload"}.
 type Event struct {
 	Seq     uint64         `json:"seq"`
 	Time    time.Time      `json:"time"`

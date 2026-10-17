@@ -115,7 +115,7 @@ func TestSessionsSplitsIO(t *testing.T) {
 		t.Fatalf("resolve suffix = %v", res)
 	}
 
-	// Write and keys, through block.method, the the reference app-shaped generic call.
+	// Write and keys, through block.method, the generic call.
 	h.call("block.method", map[string]any{"block_id": first, "method": "write", "args": map[string]any{"data": "abc"}})
 	h.call("hive.terminal.send_key", map[string]any{"block_id": first, "args": map[string]any{"keys": []string{"enter"}}})
 	if s := h.waitScreen(sid, first, "abc\nabc"); s == "" {
@@ -133,7 +133,7 @@ func TestSessionsSplitsIO(t *testing.T) {
 		t.Fatalf("view = %v", view)
 	}
 
-	// Unknown argument and missing session are rejected with the reference app's codes.
+	// Unknown argument and missing session are rejected with stable codes.
 	var cerr *client.Error
 	err := h.c.Call(context.Background(), "session.set_block_label", map[string]any{"session_id": sid, "lable": "x"}, nil)
 	if !errors.As(err, &cerr) || cerr.Code != "bad_request" {

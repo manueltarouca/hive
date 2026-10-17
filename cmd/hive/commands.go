@@ -23,7 +23,7 @@ import (
 	"github.com/manueltarouca/hive/internal/server"
 )
 
-const helpText = `hive — a terminal multiplexer for agent-heavy work (the reference app-compatible CLI)
+const helpText = `hive — a terminal multiplexer for agent-heavy work
 
 Sessions
   ls                         list sessions
@@ -106,7 +106,7 @@ func dispatch(g globals, args []string) error {
 	case "close":
 		return cmdClose(g, rest)
 	case "kill":
-		// the reference app: ref kill <session>
+		// hive kill <session>
 		if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
 			g.session = rest[0]
 			rest = append([]string{"--session"}, rest[1:]...)
@@ -435,7 +435,7 @@ func absPath(p string) string {
 }
 
 // reorder moves flags ahead of positional arguments, so "new work --cwd x"
-// works like the reference app's.
+// works too.
 func reorder(args []string) []string {
 	var fl, pos []string
 	for i := 0; i < len(args); i++ {

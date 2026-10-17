@@ -1,4 +1,4 @@
-// Package names makes friendly session names, like the reference app's "drifting-cedar":
+// Package names makes friendly session names, like "drifting-cedar":
 // an adjective and a noun from nature, kebab-cased, unique among the names
 // in use.
 package names

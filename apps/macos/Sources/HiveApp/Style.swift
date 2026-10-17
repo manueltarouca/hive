@@ -2,7 +2,7 @@ import AppKit
 import HiveCore
 import SwiftUI
 
-/// hive's look: the reference app's affordances, our own identity. Warm neutrals, a honey
+/// hive's look: warm neutrals, a honey
 /// accent for focus, and hexagons for agent status. Dark first.
 struct Style: Equatable {
     var dark: Bool

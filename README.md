@@ -1,12 +1,11 @@
 # hive
 
-A terminal multiplexer for agent-heavy work. It tracks the public surface of
-[the reference's the reference app](https://www.the reference.com/ref/docs), so it can be
-swapped for the reference app later. On top of the reference app it adds:
+A terminal multiplexer for agent-heavy work.
 
-- sessions that survive a server restart or a machine reboot
-- coding agents (Claude Code first) that are resumed mid-conversation
-- agent status driven by Claude Code's hooks
+- Sessions keep running when you close the app, and come back after a restart.
+- Coding agents (Claude Code first) report what they do and when they need you.
+  After a restart they continue their conversations.
+- Everything has an API. The app, the CLI and your scripts use the same one.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the design and milestones.
 
@@ -38,7 +37,7 @@ hive api list; hive api describe session.new_split
 
 Targets are an ID, a label, a 1-based position, or an ID suffix. Inside a
 hive terminal, `HIVE_SESSION` and `HIVE_BLOCK` are the defaults. Exit
-statuses match the reference app: 2 usage, 3 target not found or ambiguous, 4 server
+statuses: 2 usage, 3 target not found or ambiguous, 4 server
 unreachable, and `wait`/`run --wait` pass through the program's status.
 
 ### Agents

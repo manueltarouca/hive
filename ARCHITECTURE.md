@@ -1,21 +1,16 @@
 # hive: architecture
 
-A terminal multiplexer for agent-heavy work, modelled on the public surface of
-the reference's the reference app (see `~/code/research/ref/SURFACE.md`). It replaces tmux.
+A terminal multiplexer for agent-heavy work. It replaces tmux.
 
-## Goal: a stepping stone to the reference app
+## Principles
 
-the maintainer will replace hive with the reference app once he has beta access. Therefore:
-- **the reference app's documented names win.** CLI verbs and flags, `session.*` method
-  names and arguments, event names and their nesting, `block.method{block_id,
-  method, args}` for terminal methods, layout tables and exit codes all match
-  `SURFACE.md`. Only the prefixes differ: `hive` for `ref`, `HIVE_` for
-  `REX_`, and the creator `hive.terminal` for `com.the reference.terminal`.
-- **Additions are isolated.** Persistence, agent hooks and resume live in
-  their own packages and methods (`agent.*`), so they can later be rebuilt as
-  a `ref do` Lua script or a companion process against the reference app's API.
-- **Planned:** `hive export --ref` emits a the reference app Lua script that recreates
-  sessions and layouts and resumes agents.
+- **Stable names.** CLI verbs and flags, method names and arguments, event
+  names and exit codes are a contract. Scripts and agents rely on them, so
+  they don't change.
+- **One API.** The app, the CLI and scripts all use the server's API. There
+  is nothing only the app can do.
+- **Agents are first-class.** Persistence, agent hooks and resume live in
+  their own packages and methods (`agent.*`).
 
 ## Decisions (2026-10-17)
 
@@ -49,7 +44,7 @@ bumps the session's `revision`.
 
 1. **Headless core.** Server, CLI, sessions/windows/splits, send/send-key/capture/wait, events, api introspection, persistence + restore, agent hooks + resume.
 2. **Mac app.** Attach stream, Metal grid renderer from libghostty-vt render state, tabs/splits, a sidebar with agent status.
-3. **Lua.** `init.lua` keymap/actions/modes, `hive do` scripts, `ref`-compatible API names where sensible.
+3. **Lua.** `init.lua` keymap/actions/modes, `hive do` scripts, stable API names.
 4. **Remote.** tsnet listener, `hive -S host`, multi-host sidebar.
 
 ## Milestone 1 plan (detail)
@@ -66,7 +61,7 @@ bumps the session's `revision`.
 | `internal/server` | owns the state; HTTP mux on the unix socket: `POST /v1/call`, `GET /v1/events?session=&all=` (NDJSON), `GET /v1/blocks/{id}/attach` (WebSocket, M2); an event bus with per-subscriber buffers (slow consumers dropped, never blocking PTY reads) |
 | `internal/persist` | debounced (1s) `state.json` plus `blocks/<id>.snap`; atomic write by temp file + rename; periodic flush every 30s, and on SIGTERM |
 | `internal/agents` | harness adapters: hook payload → `{harness, session_id, cwd}` on the block; resume argv templates; installers for Claude Code (`settings.json` SessionStart hook) and Codex (`hooks.json`) |
-| `cmd/hive` | CLI: auto-starts the server; global `-s -w -b -S --json`; exit codes 0/1/2/3/4/130 as the reference app |
+| `cmd/hive` | CLI: auto-starts the server; global `-s -w -b -S --json`; exit codes 0/1/2/3/4/130 |
 
 **API methods (M1)**
 
@@ -80,7 +75,7 @@ bumps the session's `revision`.
 | targets | `target.resolve{kind,target,session_id}` → id, or a `not_found`/`ambiguous` error (CLI exit 3) |
 | agents | `agent.report{block_id,harness,session_id,cwd,event}` (called from hooks), `agent.list` (every agent block across sessions, with its status) |
 
-**Events (NDJSON):** the same names and nesting as the reference app (`session_event` →
+**Events (NDJSON):** session events wrap block events (`session_event` →
 `block_event`). Additionally `agent_changed{block_id, harness, session_id}`.
 
 **Panes' environment:**
@@ -120,7 +115,7 @@ and layout are restored.
   (mutex). Hooks are deferred.
 - Snapshot cost on large scrollback: snapshot only blocks dirtied since the
   last flush; cap scrollback (default 10k lines).
-- Server crash = all PTYs die (same as the reference app/tmux). Restore covers it, as long
+- Server crash = all PTYs die (as in tmux). Restore covers it, as long
   as the journal is fresh.
 - Is a long-poll for `terminal.wait` acceptable vs a streaming RPC?
 - Claude/Codex hook payload fields are assumed (`session_id`); verify against
@@ -189,9 +184,8 @@ These amendments win over the M1 detail above where they conflict.
   bounded reply writer, Claude `notification_type` + `PostToolUse`, OSC 7
   host check, process-group kill.
 - Deferred, from the same review:
-  - the reference app drift: `process_changed{generation, ancestors}`,
+  - Event detail: `process_changed{generation, ancestors}`,
     `program_status_changed.reason`, `program_status_removed`.
-  - One `LayoutSpec` ↔ the reference app layout mapping, for `hive export --ref`.
   - The hook installer embeds an absolute binary path, so moving `bin/hive`
     breaks the hooks.
   - Tests for: shutdown with a WebSocket attached; a child ignoring SIGHUP
@@ -215,7 +209,7 @@ Line Tools.
 | `Mirror` | per block: a libghostty terminal restored from the snapshot, fed seq-checked frames. Its write-back replies are discarded (the server already answered). `resync` → re-subscribe |
 | `Render` | one `MTKView` per window drawing every pane. A CoreText glyph atlas (JetBrains Mono embedded, then the system monospace font); instanced quads: background, glyph, decoration, cursor and selection passes. Driven by libghostty `RenderState` dirty rows; shaders compiled at runtime from source (CLT has no `metal` compiler) |
 | `Input` | `NSTextInputClient` for IME. Keys are encoded **client-side** by the libghostty key encoder with options taken from the mirror (kitty keyboard, cursor-key modes), then sent as `input` bytes. Mouse via the mouse encoder; paste via `paste.h` (bracketed) |
-| `UI` | window = session, tab bar = windows, split panes with draggable dividers (`session.resize_pane`), sidebar with sessions + agents (blocked first, from `agent.list` + `agent_changed`), command palette (⇧⌘P), the reference app-like default keys (⌘T, ⌘D/⇧⌘D, ⌘W, ⌥⌘arrows, ⇧⌘↩ zoom) |
+| `UI` | window = session, tab bar = windows, split panes with draggable dividers (`session.resize_pane`), sidebar with sessions + agents (blocked first, from `agent.list` + `agent_changed`), command palette (⇧⌘P), default keys (⌘T, ⌘D/⇧⌘D, ⌘W, ⌥⌘arrows, ⇧⌘↩ zoom) |
 | `Notify` | UserNotifications when an agent turns blocked/done while the app is in the background (rate-limited, names the session) |
 
 **Size authority:**

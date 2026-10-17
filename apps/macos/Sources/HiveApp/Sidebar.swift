@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The agents sidebar: every agent in every session, the ones that need
-/// you first, then this session's tabs. the reference app's vertical tabs, organized
-/// around agents.
+/// you first, then this session's tabs: vertical tabs, organized around
+/// agents.
 struct AgentSidebar: View {
     @ObservedObject var model: AppModel
     static let width: CGFloat = 248

@@ -20,7 +20,7 @@ struct TitleBar: View {
                     .padding(.trailing, -4)
             }
             SessionChip(model: model, action: openPicker)
-            // With the sidebar open, tabs live there, as in the reference app's vertical tabs.
+            // With the sidebar open, the tabs live there.
             if !model.sidebar { Tabs(model: model) }
             Spacer(minLength: 4)
             HStack(spacing: 2) {

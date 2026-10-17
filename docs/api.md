@@ -42,8 +42,7 @@ A call answers with `{"result": …}`, or with `{"error": {"status", "code",
 
 ## Methods
 
-Names follow the reference app's API where the reference app documents one. Methods only hive has say
-"hive:" in their description.
+Method names don't change between versions, so scripts keep working.
 
 | Group | Methods |
 | --- | --- |

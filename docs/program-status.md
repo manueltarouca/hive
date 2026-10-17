@@ -8,8 +8,8 @@ description: How programs tell hive what they are doing, with OSC 7501.
 # Program status
 
 A program can tell the terminal what it is doing: working, waiting for you,
-done, or failed. hive reads the Program Status Protocol, OSC 7501, which
-the reference published for the reference app. Programs that speak it work in both.
+done, or failed. hive reads the Program Status Protocol, an escape sequence
+(OSC 7501) that any terminal can support.
 
 ```sh
 printf '\e]7501;state=working:app=deploy:msg=%s\e\\' "$(printf 'Deploying' | base64)"
@@ -29,6 +29,3 @@ starts. `done` and `error` stay until you look.
 
 hive keeps the records per terminal. `hive.terminal.program_status` returns
 them, and `program_status_changed` reports each change.
-
-The full specification is in
-[the reference app's documentation](https://www.the reference.com/ref/docs/build/program-status).

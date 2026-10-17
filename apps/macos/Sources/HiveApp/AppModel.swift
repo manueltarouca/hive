@@ -178,7 +178,7 @@ final class AppModel: ObservableObject {
     @Published var activeWindow: String?
     @Published var blocks: [String: BlockInfo] = [:]
     @Published var style: Style = .light
-    /// The agents sidebar (the reference app's vertical tabs, organized around agents).
+    /// The agents sidebar: vertical tabs, organized around agents.
     @Published var sidebar = AppModel.defaults.bool(forKey: "sidebar") {
         didSet { AppModel.defaults.set(sidebar, forKey: "sidebar") }
     }
@@ -333,7 +333,7 @@ final class AppModel: ObservableObject {
                 return
             }
             if self.currentSession == nil || !self.sessions.contains(where: { $0.id == self.currentSession }) {
-                // Like the reference app: come back to the session you were in.
+                // Come back to the session you were in.
                 let last = AppModel.defaults.string(forKey: "lastSession")
                 select(session: sessions.first { $0.id == last }?.id ?? sessions.first?.id)
             }

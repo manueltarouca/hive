@@ -4,7 +4,7 @@
   import Wordmark from '#lib/Wordmark.svelte';
 
   // What hive is for, one at a time.
-  const uses = ['coding agents.', 'long builds.', 'dev servers.', 'test watchers.', 'every session.'];
+  const uses = ['coding agents.', 'long builds.', 'dev servers.', 'test runs.', 'all your sessions.'];
   let current = $state(0);
   onMount(() => {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -15,7 +15,7 @@
 
 <svelte:head>
   <title>hive · a terminal multiplexer for agent-heavy work</title>
-  <meta name="description" content="hive keeps your terminals running, knows which coding agents need you, and brings everything back after a reboot." />
+  <meta name="description" content="hive keeps your terminals running, shows which coding agents need you, and brings everything back after a restart." />
 </svelte:head>
 
 <div class="page">
@@ -39,18 +39,19 @@
 
     <section class="essay">
       <p>
-        A lot of terminal work now runs in parallel. A few coding agents on different tasks, a dev
-        server, a test watcher, a build on another machine. Close the window and it's gone. Restart
-        the laptop and you rebuild your layout by hand. An agent waits for permission in a tab you
-        aren't looking at, for an hour.
+        More and more terminal work runs at the same time: coding agents on different tasks, a dev
+        server, tests. When you close the window, the work stops. When you restart your computer, you
+        set up everything again by hand. And an agent can wait an hour for your answer, in a tab you
+        don't see.
       </p>
       <p>
-        tmux solved part of this long ago, and we still reach for it. But it draws a terminal inside
-        your terminal, scrolls through a copy mode, and was never meant to be driven by programs.
+        tmux helps with some of this, and many of us still use it. But it draws a terminal inside your
+        terminal. You need a special mode to scroll. And programs can't easily control it.
       </p>
       <p>
-        hive is a multiplexer for how this work looks now. Sessions outlive the app and the machine.
-        Scrolling and selection are native. Everything has an API. Agents are first-class.
+        hive is a terminal multiplexer for this kind of work. Your sessions keep running when you close
+        the app, and they come back after a restart. Scrolling and selecting text work like in any Mac
+        app. Programs can control everything. Coding agents are part of the design.
       </p>
     </section>
 
@@ -59,24 +60,18 @@
     <section>
       <p class="label">What it does</p>
       <ol>
-        <li><span>1</span><div><b>Keeps your sessions.</b> Quit the app, stop the server, reboot. Your layouts, scrollback and working directories come back.</div></li>
-        <li><span>2</span><div><b>Knows your agents.</b> Claude Code tells hive what it's working on and when it needs you. Every agent in every session is one glance away, the blocked ones first, and each resumes after a restart.</div></li>
-        <li><span>3</span><div><b>Answers to programs.</b> Every action in the app is an API call with a schema. The CLI, your scripts and your agents use the same API.</div></li>
-        <li><span>4</span><div><b>Feels like a terminal.</b> It draws with Ghostty's terminal engine. Scrollback, selection and scrolling are native. There is no copy mode.</div></li>
+        <li><span>1</span><div><b>Keeps your sessions.</b> Close the app, stop the server, or restart your computer. Your layouts, your scrollback and your folders come back.</div></li>
+        <li><span>2</span><div><b>Knows your agents.</b> Claude Code tells hive what it is doing and when it needs you. You see every agent in one list, the waiting ones first. After a restart, each agent continues its conversation.</div></li>
+        <li><span>3</span><div><b>Lets programs control it.</b> Everything you do in the app is also an API call. The command line, your scripts and your agents all use the same API.</div></li>
+        <li><span>4</span><div><b>Feels like a normal terminal.</b> hive uses Ghostty's terminal engine. Scrolling, scrollback and text selection are native. There is no copy mode.</div></li>
       </ol>
     </section>
 
     <section class="essay">
-      <p class="label">How it fits</p>
+      <p class="label">Your data</p>
       <p>
-        hive follows the design of <a href="https://www.the reference.com/ref/docs">the reference app</a>, the
-        multiplexer the reference is building. Commands, flags and concepts match the reference app wherever the reference app
-        documents them, so moving between the two is a short trip. hive is an independent project and
-        isn't affiliated with the reference.
-      </p>
-      <p>
-        It runs on your machine and talks to nothing else. There is no account, no telemetry, and
-        nothing to sign up for.
+        hive runs on your computer and connects to nothing else. There is no account and no
+        telemetry. There is nothing to sign up for.
       </p>
     </section>
 

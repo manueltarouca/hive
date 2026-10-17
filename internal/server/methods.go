@@ -19,9 +19,7 @@ import (
 	"github.com/manueltarouca/hive/internal/session"
 )
 
-// Method names follow the reference app's server API (see SURFACE.md) wherever the reference app
-// documents one, so scripts move over by swapping the prefix. Methods the reference app
-// doesn't have are marked "hive:" in their description.
+// Method names are part of the API's contract: they don't change.
 
 type empty struct{}
 
@@ -69,12 +67,12 @@ func (s *Server) registerMethods() {
 				"started_at": s.started.UTC(), "socket": s.cfg.Socket, "state_dir": s.cfg.StateDir,
 			}, nil
 		})
-	api.Register(r, "server.shutdown", "hive: Save every session and stop the server. Sessions are restored at the next start.",
+	api.Register(r, "server.shutdown", "Save every session and stop the server. Sessions are restored at the next start.",
 		func(ctx context.Context, _ empty) (empty, error) {
 			go func() { time.Sleep(50 * time.Millisecond); s.Shutdown() }()
 			return empty{}, nil
 		})
-	api.Register(r, "server.flush", "hive: Save state and snapshots to disk now.",
+	api.Register(r, "server.flush", "Save state and snapshots to disk now.",
 		func(ctx context.Context, _ empty) (empty, error) { return empty{}, s.Flush() })
 
 	type listIn struct {
@@ -115,7 +113,7 @@ func (s *Server) registerMethods() {
 		ID        string `json:"id"`
 		SessionID string `json:"session_id,omitempty"`
 	}
-	api.Register(r, "target.resolve", "hive: Resolve a target (ID, label, position, or ID suffix) to an ID.",
+	api.Register(r, "target.resolve", "Resolve a target (ID, label, position, or ID suffix) to an ID.",
 		func(ctx context.Context, in resolveIn) (resolveOut, error) {
 			s.mu.Lock()
 			defer s.mu.Unlock()
@@ -166,7 +164,7 @@ func (s *Server) registerMethods() {
 			}
 			label := in.Label
 			if label == "" {
-				// Like the reference app: every session gets a friendly unique name.
+				// Every session gets a friendly unique name.
 				label = names.New(func(n string) bool {
 					for _, o := range s.sessions {
 						if strings.EqualFold(o.Label, n) {
@@ -247,7 +245,7 @@ func (s *Server) registerMethods() {
 			return revisionOut{ss.Revision}, nil
 		})
 
-	api.Register(r, "session.close", "hive: Close a session and every block in it. It is not restored.",
+	api.Register(r, "session.close", "Close a session and every block in it. It is not restored.",
 		func(ctx context.Context, in sessionRef) (empty, error) {
 			s.mu.Lock()
 			ss, err := s.needSession(in.SessionID)
@@ -826,7 +824,7 @@ func (s *Server) registerTerminalMethods() {
 			}
 			return map[string]any{"written": len(data)}, r.b.Write(data)
 		})
-	s.terminal("send_key", "hive: Press keys, such as ctrl+c or enter, encoded for the terminal's modes. args: {keys: [..]}",
+	s.terminal("send_key", "Press keys, such as ctrl+c or enter, encoded for the terminal's modes. args: {keys: [..]}",
 		func(r *rec, raw json.RawMessage) (any, error) {
 			a, err := args[struct {
 				Keys []string `json:"keys"`
@@ -923,7 +921,7 @@ func (s *Server) registerTerminalMethods() {
 			defer s.mu.Unlock()
 			return map[string]any{"records": sortedStatus(r.st.Status)}, nil
 		})
-	api.Register(s.reg, terminalPrefix+"wait", "hive: Wait for the program to exit. args: {timeout} in seconds, at most 60; repeat to wait longer. Works for a short while after the block has closed.",
+	api.Register(s.reg, terminalPrefix+"wait", "Wait for the program to exit. args: {timeout} in seconds, at most 60; repeat to wait longer. Works for a short while after the block has closed.",
 		func(ctx context.Context, in blockCall) (map[string]any, error) {
 			a, err := args[struct {
 				Timeout float64 `json:"timeout"`
@@ -986,7 +984,7 @@ func (s *Server) registerAgentMethods() {
 		TranscriptPath string `json:"transcript_path,omitempty"`
 		Message        string `json:"message,omitempty"`
 	}
-	api.Register(s.reg, "agent.report", "hive: Report an agent's identity and state from its hooks. Saved to disk at once.",
+	api.Register(s.reg, "agent.report", "Report an agent's identity and state from its hooks. Saved to disk at once.",
 		func(ctx context.Context, in reportIn) (*persist.Agent, error) {
 			// What a hook reports is untrusted: it ends up in a command line
 			// at the next restore and in notifications.
@@ -1042,7 +1040,7 @@ func (s *Server) registerAgentMethods() {
 		Status       any            `json:"program_status,omitempty"`
 		Foreground   *block.Process `json:"foreground,omitempty"`
 	}
-	api.Register(s.reg, "agent.list", "hive: List every block running a known agent, with its state.",
+	api.Register(s.reg, "agent.list", "List every block running a known agent, with its state.",
 		func(ctx context.Context, _ empty) (json.RawMessage, error) {
 			s.mu.Lock()
 			defer s.mu.Unlock()
@@ -1101,7 +1099,7 @@ func indexOf(ss *session.Session, windowID string) int {
 	return 0
 }
 
-// sideFor maps the reference app's direction/side pair to a hive side.
+// sideFor maps a direction/side pair to a side.
 func sideFor(direction, side string) string {
 	after := side != "before"
 	if direction == "vertical" {

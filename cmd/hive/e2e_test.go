@@ -82,7 +82,7 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("agents: %s", out)
 	}
 
-	// Exit codes follow the reference app.
+	// Documented exit codes.
 	if _, code := hive("-s", "e2e", "run", "--wait", "--", "sh", "-c", "exit 7"); code != 7 {
 		t.Errorf("run --wait: exit %d, want 7", code)
 	}

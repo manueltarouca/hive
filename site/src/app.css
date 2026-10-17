@@ -1,4 +1,4 @@
-/* hive: the reference's scale and restraint, hive's own palette. */
+/* hive: a quiet type scale, a warm palette. */
 @font-face { font-family: Inter; src: url('./lib/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: Inter; src: url('./lib/fonts/InterVariable-Italic.woff2') format('woff2'); font-weight: 100 900; font-style: italic; font-display: swap; }
 @font-face { font-family: 'JetBrains Mono'; src: url('./lib/fonts/JetBrainsMono-Regular.ttf') format('truetype'); font-display: swap; }

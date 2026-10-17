@@ -1,5 +1,5 @@
 // Command hive is the hive server and its CLI, in one binary. Its commands,
-// flags, and exit codes follow the reference app's CLI so that scripts carry over.
+// flags, and exit codes are stable so that scripts keep working.
 package main
 
 import (
@@ -19,7 +19,7 @@ import (
 	"github.com/manueltarouca/hive/internal/paths"
 )
 
-// Exit statuses, as in the reference app.
+// Exit statuses.
 const (
 	exitOK          = 0
 	exitFail        = 1
@@ -140,7 +140,7 @@ func connect(g globals) (*client.Client, error) {
 	if c.Ping() {
 		return c, nil
 	}
-	// Like the reference app, any command starts a personal server, unless a server was
+	// Any command starts a personal server, unless a server was
 	// named explicitly.
 	if g.explicitServer || !strings.HasPrefix(sock, "/") {
 		return nil, &client.UnreachableError{Err: fmt.Errorf("no server on %s", sock)}
