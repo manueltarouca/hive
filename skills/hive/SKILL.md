@@ -115,10 +115,14 @@ hive api call session.list
 hive api call hive.terminal.format '{"block_id":"block:…","args":{"trim":true}}'
 ```
 
-Unknown arguments are errors, so `describe` before you guess. The socket
-also speaks HTTP: `curl --unix-socket "$HIVE_SERVER" http://hive/v1/call -d
-'{"method":"session.list"}'`. For a method the CLI doesn't cover, use
-`hive api call`.
+Unknown arguments are errors, so `describe` before you guess. For a method
+the CLI doesn't cover, use `hive api call`. The socket also speaks HTTP, and
+accepts only JSON:
+
+```sh
+curl --unix-socket "$HIVE_SERVER" http://hive/v1/call \
+  -H 'content-type: application/json' -d '{"method":"session.list"}'
+```
 
 ## Exit status
 

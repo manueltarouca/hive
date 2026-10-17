@@ -26,8 +26,11 @@ The server listens on a Unix socket. `hive server status` prints its path.
 
 ```sh
 curl --unix-socket "$HIVE_SERVER" http://hive/v1/call \
-  -d '{"method":"session.list"}'
+  -H 'content-type: application/json' -d '{"method":"session.list"}'
 ```
+
+The server accepts only JSON, and refuses requests from browsers (any
+`Origin` header), so a web page can't drive your terminals.
 
 A call answers with `{"result": …}`, or with `{"error": {"status", "code",
 "message"}}` and an HTTP status:
