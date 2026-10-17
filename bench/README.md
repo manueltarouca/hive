@@ -28,12 +28,27 @@ Memory is reported as the process's resident size, Go's heap, and the rest
 (native): terminal state lives in libghostty's memory, which Go's heap
 profile doesn't see.
 
+The app has its own suite, in Swift, built in release:
+
+```sh
+cd apps/macos
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift run -c release hivebench-app all   # or feed, frame, pipeline, engine, memory
+```
+
+`engine` runs `bin/hive` (`make build`) on its own socket, state and
+settings, and needs `/tmp/hivebench` (above) as the pane's program.
+
 ## Scenarios
 
 | Scenario | Ramps | Limit |
 | --- | --- | --- |
 | `flush` | busy panes (100 KB/s each), empty and full scrollback, with snapshot saves running back to back | `agent.report` p99 above 50 ms |
 | `ptyread` | busy panes (100 KB/s each), no clients, no saves | under 90% of the offered bytes read |
+| app `feed` | content (plain, SGR colour, unicode, a full-screen TUI) × chunk size | none: µs per KB parsed |
+| app `frame` | grid 80x24 to 500x150, every row or one row changed | frame + encode p99 above 8 ms (half a 60 Hz frame) |
+| app `pipeline` | grid × chunk, a frame after every chunk | under the server's 64 MB/s |
+| app `engine` | output rate, the app's real HiveClient and Engine on a real server | a resync, or the vt queue over 90% of a core |
+| app `memory` | mirrors with full scrollback | none: MB per mirror |
 | `output` | output rate per pane (64 KB/s to 128 MB/s), stamped by the emitter, read by an attach client as the app does; `--client-cost` makes the client spend time on each frame, as the app does parsing | latency p99 above 50 ms, under 90% of the bytes delivered, or a resync |
 
 ## Findings
@@ -93,3 +108,17 @@ and 350 MB of RSS. Output already queued for a subscriber now goes out as
 one frame (up to 256 KB): 0 resyncs, 101% delivered, 41 MB, frames of
 1.7–3.9 KB as the client needs. A fast client is unchanged (nothing is
 queued, nothing waits): its cost is the hand-offs per 1 KB read.
+
+**2026-10-17, the app** (same machine, on battery, load ~7, release build).
+Parsing is cheap: 400–1,500 MB/s (0.7–2.5 µs per KB; a full-screen TUI is
+the slowest). Frames are cheap too: no knee up to 500x150 (frame + encode
+p99 5.2 ms, GPU 6.8 ms); encode rebuilds every instance even when one row
+changed (1.6 ms at 400x120), room left if it ever matters. Memory: ~20 MB
+per mirror with full scrollback; the app only mirrors visible panes.
+
+The knee was frame building: the Engine built a frame per output chunk,
+up to 5,744 frames/s at 64 MB/s (120x40), and a 300x80 pane saturated the
+vt queue from 16 MB/s (1.02 cores). Frames are now paced to 120 Hz
+(FramePacer; the first after a quiet spell at once): ~108 frames/s at
+every rate, 300x80 at 16 MB/s takes 0.28 cores, and 64 MB/s is no longer
+degraded at either size (0.78–0.81 cores, parsing and the socket).

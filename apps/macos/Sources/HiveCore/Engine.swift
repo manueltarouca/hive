@@ -15,6 +15,7 @@ public final class Engine {
         var expected: UInt64 = 0
         let onFrame: (PaneFrame) -> Void
         var framePending = false
+        var pacer = FramePacer()
         var resyncs = 0
         init(onFrame: @escaping (PaneFrame) -> Void) { self.onFrame = onFrame }
     }
@@ -117,9 +118,10 @@ public final class Engine {
     private func scheduleFrame(_ pane: Pane) {
         guard !pane.framePending else { return }
         pane.framePending = true
-        queue.async { [weak self, weak pane] in
+        let build = { [weak self, weak pane] in
             guard let self, let pane, let m = pane.mirror else { return }
             pane.framePending = false
+            pane.pacer.built(at: ProcessInfo.processInfo.systemUptime)
             pane.onFrame(m.frame())
             // A program can start synchronized output and stall. Draw again
             // once the hold limit passes, even with no more output.
@@ -129,6 +131,9 @@ public final class Engine {
                 }
             }
         }
+        // Output meanwhile goes into the mirror; the frame shows all of it.
+        let wait = pane.pacer.delay(at: ProcessInfo.processInfo.systemUptime)
+        if wait > 0 { queue.asyncAfter(deadline: .now() + wait, execute: build) } else { queue.async(execute: build) }
     }
 
     // MARK: input
