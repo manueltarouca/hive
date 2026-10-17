@@ -126,3 +126,20 @@ func TestResolve(t *testing.T) {
 }
 
 func near(a, b float64) bool { d := a - b; return d < 1e-9 && d > -1e-9 }
+
+func TestMoveBlock(t *testing.T) {
+	w := newWin("block:a")
+	w.Split("block:a", "right", 0.5, leaf("block:b"), "split:1")
+	w.Split("block:a", "below", 0.5, leaf("block:c"), "split:2")
+	// Move c from under a to below b.
+	if err := w.Move("block:c", "block:b", "below", 0.5, "split:3"); err != nil {
+		t.Fatal(err)
+	}
+	r := w.Rects()
+	if !near(r["block:a"].H, 1) || !near(r["block:c"].X, 0.5) || !near(r["block:c"].Y, 0.5) {
+		t.Fatalf("rects = %+v", r)
+	}
+	if err := w.Move("block:a", "block:a", "right", 0.5, "split:4"); err == nil {
+		t.Fatal("moving a block beside itself must fail")
+	}
+}

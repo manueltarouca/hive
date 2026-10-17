@@ -178,6 +178,23 @@ func (w *Window) Split(anchor, side string, ratio float64, sub *Node, splitID st
 	return n, nil
 }
 
+// Move takes a block out of its place and puts it beside target.
+func (w *Window) Move(blockID, target, side string, ratio float64, splitID string) error {
+	if blockID == target {
+		return fmt.Errorf("can't move a block beside itself")
+	}
+	if !w.Has(blockID) || !w.Has(target) {
+		return fmt.Errorf("both blocks must be in window %s", w.ID)
+	}
+	focus := w.Focus
+	w.Remove(blockID)
+	if _, err := w.Split(target, side, ratio, &Node{Type: "block", BlockID: blockID}, splitID); err != nil {
+		return err
+	}
+	w.Focus = focus
+	return nil
+}
+
 // SideDirection maps right/left/below/above to a split direction and whether
 // the new part goes after the anchor.
 func SideDirection(side string) (dir string, after bool, err error) {

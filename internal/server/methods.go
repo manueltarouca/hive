@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/manueltarouca/hive/internal/api"
 	"github.com/manueltarouca/hive/internal/block"
 	"github.com/manueltarouca/hive/internal/id"
+	"github.com/manueltarouca/hive/internal/names"
 	"github.com/manueltarouca/hive/internal/persist"
 	"github.com/manueltarouca/hive/internal/session"
 )
@@ -161,7 +163,19 @@ func (s *Server) registerMethods() {
 					}
 				}
 			}
-			ss := &session.Session{ID: id.New(id.Session), Label: in.Label, Created: time.Now().UTC()}
+			label := in.Label
+			if label == "" {
+				// Like the reference app: every session gets a friendly unique name.
+				label = names.New(func(n string) bool {
+					for _, o := range s.sessions {
+						if strings.EqualFold(o.Label, n) {
+							return true
+						}
+					}
+					return false
+				})
+			}
+			ss := &session.Session{ID: id.New(id.Session), Label: label, Created: time.Now().UTC()}
 			root, blocks, splits, err := s.buildLayout(ss.ID, spec, cols, rows)
 			if err != nil {
 				s.abandon(blocks)
@@ -556,6 +570,25 @@ func (s *Server) registerMethods() {
 				return nil
 			})
 		})
+	api.Register(r, "session.move_block", "Move a block into a new split beside another block.",
+		func(ctx context.Context, in struct {
+			SessionID     string  `json:"session_id" required:"true"`
+			BlockID       string  `json:"block_id" required:"true"`
+			TargetBlockID string  `json:"target_block_id" required:"true" desc:"The block to put it beside."`
+			Side          string  `json:"side,omitempty" enum:"right,left,below,above" desc:"Default right."`
+			Ratio         float64 `json:"ratio,omitempty" desc:"The moved block's share, 0 to 1. Default 0.5."`
+		}) (revisionOut, error) {
+			return s.withSession(in.SessionID, func(ss *session.Session) error {
+				w := ss.WindowOf(in.BlockID)
+				if w == nil || !w.Has(in.TargetBlockID) {
+					return api.NotFound("both blocks must be in one window of session %s", in.SessionID)
+				}
+				if err := w.Move(in.BlockID, in.TargetBlockID, in.Side, in.Ratio, id.New(id.Split)); err != nil {
+					return api.BadRequest("%v", err)
+				}
+				return nil
+			})
+		})
 	api.Register(r, "session.set_block_label", "Update a block's label.",
 		func(ctx context.Context, in struct {
 			SessionID string `json:"session_id" required:"true"`
@@ -842,6 +875,43 @@ func (s *Server) registerTerminalMethods() {
 			s.mu.Unlock()
 			s.markDirty()
 			return map[string]any{"cols": a.Cols, "rows": a.Rows, "size_owner": who}, nil
+		})
+	s.terminal("list_dir", "List the directories under a path, for Go to Directory. args: {path}; default the working directory.",
+		func(r *rec, raw json.RawMessage) (any, error) {
+			a, err := args[struct {
+				Path   string `json:"path"`
+				Hidden bool   `json:"hidden"`
+			}](raw)
+			if err != nil {
+				return nil, err
+			}
+			path := expandHome(a.Path)
+			if path == "" {
+				if fg, err := r.b.Foreground(); err == nil && fg.Cwd != "" {
+					path = fg.Cwd
+				} else {
+					path, _ = os.UserHomeDir()
+				}
+			}
+			entries, err := os.ReadDir(path)
+			if err != nil {
+				return nil, api.BadRequest("%v", err)
+			}
+			out := []map[string]any{}
+			for _, e := range entries {
+				if !e.IsDir() && e.Type()&os.ModeSymlink == 0 {
+					continue
+				}
+				if !a.Hidden && strings.HasPrefix(e.Name(), ".") {
+					continue
+				}
+				full := filepath.Join(path, e.Name())
+				if fi, err := os.Stat(full); err != nil || !fi.IsDir() {
+					continue
+				}
+				out = append(out, map[string]any{"name": e.Name(), "path": full})
+			}
+			return map[string]any{"path": path, "entries": out}, nil
 		})
 	s.terminal("program_status", "Return the status records programs have reported (OSC 7501).",
 		func(r *rec, _ json.RawMessage) (any, error) {

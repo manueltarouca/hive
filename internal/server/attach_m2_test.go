@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/binary"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -113,4 +114,36 @@ func TestNewSplitAcceptsSizeAndInputBase64(t *testing.T) {
 	defer c.ws.CloseNow()
 	c.send(map[string]any{"type": "input", "block_id": bid, "data_base64": "YjY0LWlucHV0DQ=="}) // "b64-input\r"
 	h.waitScreen(sid, bid, "b64-input")
+}
+
+func TestSessionNamesMoveAndListDir(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	sid := created["session_id"].(string)
+	view := h.call("session.view", map[string]any{"session_id": sid})
+	if label, _ := view["label"].(string); len(strings.Fields(label)) != 2 {
+		t.Fatalf("unlabeled session got %q, want a two-word name", label)
+	}
+	a := strs(created["block_ids"])[0]
+	b := strs(h.call("session.new_split", map[string]any{"session_id": sid, "block_id": a,
+		"layout": map[string]any{"command": []string{"cat"}}})["block_ids"])[0]
+	c := strs(h.call("session.new_split", map[string]any{"session_id": sid, "block_id": a, "direction": "vertical",
+		"layout": map[string]any{"command": []string{"cat"}}})["block_ids"])[0]
+	h.call("session.move_block", map[string]any{"session_id": sid, "block_id": c, "target_block_id": b, "side": "below"})
+	view = h.call("session.view", map[string]any{"session_id": sid})
+	layout := view["windows"].([]any)[0].(map[string]any)["layout"].(map[string]any)
+	if layout["a"].(map[string]any)["block_id"] != a {
+		t.Fatalf("a should now fill the left: %v", layout)
+	}
+
+	dir := t.TempDir()
+	os.Mkdir(dir+"/sub1", 0o755)
+	os.Mkdir(dir+"/sub2", 0o755)
+	os.WriteFile(dir+"/file", nil, 0o644)
+	out := h.call("hive.terminal.list_dir", map[string]any{"block_id": a, "args": map[string]any{"path": dir}})
+	entries := out["entries"].([]any)
+	if len(entries) != 2 || entries[0].(map[string]any)["name"] != "sub1" {
+		t.Fatalf("list_dir = %v", out)
+	}
 }

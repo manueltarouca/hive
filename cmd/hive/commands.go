@@ -39,6 +39,8 @@ Blocks
               --label TEXT  --focus=false  --keep-open  --wait
   block inspect              show the current block
   label TEXT                 label the block (--session/--window: those)
+  move [--split SIDE] TARGET move the block beside another
+  kill SESSION               close a session
   zoom [--on|--off]          zoom the block
   focus [left|right|up|down] focus the block, or its neighbor
 
@@ -101,8 +103,17 @@ func dispatch(g globals, args []string) error {
 		return cmdZoom(g, rest)
 	case "focus":
 		return cmdFocus(g, rest)
-	case "close", "kill":
+	case "close":
 		return cmdClose(g, rest)
+	case "kill":
+		// the reference app: ref kill <session>
+		if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
+			g.session = rest[0]
+			rest = append([]string{"--session"}, rest[1:]...)
+		}
+		return cmdClose(g, rest)
+	case "move":
+		return cmdMove(g, rest)
 	case "label":
 		return cmdLabel(g, rest)
 	case "events":
@@ -807,6 +818,33 @@ func cmdClose(g globals, args []string) error {
 		return err
 	}
 	return x.call("block.close", map[string]any{"session_id": sid, "block_id": bid}, nil)
+}
+
+// cmdMove moves the block (-b) beside another: hive move --below TARGET.
+func cmdMove(g globals, args []string) error {
+	fs := flags("move")
+	side := fs.String("split", "right", "")
+	ratio := fs.Float64("ratio", 50, "")
+	if err := parse(fs, reorder(args)); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return usagef("usage: hive move [-b BLOCK] [--split right|left|above|below] TARGET")
+	}
+	x, err := open(g)
+	if err != nil {
+		return err
+	}
+	sid, bid, err := x.blockID()
+	if err != nil {
+		return err
+	}
+	target, _, err := x.resolve("block", fs.Arg(0), sid, "")
+	if err != nil {
+		return err
+	}
+	return x.call("session.move_block", map[string]any{"session_id": sid, "block_id": bid, "target_block_id": target,
+		"side": *side, "ratio": *ratio / 100}, nil)
 }
 
 func cmdLabel(g globals, args []string) error {
