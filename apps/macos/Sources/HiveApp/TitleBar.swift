@@ -1,4 +1,5 @@
 import AppKit
+import HiveCore
 import SwiftUI
 
 /// The title bar: session chip, tabs, palette and new-tab buttons. Lives in
@@ -34,6 +35,12 @@ struct TitleBar: View {
     }
 }
 
+/// "1 blocked · 2 done in other sessions".
+func attentionHelp(_ a: Attention) -> String {
+    [a.blocked > 0 ? "\(a.blocked) blocked" : nil, a.done > 0 ? "\(a.done) done" : nil]
+        .compactMap { $0 }.joined(separator: " · ") + " in other sessions"
+}
+
 /// The session and host. Opens the session picker.
 struct SessionChip: View {
     @ObservedObject var model: AppModel
@@ -53,6 +60,18 @@ struct SessionChip: View {
                     Text(model.host).font(.system(size: 10)).foregroundStyle(s.secondary.swiftUI)
                 }
                 .lineLimit(1)
+                // Agents in other sessions that need the user.
+                let elsewhere = model.attentionElsewhere
+                if !elsewhere.isEmpty {
+                    HStack(spacing: 3) {
+                        Image(systemName: "hexagon.fill").font(.system(size: 8))
+                        Text("\(elsewhere.blocked + elsewhere.done)").font(.system(size: 10.5, weight: .semibold)).monospacedDigit()
+                    }
+                    .foregroundStyle(elsewhere.blocked > 0 ? s.blocked.swiftUI : s.done.swiftUI)
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(Capsule().fill((elsewhere.blocked > 0 ? s.blocked : s.done).swiftUI.opacity(0.14)))
+                    .help(attentionHelp(elsewhere))
+                }
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
                     .foregroundStyle(s.secondary.swiftUI.opacity(hover ? 1 : 0.6))
             }

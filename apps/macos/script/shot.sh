@@ -48,6 +48,11 @@ defaults delete "$suite" >/dev/null 2>&1 || true
 # APPEARANCE=system|day|night stores the theme setting. Use the style
 # "system" to test it: then HIVE_STYLE isn't set and the setting decides.
 [ -n "${APPEARANCE:-}" ] && defaults write "$suite" appearance -string "$APPEARANCE"
+# SESSION=label opens the app in that session instead of the last one.
+if [ -n "${SESSION:-}" ]; then
+  sid=$($H api call target.resolve "{\"kind\":\"session\",\"target\":\"$SESSION\"}" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+  defaults write "$suite" lastSession -string "$sid"
+fi
 envstyle="$style"; [ "$style" = system ] && envstyle=""
 # Start our own copy of the app and track its PID, so we never touch a Hive
 # window the maintainer is using. `open -n` makes it the active app, as a real launch

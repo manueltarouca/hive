@@ -1,11 +1,15 @@
+import HiveCore
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// The agents sidebar: every agent in every session, the ones that need
-/// you first, then this session's tabs: vertical tabs, organized around
-/// agents.
+/// Vertical tabs: the current session's tabs, in order. A tab running an
+/// agent shows the agent's task and state on the row itself, so the tab is
+/// the agent and nothing is listed twice. Agents in other sessions that need
+/// the user show as a badge on the session chip and in the session picker.
 struct AgentSidebar: View {
     @ObservedObject var model: AppModel
     static let width: CGFloat = 248
+    @State private var dragging: String?
 
     var body: some View {
         let s = model.style
@@ -18,31 +22,24 @@ struct AgentSidebar: View {
             .frame(height: TitleBar.height).padding(.trailing, 8)
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 7) {
-                        Image(systemName: "laptopcomputer").font(.system(size: 12))
-                        Text(model.host).font(.system(size: 12.5, weight: .semibold))
-                    }
-                    .foregroundStyle(s.text.swiftUI)
-                    .padding(.horizontal, 10).padding(.top, 4)
-
-                    SectionTitle(text: "Agents", style: s)
-                    if model.agents.isEmpty {
-                        Text("Agents started in hive show up here.")
-                            .font(.system(size: 11.5)).foregroundStyle(s.secondary.swiftUI)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                    }
-                    ForEach(model.agents) { a in
-                        AgentRow(model: model, agent: a)
-                    }
-
-                    SectionTitle(text: model.sessionLabel.isEmpty ? "Tabs" : model.sessionLabel, style: s)
+                VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(model.windows.enumerated()), id: \.element.id) { i, w in
                         TabRow(model: model, window: w, index: i)
+                            .opacity(dragging == w.id ? 0.4 : 1)
+                            .onDrag {
+                                dragging = w.id
+                                return NSItemProvider(object: w.id as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: TabDrop(model: model, target: i, dragging: $dragging))
                     }
                 }
-                .padding(.horizontal, 8).padding(.bottom, 12)
+                .padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 12)
             }
+            // Rows fade out under the title bar instead of being cut off.
+            .mask(VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 10)
+                Rectangle()
+            })
         }
         .frame(width: AgentSidebar.width)
         .background(s.sidebar.swiftUI)
@@ -50,18 +47,26 @@ struct AgentSidebar: View {
     }
 }
 
-struct SectionTitle: View {
-    let text: String
-    let style: Style
-    var body: some View {
-        Text(text.uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.6)
-            .foregroundStyle(style.secondary.swiftUI)
-            .padding(.horizontal, 10).padding(.top, 14).padding(.bottom, 2)
+/// Dropping a dragged tab onto a row moves it to that row's place.
+struct TabDrop: DropDelegate {
+    let model: AppModel
+    let target: Int
+    @Binding var dragging: String?
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        defer { dragging = nil }
+        guard let id = dragging, let from = model.windows.firstIndex(where: { $0.id == id }), from != target else { return false }
+        model.moveWindow(id, to: target)
+        return true
     }
+
+    func dropExited(info: DropInfo) {}
 }
 
-/// An app tile: a rounded square with a symbol, and a status hexagon on
-/// its corner when the agent needs attention.
+/// An app tile: a rounded square with a symbol, and a dot on its corner when
+/// the agent needs the user.
 struct AppTile: View {
     let symbol: String
     let tint: Color
@@ -84,69 +89,6 @@ struct AppTile: View {
     }
 }
 
-struct AgentRow: View {
-    @ObservedObject var model: AppModel
-    let agent: AgentInfo
-    @State private var hover = false
-
-    var body: some View {
-        let s = model.style
-        let selected = model.focusedBlock == agent.blockID
-        let claude = agent.harness == "claude"
-        HStack(alignment: .top, spacing: 10) {
-            AppTile(symbol: claude ? "sparkle" : "hexagon", tint: claude ? s.claude.swiftUI : s.accent.swiftUI,
-                    style: s, badge: agent.state == "blocked" || agent.state == "done" ? agent.state : nil)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(agent.task).font(.system(size: 12.5, weight: .medium)).foregroundStyle(s.text.swiftUI).lineLimit(1)
-                    Spacer(minLength: 4)
-                    if agent.state == "blocked" { StatusBadge(state: "blocked-dot", style: s) }
-                    if agent.state == "working" { StatusBadge(state: "working", style: s) }
-                    Text(age).font(.system(size: 10.5)).foregroundStyle(s.secondary.swiftUI)
-                }
-                // Why it's waiting matters most: full width, up to two lines.
-                Text(subtitle).font(.system(size: 11)).foregroundStyle(subtitleColor(s))
-                    .lineLimit(agent.state == "blocked" ? 2 : 1)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.horizontal, 8).padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(selected ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear))
-        )
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(selected ? s.border.swiftUI : .clear, lineWidth: 1))
-        .contentShape(Rectangle())
-        .onTapGesture { model.jump(to: agent) }
-        .onHover { hover = $0 }
-        .help("\(agent.sessionLabel) · \(agent.cwd)")
-    }
-
-    var subtitle: String {
-        switch agent.state {
-        case "blocked": return agent.message.isEmpty ? "Needs you" : agent.message
-        case "working": return "Working · \(agent.sessionLabel)"
-        case "done": return "Done · \(agent.sessionLabel)"
-        default: return "Idle · \(agent.sessionLabel)"
-        }
-    }
-
-    func subtitleColor(_ s: Style) -> Color {
-        agent.state == "blocked" ? s.blocked.swiftUI.opacity(0.9) : s.secondary.swiftUI
-    }
-
-    var age: String {
-        guard let d = agent.updatedAt else { return "" }
-        let secs = -d.timeIntervalSinceNow
-        switch secs {
-        case ..<60: return "now"
-        case ..<3600: return "\(Int(secs / 60))m"
-        case ..<86400: return "\(Int(secs / 3600))h"
-        default: return "\(Int(secs / 86400))d"
-        }
-    }
-}
-
 struct TabRow: View {
     @ObservedObject var model: AppModel
     let window: WindowInfo
@@ -157,26 +99,42 @@ struct TabRow: View {
         let s = model.style
         let active = window.id == model.active?.id
         let info = window.focused.flatMap { model.blocks[$0] }
-        let parts = window.titleParts(model.blocks)
-        HStack(spacing: 10) {
-            AppTile(symbol: info?.symbol ?? "apple.terminal", tint: active ? s.accent.swiftUI : s.secondary.swiftUI, style: s)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(parts.primary).font(.system(size: 12.5, weight: active ? .medium : .regular))
-                    .foregroundStyle(active ? s.text.swiftUI : s.secondary.swiftUI).lineLimit(1)
-                if !parts.secondary.isEmpty {
-                    Text(parts.secondary).font(.system(size: 10.5)).foregroundStyle(s.secondary.swiftUI).lineLimit(1).truncationMode(.head)
+        let sum = model.summary(of: window)
+        let blocked = sum.state == "blocked"
+        HStack(alignment: sum.detail == nil ? .center : .top, spacing: 10) {
+            AppTile(symbol: sum.isAgent ? "sparkle" : (info?.symbol ?? "apple.terminal"),
+                    tint: sum.isAgent ? s.claude.swiftUI : (active ? s.accent.swiftUI : s.secondary.swiftUI),
+                    style: s, badge: blocked ? "blocked" : nil)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(sum.title).font(.system(size: 12.5, weight: active ? .semibold : .medium))
+                        .foregroundStyle(s.text.swiftUI.opacity(active ? 1 : 0.86)).lineLimit(1)
+                    Spacer(minLength: 4)
+                    if blocked {
+                        StatusBadge(state: "blocked", style: s)
+                    } else if let st = sum.state {
+                        StatusBadge(state: st, style: s)
+                    }
+                    if !blocked, index < 9, hover || active {
+                        Text("⌘\(index + 1)").font(.system(size: 10)).foregroundStyle(s.secondary.swiftUI)
+                    }
+                }
+                if let detail = sum.detail {
+                    // Why it's waiting matters most: up to two lines.
+                    Text(detail).font(.system(size: 11))
+                        .foregroundStyle(blocked ? s.blocked.swiftUI.opacity(0.9) : s.secondary.swiftUI)
+                        .lineLimit(blocked ? 2 : 1).truncationMode(sum.isAgent ? .tail : .head)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer(minLength: 4)
-            if let st = model.status(of: window) { StatusBadge(state: st == "blocked" ? "blocked-dot" : st, style: s) }
-            Text("⌘\(index + 1)").font(.system(size: 10)).foregroundStyle(s.secondary.swiftUI.opacity(hover || active ? 1 : 0))
         }
-        .padding(.horizontal, 8).padding(.vertical, 6)
+        .padding(.horizontal, 8).padding(.vertical, sum.detail == nil ? 7 : 8)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(active ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear)))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(active ? s.border.swiftUI : .clear, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture { model.selectWindow(index: index) }
         .onHover { hover = $0 }
+        .help(info?.shortDir ?? "")
     }
 }

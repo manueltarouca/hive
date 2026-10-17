@@ -332,6 +332,32 @@ func (s *Server) registerMethods() {
 				return nil
 			})
 		})
+	type moveWindowIn struct {
+		SessionID string `json:"session_id" required:"true"`
+		WindowID  string `json:"window_id" required:"true"`
+		Index     int    `json:"index" required:"true" description:"The window's new 0-based position. Past the end means last."`
+	}
+	api.Register(r, "session.move_window", "Move a window to a new position in the session's tab order.",
+		func(ctx context.Context, in moveWindowIn) (revisionOut, error) {
+			if in.Index < 0 {
+				return revisionOut{}, api.BadRequest("index must be 0 or more")
+			}
+			return s.withSession(in.SessionID, func(ss *session.Session) error {
+				w := ss.Window(in.WindowID)
+				if w == nil {
+					return api.NotFound("no window %s", in.WindowID)
+				}
+				rest := make([]*session.Window, 0, len(ss.Windows))
+				for _, o := range ss.Windows {
+					if o.ID != in.WindowID {
+						rest = append(rest, o)
+					}
+				}
+				at := min(in.Index, len(rest))
+				ss.Windows = append(rest[:at], append([]*session.Window{w}, rest[at:]...)...)
+				return nil
+			})
+		})
 	type stepIn struct {
 		SessionID string `json:"session_id" required:"true"`
 	}

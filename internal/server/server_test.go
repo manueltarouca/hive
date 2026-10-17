@@ -330,3 +330,42 @@ func writeFile(t *testing.T, path, data string) {
 		t.Fatal(err)
 	}
 }
+
+// Tabs can be reordered: the sidebar lists them in this order.
+func TestMoveWindowReorders(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	c := h.call("session.create", map[string]any{"label": "w", "layout": map[string]any{"label": "a", "command": []string{"cat"}}})
+	sid := c["session_id"].(string)
+	h.call("session.set_window_label", map[string]any{"session_id": sid, "window_id": c["window_id"], "label": "a"})
+	for _, l := range []string{"b", "c"} {
+		h.call("session.new_window", map[string]any{"session_id": sid, "label": l, "layout": map[string]any{"command": []string{"cat"}}})
+	}
+	order := func() (labels []string, ids map[string]string) {
+		v := h.call("session.view", map[string]any{"session_id": sid})
+		ids = map[string]string{}
+		for _, w := range v["windows"].([]any) {
+			m := w.(map[string]any)
+			l, _ := m["label"].(string)
+			labels = append(labels, l)
+			ids[l] = m["window_id"].(string)
+		}
+		return
+	}
+	_, ids := order()
+	h.call("session.move_window", map[string]any{"session_id": sid, "window_id": ids["c"], "index": 0})
+	if got, _ := order(); strings.Join(got, ",") != "c,a,b" {
+		t.Fatalf("after moving c first: %v", got)
+	}
+	h.call("session.move_window", map[string]any{"session_id": sid, "window_id": ids["a"], "index": 99})
+	if got, _ := order(); strings.Join(got, ",") != "c,b,a" {
+		t.Fatalf("after moving a past the end: %v", got)
+	}
+	var out map[string]any
+	if err := h.c.Call(context.Background(), "session.move_window", map[string]any{"session_id": sid, "window_id": "window:nope", "index": 0}, &out); err == nil {
+		t.Fatal("moving an unknown window should fail")
+	}
+	if err := h.c.Call(context.Background(), "session.move_window", map[string]any{"session_id": sid, "window_id": ids["a"], "index": -1}, &out); err == nil {
+		t.Fatal("a negative index should fail")
+	}
+}

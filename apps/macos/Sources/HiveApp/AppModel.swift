@@ -360,6 +360,7 @@ final class AppModel: ObservableObject {
             }
             let order = ["blocked": 0, "done": 1, "working": 2, "idle": 3]
             agents = list.sorted { (order[$0.state] ?? 9) < (order[$1.state] ?? 9) }
+            markSeen()
             notifyChanges(list)
         }
     }
@@ -405,6 +406,7 @@ final class AppModel: ObservableObject {
             }
             blocks = info
             attachVisible()
+            markSeen()
             onLayout?()
         }
     }
@@ -519,12 +521,52 @@ final class AppModel: ObservableObject {
         call("session.close_window", ["session_id": sid, "window_id": .string(w.id)])
     }
 
-    /// Whether an agent in the window is working or blocked.
-    func status(of w: WindowInfo) -> String? {
-        let states = (w.layout?.rects().map(\.0) ?? []).compactMap { blocks[$0]?.agentState }
-        if states.contains("blocked") { return "blocked" }
-        if states.contains("working") { return "working" }
-        return nil
+    /// The state a tab shows: working, blocked, or done not yet looked at.
+    func status(of w: WindowInfo) -> String? { summary(of: w).state }
+
+    // MARK: what needs the user
+
+    /// For each block whose agent finished, the agent's update time when the
+    /// user last looked at it. "Done" goes quiet once seen.
+    @Published private(set) var seenDone: [String: Date] = [:]
+
+    func doneSeen(_ a: AgentInfo) -> Bool {
+        guard let d = a.updatedAt, let seen = seenDone[a.blockID] else { return false }
+        return seen >= d
+    }
+
+    /// Marks finished agents in the window the user is looking at as seen.
+    func markSeen() {
+        guard NSApp.isActive, let w = active else { return }
+        let ids = Set(w.layout?.rects().map(\.0) ?? [])
+        for a in agents where a.state == "done" && ids.contains(a.blockID) {
+            if let d = a.updatedAt, seenDone[a.blockID] != d { seenDone[a.blockID] = d }
+        }
+    }
+
+    /// What a tab's sidebar row says (see TabSummary).
+    func summary(of w: WindowInfo) -> TabSummary {
+        let ids = Set(w.layout?.rects().map(\.0) ?? [])
+        let mine = agents.filter { ids.contains($0.blockID) }
+        let info = w.focused.flatMap { blocks[$0] }
+        let label = w.label.isEmpty ? (info?.label ?? "") : w.label
+        return TabSummary.make(label: label, program: info?.program ?? "shell", dir: info?.shortDir ?? "",
+                               agents: mine.map { AgentSnapshot(state: $0.state, task: $0.task, message: $0.message) },
+                               doneSeen: mine.filter { $0.state == "done" }.allSatisfy(doneSeen))
+    }
+
+    private var places: [AgentPlace] {
+        agents.map { AgentPlace(session: $0.sessionID, state: $0.state, doneSeen: doneSeen($0)) }
+    }
+
+    /// Agents in other sessions that need the user.
+    var attentionElsewhere: Attention { Attention.elsewhere(places, current: currentSession) }
+
+    func attention(session: String) -> Attention { Attention.of(places, session: session) }
+
+    /// Moves a tab to a new position.
+    func moveWindow(_ id: String, to index: Int) {
+        call("session.move_window", ["session_id": sid, "window_id": .string(id), "index": .number(Double(index))])
     }
 
     func newTab() { call("session.new_window", ["session_id": sid, "layout": ["cwd": .string(currentCwd())]]) }

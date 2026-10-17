@@ -85,8 +85,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         root.addSubview(sidebar)
         window.contentView = root
 
-        window.setFrameAutosaveName("HiveMain")
-        if window.frame.width < 900 || window.frame.height < 560 {
+        // Screenshot runs use their own defaults suite: they mustn't take or
+        // change the size of the user's own window.
+        if AppModel.defaults == .standard { window.setFrameAutosaveName("HiveMain") }
+        if AppModel.defaults != .standard || window.frame.width < 900 || window.frame.height < 560 {
             window.setContentSize(NSSize(width: 1280, height: 800))
             window.center()
         }
@@ -172,6 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
+        model.markSeen()
         panes.claimSizes()
         panes.sync()
     }
@@ -193,8 +196,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                      placeholder: "Filter or create…", style: model.style, items: { [weak self] q in
             guard let self else { return [] }
             var rows = self.model.sessions.enumerated().filter { fuzzy($0.element.label, q) }.map { i, s in
-                PaletteItem(title: s.label.isEmpty ? String(s.id.suffix(6)) : s.label,
-                            detail: s.agents > 0 ? "\(s.agents) agent\(s.agents == 1 ? "" : "s")" : (i < 9 ? "⌃\(i + 1)" : ""),
+                let need = self.model.attention(session: s.id)
+                let detail = !need.isEmpty
+                    ? [need.blocked > 0 ? "\(need.blocked) blocked" : nil, need.done > 0 ? "\(need.done) done" : nil].compactMap { $0 }.joined(separator: " · ")
+                    : s.agents > 0 ? "\(s.agents) agent\(s.agents == 1 ? "" : "s")" : (i < 9 ? "⌃\(i + 1)" : "")
+                return PaletteItem(title: s.label.isEmpty ? String(s.id.suffix(6)) : s.label,
+                            detail: detail,
                             symbol: "rectangle.split.2x1", checked: s.id == self.model.currentSession, section: self.model.host) { [weak self] in
                     self?.model.select(session: s.id)
                 }

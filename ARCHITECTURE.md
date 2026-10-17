@@ -71,7 +71,7 @@ bumps the session's `revision`.
 |---|---|
 | server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `client.list` |
 | sessions | `session.list`, `session.create{label,cwd,command,layout}`, `session.view`, `session.list_blocks`, `session.set_label`, `session.close` |
-| windows | `session.new_window{layout,label,focus}`, `session.close_window`, `session.focus_window`, `session.focus_next_window`, `session.focus_previous_window`, `session.set_window_label` |
+| windows | `session.new_window{layout,label,focus}`, `session.close_window`, `session.focus_window`, `session.focus_next_window`, `session.focus_previous_window`, `session.move_window{index}`, `session.set_window_label` |
 | blocks/layout | `session.new_split{block_id,direction: horizontal\|vertical,side: before\|after,ratio,focus,layout}`, `session.move_block`, `session.describe_block`, `session.focus_block`, `session.focus_direction`, `session.focus_next_pane`, `session.focus_previous_pane`, `session.zoom_block`, `session.resize_pane`, `session.set_block_label`, `block.close`, `block.method` |
 | terminal | through `block.method`, as `hive.terminal.*`: `format{format: text\|vt,trim,unwrap}`, `write`, `send_key`, `resize`, `size`, `title`, `pwd`, `process`, `program_status`, `list_dir`, `wait{timeout}` (long-poll, at most 60 s) |
 | targets | `target.resolve{kind,target,session_id,window_id}` → id, or a `not_found`/`ambiguous` error (CLI exit 3) |

@@ -52,7 +52,7 @@ lists every change.
 | Group | Methods |
 | --- | --- |
 | Sessions | `session.list`, `session.create`, `session.view`, `session.list_blocks`, `session.set_label`, `session.close` |
-| Windows | `session.new_window`, `session.close_window`, `session.focus_window`, `session.focus_next_window`, `session.focus_previous_window`, `session.set_window_label` |
+| Windows | `session.new_window`, `session.close_window`, `session.focus_window`, `session.focus_next_window`, `session.focus_previous_window`, `session.move_window`, `session.set_window_label` |
 | Blocks | `session.new_split`, `session.move_block`, `session.describe_block`, `session.focus_block`, `session.focus_direction`, `session.focus_next_pane`, `session.focus_previous_pane`, `session.zoom_block`, `session.resize_pane`, `session.set_block_label`, `block.close`, `block.method` |
 | Terminals, as `hive.terminal.NAME` | `format`, `write`, `send_key`, `resize`, `size`, `title`, `pwd`, `process`, `program_status`, `list_dir`, `wait` |
 | Agents | `agent.report`, `agent.list` |
