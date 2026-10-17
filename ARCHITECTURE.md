@@ -39,7 +39,7 @@ bumps the session's `revision`.
 
 - socket: `$XDG_RUNTIME_DIR/hive/server.sock`, or `$TMPDIR/hive-$UID/server.sock` on macOS
 - state: `$XDG_STATE_HOME/hive` (default `~/.local/state/hive`): `state.json`, `blocks/<id>.snap`, `server.log`
-- config: `~/.config/hive/init.lua` (milestone 3)
+- config: `~/.config/hive/config`, Ghostty-style `key = value` (internal/config; the app reads it through `hive config`). Lua (`init.lua`, milestone 3) is for keys and scripts
 
 ## Milestones
 

@@ -247,7 +247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
         ] + Appearance.allCases.map { a in
             PaletteItem(title: "Theme: \(a.title)", symbol: a == .night ? "moon" : a == .day ? "sun.max" : "circle.lefthalf.filled",
-                        checked: m.appearance == a) { m.appearance = a }
+                        checked: m.appearance == a) { m.setAppearance(a) }
         }
     }
 
@@ -311,7 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSMenuItem(title: "Copy", action: #selector(PaneView.copy(_:)), keyEquivalent: "c"),
             NSMenuItem(title: "Paste", action: #selector(PaneView.paste(_:)), keyEquivalent: "v"),
         ])
-        appearanceItems = Appearance.allCases.map { a in (a, item(a.title, "") { m.appearance = a }) }
+        appearanceItems = Appearance.allCases.map { a in (a, item(a.title, "") { m.setAppearance(a) }) }
         menu("View", [item("Toggle Agents Sidebar", "s", [.command, .shift]) { m.sidebar.toggle() }, .separator()]
              + appearanceItems.map(\.1))
         var paneItems: [NSMenuItem] = [item("Zoom Pane", "\r", [.command, .shift]) { m.toggleZoom() }, .separator()]

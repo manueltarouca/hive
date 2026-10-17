@@ -70,7 +70,8 @@ See [Agents](./agents) for how agents report their state.
 ## Theme
 
 Choose **Hive Day**, **Hive Night** or **Match System** in the View menu, or
-type "theme" in the command palette. hive remembers your choice.
+type "theme" in the command palette. Your choice is saved in the settings
+file (`theme`); see [Settings](./config).
 
 ## Mouse
 

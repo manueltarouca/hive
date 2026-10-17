@@ -33,6 +33,8 @@ type Options struct {
 	Preamble []byte `json:"-"`
 	// InitialInput is typed into the program once it starts.
 	InitialInput string `json:"initial_input,omitempty"`
+	// ScrollbackBytes caps the history kept; 0 is vt's default.
+	ScrollbackBytes uint64 `json:"-"`
 }
 
 // Event is something the block reports, named as in the events reference:
@@ -143,6 +145,9 @@ func Start(blockID string, opts Options, emit func(Event)) (*Block, error) {
 		if err == nil && len(opts.Restore) > 0 {
 			b.term.Feed([]byte("\x1b[2m(scrollback could not be restored)\x1b[0m\r\n"))
 		}
+	}
+	if err == nil && opts.ScrollbackBytes > 0 {
+		err = b.term.SetScrollbackLimit(uint(opts.ScrollbackBytes))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("terminal: %w", err)
@@ -578,3 +583,7 @@ func (b *Block) SnapshotTo(w io.Writer) error {
 // EventsDone is closed once every event, child_exited last, has been
 // delivered.
 func (b *Block) EventsDone() <-chan struct{} { return b.evDone }
+
+// SetScrollbackLimit changes the history kept, in bytes. Lowering it drops
+// old lines at once.
+func (b *Block) SetScrollbackLimit(n uint64) error { return b.term.SetScrollbackLimit(uint(n)) }

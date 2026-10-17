@@ -25,8 +25,16 @@ type harness struct {
 
 func start(t *testing.T, state string, resume func(string, string) []string) *harness {
 	t.Helper()
+	return startCfg(t, state, func(c *Config) { c.ResumeArgv = resume })
+}
+
+// startCfg starts a server whose Config the caller adjusts.
+func startCfg(t *testing.T, state string, adjust func(*Config)) *harness {
+	t.Helper()
 	sock := filepath.Join(os.TempDir(), fmt.Sprintf("hive-test-%d-%d.sock", os.Getpid(), time.Now().UnixNano()))
-	srv, err := New(Config{Socket: sock, StateDir: state, FlushDelay: 50 * time.Millisecond, ResumeArgv: resume})
+	cfg := Config{Socket: sock, StateDir: state, FlushDelay: 50 * time.Millisecond}
+	adjust(&cfg)
+	srv, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

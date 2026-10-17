@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import HiveCore
 import HiveKit
@@ -161,10 +162,12 @@ final class AppModel: ObservableObject {
     @Published var activeWindow: String?
     @Published var blocks: [String: BlockInfo] = [:]
     @Published var style: Style = .light
-    /// The theme: Hive Day, Hive Night, or follow macOS.
-    @Published var appearance = Appearance(stored: AppModel.defaults.string(forKey: "appearance")) {
-        didSet { AppModel.defaults.set(appearance.rawValue, forKey: "appearance") }
-    }
+    /// The settings file (~/.config/hive/config), read through the bundled hive.
+    let settingsStore = SettingsStore()
+    /// The theme: Hive Day, Hive Night, or follow macOS. From the settings
+    /// file; until it exists, the choice remembered before (UserDefaults).
+    @Published var appearance = Appearance.system
+    private var settingsBag: Set<AnyCancellable> = []
     /// The agents sidebar: vertical tabs, organized around agents.
     @Published var sidebar = AppModel.defaults.bool(forKey: "sidebar") {
         didSet { AppModel.defaults.set(sidebar, forKey: "sidebar") }
@@ -185,6 +188,21 @@ final class AppModel: ObservableObject {
         socket = AppModel.socketPath()
         client = HiveClient(socketPath: socket, queue: vt)
         engine = Engine(client: client)
+        appearance = settingsStore.fileExists ? settingsStore.settings.theme
+            : Appearance(stored: AppModel.defaults.string(forKey: "appearance"))
+        settingsStore.$settings.combineLatest(settingsStore.$fileExists).sink { [weak self] s, exists in
+            guard let self, exists, self.appearance != s.theme else { return }
+            self.appearance = s.theme
+        }.store(in: &settingsBag)
+    }
+
+    /// The settings the app follows (bell, notifications, paste).
+    var settings: Settings { settingsStore.settings }
+
+    /// Chosen from the menu or palette: applied now, and written to the file.
+    func setAppearance(_ a: Appearance) {
+        appearance = a
+        settingsStore.set("theme", a.rawValue)
     }
 
     static func socketPath() -> String {
@@ -197,7 +215,8 @@ final class AppModel: ObservableObject {
     }
 
     /// The hive binary: bundled in the app, or HIVE_BIN, or on PATH.
-    static func hiveBinary() -> String? {
+    /// Reads only the bundle, the environment and the disk: any thread.
+    nonisolated static func hiveBinary() -> String? {
         if let p = Bundle.main.url(forResource: "hive", withExtension: nil)?.path, FileManager.default.isExecutableFile(atPath: p) { return p }
         if let p = ProcessInfo.processInfo.environment["HIVE_BIN"] { return p }
         for dir in (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":") {
@@ -213,7 +232,9 @@ final class AppModel: ObservableObject {
     private var closing = false
 
     func start() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        if settings.notify != "never" {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
         // Only at launch: if the server stops later, it was asked to.
         // Reconnecting must not undo `hive server stop`.
         ensureServer()
@@ -371,7 +392,11 @@ final class AppModel: ObservableObject {
 
     private func notifyChanges(_ list: [AgentInfo]) {
         defer { lastAgentStates = Dictionary(uniqueKeysWithValues: list.map { ($0.blockID, $0.state) }) }
-        guard !NSApp.isActive else { return }
+        switch settings.notify {
+        case "never": return
+        case "always": break
+        default: guard !NSApp.isActive else { return } // background
+        }
         for a in list where (a.state == "blocked" || a.state == "done") && lastAgentStates[a.blockID] != a.state {
             let c = UNMutableNotificationContent()
             c.title = "\(Programs.lookup(a.harness).name) \(a.state == "blocked" ? "needs you" : "is done")"
@@ -734,6 +759,7 @@ final class AppModel: ObservableObject {
 
     /// Checks on the vt queue whether pasting s is safe, then answers on main.
     func pasteChecked(block: String, _ s: String, then: @escaping @MainActor (Bool) -> Void) {
+        guard settings.confirmPaste else { then(true); return } // confirm-paste = false
         let engine = engine
         vt.async {
             let safe = engine.mirror(block: block)?.isPasteSafe(s) ?? true

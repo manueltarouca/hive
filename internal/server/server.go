@@ -31,6 +31,7 @@ import (
 	"github.com/manueltarouca/hive/internal/agents"
 	"github.com/manueltarouca/hive/internal/api"
 	"github.com/manueltarouca/hive/internal/block"
+	"github.com/manueltarouca/hive/internal/config"
 	"github.com/manueltarouca/hive/internal/events"
 	"github.com/manueltarouca/hive/internal/id"
 	"github.com/manueltarouca/hive/internal/persist"
@@ -56,6 +57,10 @@ type Config struct {
 	// ResumeArgv builds the command that resumes an agent. Default
 	// agents.ResumeArgv.
 	ResumeArgv func(harness, sessionID string) []string
+	// ConfigPath is the settings file; empty means defaults and no file
+	// (tests). ConfigPoll is how often it's checked for edits (default 2s).
+	ConfigPath string
+	ConfigPoll time.Duration
 }
 
 type exitRec struct {
@@ -84,6 +89,12 @@ type Client struct {
 
 // Server is a running hive server.
 type Server struct {
+	// conf is the settings (guarded by mu), confStamp the file's identity
+	// when it was read.
+	conf      config.Config
+	confDiags []config.Diagnostic
+	confStamp fileStamp
+
 	cfg   Config
 	log   *slog.Logger
 	reg   *api.Registry
@@ -120,6 +131,9 @@ func New(cfg Config) (*Server, error) {
 	if cfg.ResumeArgv == nil {
 		cfg.ResumeArgv = agents.ResumeArgv
 	}
+	if cfg.ConfigPoll == 0 {
+		cfg.ConfigPoll = 2 * time.Second
+	}
 	s := &Server{
 		cfg: cfg, log: cfg.Logger, reg: api.New(), bus: events.New(4096),
 		store:  persist.New(cfg.StateDir),
@@ -127,7 +141,18 @@ func New(cfg Config) (*Server, error) {
 		dirty: make(chan struct{}, 1), flushReq: make(chan chan error),
 		quit: make(chan struct{}), stopped: make(chan struct{}),
 	}
+	s.conf, s.confDiags, s.confStamp = s.readConfig()
+	for _, d := range s.confDiags {
+		s.log.Warn("config", "path", cfg.ConfigPath, "problem", d.String())
+	}
+	if !s.conf.ResumeAgents {
+		cfg.ResumeArgv = func(string, string) []string { return nil } // read at start: resume-agents = false
+		s.cfg.ResumeArgv = cfg.ResumeArgv
+	}
 	s.registerMethods()
+	if cfg.ConfigPath != "" {
+		go s.watchConfig()
+	}
 	// Built here, not in Serve, so a Shutdown racing a starting Serve sees it.
 	s.srv = &http.Server{Handler: s.handler(), ReadHeaderTimeout: 10 * time.Second}
 	if !cfg.Fresh {
@@ -244,6 +269,7 @@ func (s *Server) startBlock(sessionID, blockID string, st *persist.BlockState, o
 			return nil, api.BadRequest("cwd %q is not a directory", opts.Cwd)
 		}
 	}
+	opts.ScrollbackBytes = s.conf.ScrollbackLimit
 	b, err := block.Start(blockID, opts, func(e block.Event) { s.onBlockEvent(sessionID, e) })
 	if err != nil {
 		return nil, api.BadRequest("start %v: %v", opts.Command, err)

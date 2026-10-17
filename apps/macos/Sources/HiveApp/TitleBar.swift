@@ -25,6 +25,7 @@ struct TitleBar: View {
             // With the sidebar open, the tabs live there.
             if !model.sidebar { Tabs(model: model) }
             Spacer(minLength: 4)
+            SettingsBanner(store: model.settingsStore, style: s)
             HStack(spacing: 2) {
                 BarButton(symbol: "command", help: "Command palette (⇧⌘P)", style: s, action: openPalette)
                 BarButton(symbol: "plus", help: "New tab (⌘T)", style: s) { model.newTab() }
@@ -203,3 +204,33 @@ struct BarButton: View {
 final class TitleBarHost<V: View>: NSHostingView<V> {
     override var mouseDownCanMoveWindow: Bool { true }
 }
+
+/// A problem with the settings file, or a write that failed: a small warning
+/// in the title bar. Clicking it opens the file. Settings keep working: a bad
+/// value keeps its default.
+struct SettingsBanner: View {
+    @ObservedObject var store: SettingsStore
+    let style: Style
+    @State private var hover = false
+
+    var body: some View {
+        if let text = store.writeError.map({ "Settings: " + $0 }) ?? store.settings.banner {
+            Button { store.openInEditor() } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10.5))
+                        .foregroundStyle(style.blocked.swiftUI)
+                    Text(text).font(.system(size: 11.5)).foregroundStyle(style.text.swiftUI.opacity(0.85))
+                        .lineLimit(1).truncationMode(.tail)
+                }
+                .padding(.horizontal, 9).frame(height: 24)
+                .background(Capsule().fill(style.blocked.swiftUI.opacity(hover ? 0.2 : 0.12)))
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: 380)
+            .onHover { hover = $0 }
+            .help(text + "\nClick to open the settings file.")
+            .accessibilityLabel(text)
+        }
+    }
+}
+

@@ -58,6 +58,7 @@ const terminalPrefix = "hive.terminal."
 
 func (s *Server) registerMethods() {
 	r := s.reg
+	s.registerConfigMethods()
 
 	// ---- server ----
 	api.Register(r, "server.version", "Return the server's version and where it keeps its state.",

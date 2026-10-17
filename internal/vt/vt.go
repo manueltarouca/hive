@@ -343,6 +343,12 @@ func (v *Term) Reset() {
 	})
 }
 
+// SetScrollbackLimit caps the history kept, in bytes. Lowering it drops old
+// lines at once.
+func (v *Term) SetScrollbackLimit(n uint) error {
+	return v.do(func(t *ghostty.Terminal) error { return t.SetScrollbackMaxBytes(&n) })
+}
+
 // Format renders the terminal's contents, scrollback included.
 func (v *Term) Format(o FormatOpts) (string, error) {
 	format := ghostty.FormatterFormatPlain

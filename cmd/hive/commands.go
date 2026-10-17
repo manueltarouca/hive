@@ -20,6 +20,7 @@ import (
 	"github.com/manueltarouca/hive/internal/agents"
 	"github.com/manueltarouca/hive/internal/block"
 	"github.com/manueltarouca/hive/internal/client"
+	"github.com/manueltarouca/hive/internal/config"
 	"github.com/manueltarouca/hive/internal/paths"
 	"github.com/manueltarouca/hive/internal/server"
 )
@@ -58,6 +59,14 @@ Agents (hive)
   agent uninstall claude     remove them
   agent hook HARNESS         called by an agent's hooks
 
+Settings (~/.config/hive/config, or HIVE_CONFIG)
+  config path [--create]     where the file is (--create: from the template)
+  config default             print the commented template
+  config check               report problems by line (exit 1 on errors)
+  config show [--json]       every setting's value and where it came from
+  config set KEY VALUE       change one setting, keeping the rest of the file
+  config reload              make the server read it again
+
 API
   api list [-q]              every server method
   api describe METHOD        a method's arguments and result
@@ -84,6 +93,8 @@ func dispatch(g globals, args []string) error {
 		return nil
 	case "server":
 		return cmdServer(g, rest)
+	case "config":
+		return cmdConfig(g, rest)
 	case "ls":
 		return cmdLs(g, rest)
 	case "new":
@@ -306,7 +317,7 @@ func cmdServer(g globals, args []string) error {
 			return err
 		}
 		exe, _ := os.Executable()
-		srv, err := server.New(server.Config{Socket: *sock, StateDir: *state, Fresh: *fresh, HivePath: exe,
+		srv, err := server.New(server.Config{Socket: *sock, StateDir: *state, Fresh: *fresh, HivePath: exe, ConfigPath: config.Path(),
 			Logger: newLogger()})
 		if err != nil {
 			return err

@@ -14,7 +14,8 @@ for t in winid; do
   [ "$tools/$t" -nt "$here/script/tools/$t.swift" ] || swiftc -O "$here/script/tools/$t.swift" -o "$tools/$t"
 done
 D="$(mktemp -d "${TMPDIR:-/tmp}/hive-fixture.XXXX")"
-export HIVE_SERVER="$D/s.sock" HIVE_STATE_DIR="$D/state"
+# HIVE_CONFIG: the fixture's own settings, never the real file.
+export HIVE_SERVER="$D/s.sock" HIVE_STATE_DIR="$D/state" HIVE_CONFIG="$D/config"
 # Fixture agents report made-up sessions: never resume a real agent.
 export HIVE_RESUME_CLAUDE='["sh","-c","echo resumed {id}; exec cat"]'
 H="$root/bin/hive"
@@ -52,9 +53,10 @@ done
 suite=xyz.matm.hive.shots
 defaults delete "$suite" >/dev/null 2>&1 || true
 [ "${SIDEBAR:-0}" = 1 ] && defaults write "$suite" sidebar -bool true
-# APPEARANCE=system|day|night stores the theme setting. Use the style
-# "system" to test it: then HIVE_STYLE isn't set and the setting decides.
-[ -n "${APPEARANCE:-}" ] && defaults write "$suite" appearance -string "$APPEARANCE"
+# APPEARANCE=system|day|night sets the theme in the fixture's settings file.
+# Use the style "system" to test it: then HIVE_STYLE isn't set and the
+# setting decides.
+[ -n "${APPEARANCE:-}" ] && $H config set theme "$APPEARANCE"
 # SESSION=label opens the app in that session instead of the last one.
 if [ -n "${SESSION:-}" ]; then
   sid=$($H api call target.resolve "{\"kind\":\"session\",\"target\":\"$SESSION\"}" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["id"])')
@@ -73,7 +75,7 @@ cleanup() {
   "$H" server stop >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
-open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$envstyle" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
+open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_CONFIG="$HIVE_CONFIG" --env HIVE_STYLE="$envstyle" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
   --stdout "$out/app.log" --stderr "$out/app.log" "$here/build/Hive.app"
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   app=$(lsof -t "$out/app.log" 2>/dev/null | head -1)
@@ -101,6 +103,6 @@ for f in titlebar header; do cwebp -quiet -q 85 "$out/$style-$f.png" -o "$out/$s
 echo "$D" > "$out/fixture"
 # Follow-up commands source this: both variables, or a stray server uses
 # your real state directory.
-{ printf 'export HIVE_SERVER=%s HIVE_STATE_DIR=%s\n' "$HIVE_SERVER" "$HIVE_STATE_DIR"
+{ printf 'export HIVE_SERVER=%s HIVE_STATE_DIR=%s HIVE_CONFIG=%s\n' "$HIVE_SERVER" "$HIVE_STATE_DIR" "$HIVE_CONFIG"
   printf "export HIVE_RESUME_CLAUDE='%s'\n" "$HIVE_RESUME_CLAUDE"; } > "$out/fixture.env"
 echo "$out/$style.webp"

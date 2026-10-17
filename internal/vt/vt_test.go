@@ -2,6 +2,7 @@ package vt
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -145,5 +146,52 @@ func TestClipboardWritesAreBounded(t *testing.T) {
 			lens = append(lens, len(g))
 		}
 		t.Fatalf("hook got %d writes, lengths %v", len(got), lens)
+	}
+}
+
+// The scrollback limit is a setting (scrollback-limit): a terminal keeps at
+// most that much history, also one restored from a snapshot, and a lower
+// limit drops old lines at once.
+func TestScrollbackLimit(t *testing.T) {
+	fill := func(term *Term) {
+		var b strings.Builder
+		for i := 0; i < 20000; i++ {
+			fmt.Fprintf(&b, "line %05d %s\r\n", i, strings.Repeat("x", 60))
+		}
+		term.Feed([]byte(b.String()))
+	}
+	has := func(term *Term, s string) bool {
+		out, err := term.Format(FormatOpts{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Contains(out, s)
+	}
+	term, _ := New(80, 24, Hooks{})
+	defer term.Close()
+	fill(term)
+	if !has(term, "line 00000") {
+		t.Fatal("the default limit (16m) lost early lines")
+	}
+	if err := term.SetScrollbackLimit(64 << 10); err != nil {
+		t.Fatal(err)
+	}
+	if has(term, "line 00000") || !has(term, "line 19999") {
+		t.Fatal("a 64k limit kept the early lines, or lost the last")
+	}
+
+	small, _ := New(80, 24, Hooks{})
+	_ = small.SetScrollbackLimit(64 << 10)
+	snap, _ := small.Snapshot()
+	small.Close()
+	restored, err := Restore(snap, Hooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restored.Close()
+	_ = restored.SetScrollbackLimit(64 << 10)
+	fill(restored)
+	if has(restored, "line 00000") {
+		t.Fatal("a restored terminal ignored its limit")
 	}
 }
