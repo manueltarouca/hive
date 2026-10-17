@@ -28,6 +28,17 @@ func TestProgramOf(t *testing.T) {
 		{"Python", "/Library/Frameworks/Python.framework/Versions/3.12/Resources/Python.app/Contents/MacOS/Python", []string{"python3", "app.py"}, "python"},
 		{"bun", "/Users/x/.bun/bin/bun", []string{"bun", "run", "dev"}, "bun"},
 		{"htop", "", nil, "htop"},
+		// Interactive shells are shells; a shell running something is named
+		// by what it runs (a wrapper script that doesn't exec stays in front).
+		{"zsh", "/bin/zsh", []string{"zsh", "-f"}, "zsh"},
+		{"bash", "/bin/bash", []string{"bash", "--login"}, "bash"},
+		{"bash", "/bin/bash", []string{"bash", "/Users/x/bin/claude"}, "claude"},
+		{"bash", "/bin/bash", []string{"/bin/bash", "/Users/x/bin/run-agent.sh", "--fast"}, "run-agent"},
+		{"zsh", "/bin/zsh", []string{"zsh", "-c", "claude --resume abc"}, "claude"},
+		{"sh", "/bin/sh", []string{"sh", "-c", "FOO=1 exec cat"}, "cat"},
+		// Release builds named with their version and platform.
+		{"grok-1.0.41-macos-aarch64", "/Users/x/.grok/bin/grok-1.0.41-macos-aarch64", []string{"grok"}, "grok"},
+		{"node-22", "", nil, "node-22"},
 		{"", "", nil, ""},
 	}
 	for _, c := range cases {
@@ -61,4 +72,23 @@ func TestForegroundNamesTheProgram(t *testing.T) {
 		p, _ = b.Foreground()
 		return p.Program == "claude"
 	})
+}
+
+// A pane is "at the shell" only with an interactive shell in front.
+func TestAtShell(t *testing.T) {
+	cases := []struct {
+		p    Process
+		want bool
+	}{
+		{Process{Name: "zsh", Program: "zsh"}, true},
+		{Process{Name: "-bash"}, true}, // saved by an older server
+		{Process{Name: "bash", Program: "claude"}, false},
+		{Process{Name: "2.1.302", Program: "claude"}, false},
+		{Process{Name: "2.1.302"}, false},
+	}
+	for _, c := range cases {
+		if got := c.p.AtShell(); got != c.want {
+			t.Errorf("%+v.AtShell() = %v, want %v", c.p, got, c.want)
+		}
+	}
 }

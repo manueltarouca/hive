@@ -46,7 +46,9 @@ The first release.
   Match System theme setting. The sidebar shows each tab's agent, its task
   and state; tabs reorder by dragging. Tabs show each program as an app
   icon, and the server names programs as people do (Claude Code, not its
-  version number; npm tools, not node). ⌘/ shows every shortcut. Accents typed
+  version number; npm tools, not node). Grok, which runs Claude Code's
+  hooks, is told apart from Claude, and an agent killed without ending its
+  session ends when its shell returns, so it isn't resumed. ⌘/ shows every shortcut. Accents typed
   with dead keys (~, ´, ^) reach programs as typed, Claude Code included.
 - **The mouse in terminal programs:** the scroll wheel, clicks and drags
   reach programs that use the mouse (Claude Code's scrolling and copy), and a

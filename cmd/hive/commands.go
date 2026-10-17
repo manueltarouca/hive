@@ -1241,6 +1241,8 @@ func agentHook(g globals, harness string) error {
 		return nil // not running inside hive
 	}
 	data, _ := io.ReadAll(io.LimitReader(os.Stdin, 1<<20))
+	// The hook may run for another agent: grok runs Claude Code's hooks.
+	harness = agents.HookHarness(harness, os.Getenv)
 	r, err := agents.ParseHook(harness, data)
 	if errors.Is(err, agents.ErrNoChange) {
 		return nil

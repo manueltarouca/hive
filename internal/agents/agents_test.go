@@ -2,6 +2,7 @@ package agents
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -146,5 +147,56 @@ func TestInstallFollowsSymlinkedSettings(t *testing.T) {
 func TestResumeArgvRefusesFlagLikeIDs(t *testing.T) {
 	if ResumeArgv("claude", "-x") != nil || ResumeArgv("claude", "--resume") != nil || ResumeArgv("claude", "a b") != nil {
 		t.Fatal("flag-like or spaced session IDs must not reach a command line")
+	}
+}
+
+// Some agents run Claude Code's hooks too (Grok's CLI reads the same
+// settings), so a "claude" report can come from another agent. The program
+// in the pane decides: resuming grok's session with claude would fail.
+func TestHarnessFollowsTheRunningAgent(t *testing.T) {
+	cases := []struct{ reported, running, want string }{
+		{"claude", "claude", "claude"},
+		{"claude", "grok", "grok"},
+		{"claude", "codex", "codex"},
+		{"claude", "zsh", "claude"}, // a hook can run as the shell takes over
+		{"claude", "", "claude"},
+		{"codex", "node", "codex"},
+	}
+	for _, c := range cases {
+		if got := Harness(c.reported, c.running); got != c.want {
+			t.Errorf("Harness(%q, %q) = %q, want %q", c.reported, c.running, got, c.want)
+		}
+	}
+}
+
+// Grok runs the hooks in ~/.claude/settings.json and says so in the
+// variables it sets on every hook process.
+func TestHookHarnessUnderGrok(t *testing.T) {
+	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	if got := HookHarness("claude", env(nil)); got != "claude" {
+		t.Errorf("plain claude hook = %q", got)
+	}
+	if got := HookHarness("claude", env(map[string]string{"GROK_SESSION_ID": "01a1", "GROK_HOOK_EVENT": "session_start"})); got != "grok" {
+		t.Errorf("hook under grok = %q", got)
+	}
+}
+
+// Grok's events, as its hooks guide shows them: Claude's event names, its
+// own camelCase session field, and subagent sessions tagged subagentType.
+func TestParseGrokHooks(t *testing.T) {
+	r, err := ParseHook("grok", []byte(`{"hookEventName":"session_start","hook_event_name":"SessionStart","sessionId":"01a14b1e-1122-7a50-a819-084bfc5e3bbf","cwd":"/Users/x/media"}`))
+	if err != nil || r.Harness != "grok" || r.State != "idle" || r.SessionID != "01a14b1e-1122-7a50-a819-084bfc5e3bbf" {
+		t.Fatalf("grok SessionStart = %+v, %v", r, err)
+	}
+	if r, err := ParseHook("grok", []byte(`{"hook_event_name":"Stop","session_id":"s1"}`)); err != nil || r.State != "done" {
+		t.Fatalf("grok Stop = %+v, %v", r, err)
+	}
+	// A subagent's session starting or ending says nothing about the agent
+	// in the pane, and its ID isn't the one to resume.
+	for _, ev := range []string{"SessionStart", "SessionEnd"} {
+		_, err := ParseHook("grok", []byte(`{"hook_event_name":"`+ev+`","sessionId":"child-1","subagentType":"explore"}`))
+		if !errors.Is(err, ErrNoChange) {
+			t.Errorf("subagent %s: err = %v, want ErrNoChange", ev, err)
+		}
 	}
 }

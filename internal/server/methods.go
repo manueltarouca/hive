@@ -1035,6 +1035,17 @@ func (s *Server) registerAgentMethods() {
 				s.mu.Unlock()
 				return nil, err
 			}
+			// Agents borrow each other's hooks (grok runs Claude Code's):
+			// the agent running in the pane is the one reporting.
+			if fg, err := rr.b.Foreground(); err == nil {
+				in.Harness = agents.Harness(in.Harness, fg.Program)
+				// Hooks run inside the agent, which holds the terminal. With
+				// the shell in front, this is a hook finishing after the
+				// agent exited: it stays ended.
+				if fg.AtShell() {
+					in.State = "ended"
+				}
+			}
 			a := rr.st.Agent
 			if a == nil || a.Harness != in.Harness {
 				a = &persist.Agent{Harness: in.Harness}

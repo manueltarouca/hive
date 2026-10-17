@@ -351,6 +351,16 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 	case "process_changed":
 		if p, ok := e.Payload["foreground"].(block.Process); ok {
 			r.st.Foreground = &p
+			// The shell is back in front: the agent exited, maybe killed
+			// before its SessionEnd hook. Its tools never take the terminal
+			// (they run without one), so this means it's gone. A report from
+			// it later brings it back.
+			if a := r.st.Agent; a != nil && a.State != "ended" && p.AtShell() {
+				a.State, a.Message, a.UpdatedAt = "ended", "", time.Now().UTC()
+				s.bus.Block(r.st.SessionID, e.BlockID, "agent_changed", map[string]any{
+					"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": "", "event": "shell_returned",
+				})
+			}
 		}
 	case "program_status_changed":
 		if rec, ok := e.Payload["record"].(vt.ProgramStatus); ok {
@@ -661,9 +671,11 @@ func restoreCwd(st *persist.BlockState) string {
 }
 
 // restoreCommand picks what a restored block runs: the agent's resume
-// command, or a shell. Other programs are not re-run.
+// command, or a shell. Other programs are not re-run. An agent whose pane
+// was back at a shell had exited without saying so (killed before its
+// SessionEnd hook): resuming it would reopen a session the user closed.
 func restoreCommand(st *persist.BlockState, resume func(string, string) []string) (argv []string, was string) {
-	if a := st.Agent; a != nil && a.State != "ended" {
+	if a := st.Agent; a != nil && a.State != "ended" && (st.Foreground == nil || !st.Foreground.AtShell()) {
 		if argv := resume(a.Harness, a.SessionID); argv != nil {
 			return argv, a.Harness + " " + a.SessionID
 		}

@@ -113,8 +113,9 @@ struct BlockInfo: Equatable {
     /// The program as people call it: "Node", "Neovim", "Claude Code".
     var program: String { programInfo.name }
 
-    /// The agent if one reports from here, else the foreground program.
-    var programInfo: Program { Programs.lookup(harness ?? foreground ?? "") }
+    /// The agent if one reports from here, else the foreground program (see
+    /// Programs.shown for when the running program wins).
+    var programInfo: Program { Programs.shown(harness: harness, foreground: foreground) }
 
     /// An agent's task, from the title it sets ("✳ Arch review" → "Arch review").
     var task: String? { harness.flatMap { taskName(title: title, harness: $0) } }
@@ -359,7 +360,7 @@ final class AppModel: ObservableObject {
         guard !NSApp.isActive else { return }
         for a in list where (a.state == "blocked" || a.state == "done") && lastAgentStates[a.blockID] != a.state {
             let c = UNMutableNotificationContent()
-            c.title = "\(a.harness) \(a.state == "blocked" ? "needs you" : "is done")"
+            c.title = "\(Programs.lookup(a.harness).name) \(a.state == "blocked" ? "needs you" : "is done")"
             c.body = [a.sessionLabel.isEmpty ? nil : a.sessionLabel, a.message.isEmpty ? nil : a.message].compactMap { $0 }.joined(separator: " — ")
             UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "\(a.blockID)-\(a.state)", content: c, trigger: nil))
         }

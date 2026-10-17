@@ -72,6 +72,31 @@ var claudeStates = map[string]string{
 	"PostToolUse": "working", "Stop": "done", "SessionEnd": "ended",
 }
 
+// Names lists the agents hive knows. Their programs are named the same (see
+// programOf in internal/block).
+var Names = map[string]bool{"claude": true, "codex": true, "gemini": true, "grok": true, "opencode": true}
+
+// HookHarness is the agent a hook really runs for. Grok runs the hooks in
+// ~/.claude/settings.json for Claude Code compatibility, so hive's "claude"
+// hook also fires inside grok; grok sets GROK_SESSION_ID on every hook.
+func HookHarness(installed string, getenv func(string) string) string {
+	if getenv("GROK_SESSION_ID") != "" || getenv("GROK_HOOK_EVENT") != "" {
+		return "grok"
+	}
+	return installed
+}
+
+// Harness reconciles a report with the program running in the pane: when
+// that is another agent, the report came through borrowed hooks and that
+// agent is the one to name and resume. Anything else (a shell taking over,
+// an unknown name) keeps the report's.
+func Harness(reported, running string) string {
+	if Names[running] && running != reported {
+		return running
+	}
+	return reported
+}
+
 // ErrNoChange means the hook carries nothing to report.
 var ErrNoChange = errors.New("no state change")
 
@@ -79,6 +104,8 @@ var ErrNoChange = errors.New("no state change")
 func ParseHook(harness string, data []byte) (Report, error) {
 	var in struct {
 		SessionID      string `json:"session_id"`
+		SessionIDCamel string `json:"sessionId"`    // grok
+		Subagent       string `json:"subagentType"` // grok: a child session's events
 		TranscriptPath string `json:"transcript_path"`
 		Cwd            string `json:"cwd"`
 		Event          string `json:"hook_event_name"`
@@ -89,16 +116,24 @@ func ParseHook(harness string, data []byte) (Report, error) {
 	if err := json.Unmarshal(data, &in); err != nil {
 		return Report{}, fmt.Errorf("hook input: %w", err)
 	}
+	if in.SessionID == "" {
+		in.SessionID = in.SessionIDCamel
+	}
 	r := Report{Harness: harness, Event: in.Event, SessionID: in.SessionID, Cwd: in.Cwd,
 		TranscriptPath: in.TranscriptPath, Message: in.Message, Source: in.Source}
 	switch harness {
-	case "claude", "codex":
+	case "claude", "codex", "grok":
 		r.State = claudeStates[in.Event]
 	default:
 		return r, fmt.Errorf("unknown harness %q", harness)
 	}
 	if r.State == "" {
 		return r, fmt.Errorf("unknown hook event %q", in.Event)
+	}
+	if in.Subagent != "" {
+		// A subagent's session starting or ending isn't the pane's agent,
+		// and its ID isn't the one to resume.
+		return r, ErrNoChange
 	}
 	if in.Event == "Notification" {
 		switch in.NotifType {

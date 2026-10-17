@@ -95,3 +95,36 @@ import Testing
         #expect(BrandIcon.fill("python") == 0x3776AB)
     }
 }
+
+/// What a pane shows: the agent that reported from it, unless the program
+/// running there says otherwise.
+@Suite struct ShownProgramTests {
+    /// Release binaries carry a version and platform (older servers send them).
+    @Test func versionedAgentBinaries() {
+        #expect(Programs.lookup("grok-1.0.41-macos-aarch64").name == "Grok")
+        #expect(Programs.canonical("grok-1.0.62-macos-aarch64") == "grok")
+        #expect(Programs.canonical("Python") == "python")
+        #expect(Programs.canonical("-zsh") == "zsh")
+    }
+
+    @Test func theReportedAgent() {
+        #expect(Programs.shown(harness: "claude", foreground: "claude").name == "Claude Code")
+        // Older servers name Claude by its binary, a version number.
+        #expect(Programs.shown(harness: "claude", foreground: "2.1.302").name == "Claude Code")
+        #expect(Programs.shown(harness: "gemini", foreground: "node").name == "Gemini")
+        #expect(Programs.shown(harness: nil, foreground: "nvim").name == "Neovim")
+    }
+
+    /// Grok runs Claude Code's hooks, so a "claude" agent can be grok.
+    @Test func anotherAgentRunningWins() {
+        #expect(Programs.shown(harness: "claude", foreground: "grok-1.0.41-macos-aarch64").name == "Grok")
+        #expect(Programs.shown(harness: "claude", foreground: "codex").name == "Codex")
+    }
+
+    /// An agent that ended without saying so (killed) leaves the shell.
+    @Test func backAtTheShell() {
+        #expect(Programs.shown(harness: "claude", foreground: "zsh").name == "Zsh")
+        #expect(Programs.shown(harness: "claude", foreground: "-bash").name == "Bash")
+        #expect(Programs.shown(harness: "claude", foreground: nil).name == "Claude Code")
+    }
+}

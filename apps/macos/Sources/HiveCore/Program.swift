@@ -113,7 +113,36 @@ public enum Programs {
     /// name. Names compare without case: macOS calls Python "Python".
     public static func lookup(_ name: String) -> Program {
         if name.isEmpty { return Program("shell", .symbol("apple.terminal")) }
-        return table[name.lowercased()] ?? Program(name, .symbol("apple.terminal"))
+        return table[canonical(name)] ?? Program(name, .symbol("apple.terminal"))
+    }
+
+    /// The agents hive knows, as the server names them (agents.Names).
+    public static let agents: Set<String> = ["claude", "codex", "gemini", "grok", "opencode"]
+    static let shells: Set<String> = ["zsh", "bash", "sh", "fish", "dash", "ksh", "tcsh", "nu"]
+
+    /// A reported name, as the table keys it: lowercase, a login shell's
+    /// leading dash dropped, and an agent's release binary
+    /// (grok-1.0.62-macos-aarch64, sent by older servers) by its agent.
+    public static func canonical(_ name: String) -> String {
+        var n = name.lowercased()
+        if n.hasPrefix("-") { n.removeFirst() }
+        if let dash = n.firstIndex(of: "-"), agents.contains(String(n[..<dash])),
+           n[n.index(after: dash)...].first?.isNumber == true {
+            return String(n[..<dash])
+        }
+        return n
+    }
+
+    /// What a pane shows. The agent that reported from it, unless the
+    /// program running there says otherwise: another agent (grok runs Claude
+    /// Code's hooks and reports as claude), or a shell (the agent ended
+    /// without saying so).
+    public static func shown(harness: String?, foreground: String?) -> Program {
+        let fg = foreground.map(canonical) ?? ""
+        guard let harness else { return lookup(foreground ?? "") }
+        if agents.contains(fg) && fg != harness { return lookup(fg) }
+        if shells.contains(fg) { return lookup(fg) }
+        return lookup(harness)
     }
 }
 
