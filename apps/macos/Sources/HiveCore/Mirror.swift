@@ -167,6 +167,12 @@ public final class Mirror {
         }
     }
 
+    /// Applies default colors. Programs' own colors still win.
+    public func apply(theme: Theme) {
+        let pal = theme.palette.map { $0.c }
+        pal.withUnsafeBufferPointer { hive_set_theme(term, theme.foreground.c, theme.background.c, theme.cursor.c, $0.baseAddress) }
+    }
+
     public func resize(cols: UInt16, rows: UInt16, cellWidth: UInt32, cellHeight: UInt32) {
         ghostty_terminal_resize(term, cols, rows, max(cellWidth, 1), max(cellHeight, 1))
     }

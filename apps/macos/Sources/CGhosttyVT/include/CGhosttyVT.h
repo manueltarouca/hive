@@ -45,3 +45,8 @@ bool hive_mode(GhosttyTerminal t, uint16_t number, bool ansi);
 void hive_set_render_hold(GhosttyTerminal t, GhosttyTerminalRenderHoldFn fn, void *userdata);
 void hive_scroll_delta(GhosttyTerminal t, intptr_t rows);
 void hive_scroll_bottom(GhosttyTerminal t);
+
+// Sets default colors and the first 16 palette entries (the rest keep
+// libghostty's 256-color defaults).
+void hive_set_theme(GhosttyTerminal t, GhosttyColorRgb fg, GhosttyColorRgb bg, GhosttyColorRgb cursor,
+                    const GhosttyColorRgb *palette16);

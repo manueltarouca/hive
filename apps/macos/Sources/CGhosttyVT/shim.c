@@ -158,3 +158,14 @@ void hive_scroll_bottom(GhosttyTerminal t) {
   GhosttyTerminalScrollViewport s = {.tag = GHOSTTY_SCROLL_VIEWPORT_BOTTOM};
   ghostty_terminal_scroll_viewport(t, s);
 }
+
+void hive_set_theme(GhosttyTerminal t, GhosttyColorRgb fg, GhosttyColorRgb bg, GhosttyColorRgb cursor,
+                    const GhosttyColorRgb *palette16) {
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND, &fg);
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND, &bg);
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_COLOR_CURSOR, &cursor);
+  GhosttyColorRgb palette[256];
+  if (ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_COLOR_PALETTE_DEFAULT, palette) != GHOSTTY_SUCCESS) return;
+  if (palette16) memcpy(palette, palette16, 16 * sizeof(GhosttyColorRgb));
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_COLOR_PALETTE, palette);
+}

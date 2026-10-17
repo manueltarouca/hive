@@ -26,5 +26,12 @@ let package = Package(
                 swiftSettings: vtSwift + [.swiftLanguageMode(.v5)], linkerSettings: vtLink),
         .testTarget(name: "HiveCoreTests", dependencies: ["HiveCore", "HiveKit"],
                     swiftSettings: vtSwift + [.swiftLanguageMode(.v5)], linkerSettings: vtLink),
+        // Metal renderer: glyph atlases, procedural box drawing, instanced
+        // quads. Draws PaneFrames; never touches libghostty.
+        .target(name: "HiveRender", dependencies: ["HiveCore"], resources: [.copy("Resources/fonts")],
+                swiftSettings: vtSwift + [.swiftLanguageMode(.v5)]),
+        .testTarget(name: "HiveRenderTests", dependencies: ["HiveRender", "HiveCore"],
+                    resources: [.copy("Golden")],
+                    swiftSettings: vtSwift + [.swiftLanguageMode(.v5)], linkerSettings: vtLink),
     ]
 )

@@ -23,6 +23,8 @@ public final class Engine {
     public private(set) var resyncCount = 0
     public var log: (String) -> Void = { _ in }
 
+    public var theme: Theme = .tomorrowNight
+
     public init(client: HiveClient) { self.client = client }
 
     /// Starts mirroring a block. `onFrame` runs on the engine's queue.
@@ -57,7 +59,9 @@ public final class Engine {
         switch update {
         case .snapshot(let seq, let data):
             do {
-                pane.mirror = try Mirror(snapshot: data)
+                let m = try Mirror(snapshot: data)
+                m.apply(theme: theme)
+                pane.mirror = m
                 pane.expected = seq
             } catch {
                 log("snapshot for \(block) failed: \(error)")
