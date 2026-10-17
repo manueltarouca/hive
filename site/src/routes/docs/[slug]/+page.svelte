@@ -15,6 +15,8 @@
 <svelte:head>
   <title>{data.title} · hive docs</title>
   <meta name="description" content={data.description} />
+  <meta property="og:title" content="{data.title} · hive docs" />
+  <meta property="og:description" content={data.description} />
   <link rel="alternate" type="text/markdown" href={resolve('/docs/[slug].md', { slug: data.slug })} />
 </svelte:head>
 

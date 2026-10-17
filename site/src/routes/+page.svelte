@@ -17,6 +17,8 @@
 <svelte:head>
   <title>hive · a terminal multiplexer for agent-heavy work</title>
   <meta name="description" content="hive keeps your terminals running, shows which coding agents need you, and brings everything back after a restart." />
+  <meta property="og:title" content="hive · a terminal multiplexer for agent-heavy work" />
+  <meta property="og:description" content="hive keeps your terminals running, shows which coding agents need you, and brings everything back after a restart." />
 </svelte:head>
 
 <div class="page">
