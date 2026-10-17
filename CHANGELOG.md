@@ -42,7 +42,12 @@ The first release.
   exit codes.
 - **Hive.app:** a native macOS client drawn with Metal on Ghostty's
   terminal engine. It has an agents sidebar, a command palette, a session
-  picker, native selection and scrollback, and light and dark themes.
+  picker, native selection and scrollback, and a Hive Day / Hive Night /
+  Match System theme setting. The sidebar shows each tab's agent, its task
+  and state; tabs reorder by dragging.
+- **The mouse in terminal programs:** the scroll wheel, clicks and drags
+  reach programs that use the mouse (Claude Code's scrolling and copy), and a
+  program's copy (OSC 52) lands on the clipboard from the focused pane.
 - **Agent skills** for Claude Code and other agents: `hive`, `hive-setup`
   and `hive-from-tmux`.
 

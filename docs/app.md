@@ -37,18 +37,40 @@ a name that doesn't exist and press return to create it.
 
 The app reopens the session you were last in.
 
-## The agents sidebar
+## The sidebar
 
-Press ⇧⌘S. The sidebar lists every coding agent in every session. Agents
-waiting for you come first, with the reason they are waiting. Click one to
-jump to it. Below them are the current session's tabs.
+Press ⇧⌘S to show the session's tabs as a list. A tab with a coding agent
+shows the agent's task and what it is doing:
+
+- **Working:** a honey hexagon.
+- **Blocked:** a Blocked badge, and the reason it is waiting.
+- **Done:** a green hexagon, until you look at the tab.
+
+Drag a tab to move it. When an agent in another session needs you, the
+session name in the title bar shows a count, and the session picker (⌘K)
+says which session.
 
 See [Agents](./agents) for how agents report their state.
+
+## Theme
+
+Choose **Hive Day**, **Hive Night** or **Match System** in the View menu, or
+type "theme" in the command palette. hive remembers your choice.
+
+## Mouse
+
+Some programs use the mouse themselves, such as Claude Code. In those
+programs, clicks, drags and the scroll wheel go to the program. That's how
+you scroll Claude Code and copy from it. When a program copies text, it goes
+on your clipboard, and the pane says **Copied**.
+
+Hold **Shift** to select and scroll in hive instead.
 
 ## Selection
 
 Drag to select. Double-click selects a word, triple-click a line. ⌘C copies.
-Typing clears the selection.
+Typing clears the selection. In programs that use the mouse, hold Shift
+while you drag.
 
 ## Size
 
