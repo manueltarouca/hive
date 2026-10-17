@@ -677,6 +677,16 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func pointer(block: String, _ action: Mirror.PointerAction, button: Mirror.PointerButton?, mods: KeyMods,
+                 x: Double, y: Double, geometry: PointerGeometry, col: Int, row: Int,
+                 repeatInterval: TimeInterval, repeatDistance: Double) {
+        let engine = engine
+        vt.async {
+            engine.pointer(block: block, action, button: button, mods: mods, x: x, y: y, geometry: geometry,
+                           col: col, row: row, repeatInterval: repeatInterval, repeatDistance: repeatDistance)
+        }
+    }
+
     func wheel(block: String, rows: Int, shift: Bool, x: Double, y: Double, geometry: PointerGeometry) {
         let engine = engine
         vt.async { engine.wheel(block: block, rows: rows, shift: shift, x: x, y: y, geometry: geometry) }

@@ -137,6 +137,63 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         #expect(out.contains("033   [   <   6   4   ;   3   ;   3   M"), "got: \(out)")
     }
 
+    /// A click in a program that tracks the mouse reaches it as press and
+    /// release reports, instead of starting a local selection.
+    @Test func clickReachesAProgramTrackingTheMouse() async throws {
+        let server = try Server(); defer { server.stop() }
+        let rig = Rig(server)
+        try await rig.connect()
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; head -c 18 | od -An -c"], "cols": 80, "rows": 24])
+        let block = try #require(created["block_ids"][0].string)
+        await rig.onQueue { rig.engine.attach(block: block) { _ in } }
+        let geo = PointerGeometry(cellWidth: 10, cellHeight: 20, paneWidth: 800, paneHeight: 480)
+        for _ in 0..<100 {
+            // Stateless probe: the wheel goes to the program once tracking is on.
+            let r = await rig.onQueue { rig.engine.mirror(block: block)?.wheel(rows: -1, shift: false, x: 25, y: 45, geometry: geo) }
+            if case .send = r { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        for action in [Mirror.PointerAction.press, .release] {
+            await rig.onQueue {
+                rig.engine.pointer(block: block, action, button: .left, mods: [], x: 25, y: 45, geometry: geo,
+                                   col: 2, row: 2, repeatInterval: 0.5, repeatDistance: 8)
+            }
+        }
+        var out = ""
+        for _ in 0..<150 {
+            out = try await rig.call("hive.terminal.format", ["block_id": .string(block), "args": ["trim": true]])["content"].string ?? ""
+            if out.filter({ !$0.isWhitespace }).contains("033[<0;3;3m") { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        // od -c wraps after 16 bytes, so compare without whitespace.
+        #expect(out.filter { !$0.isWhitespace }.contains("033[<0;3;3M033[<0;3;3m"), "got: \(out)")
+        #expect(await rig.onQueue { rig.engine.selectedText(block: block) } == nil)
+    }
+
+    /// Without mouse tracking, the same mouse path selects text locally.
+    @Test func dragSelectsWhenTheProgramDoesNotTrackTheMouse() async throws {
+        let server = try Server(); defer { server.stop() }
+        let rig = Rig(server)
+        try await rig.connect()
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf 'hello world'; exec cat"], "cols": 80, "rows": 24])
+        let block = try #require(created["block_ids"][0].string)
+        await rig.onQueue { rig.engine.attach(block: block) { _ in } }
+        for _ in 0..<100 {
+            if await rig.onQueue({ rig.engine.plainText(block: block) })?.contains("hello world") == true { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        let geo = PointerGeometry(cellWidth: 10, cellHeight: 20, paneWidth: 800, paneHeight: 480)
+        let steps: [(Mirror.PointerAction, Double, Int)] = [(.press, 2, 0), (.motion, 46, 4), (.release, 46, 4)]
+        await rig.onQueue {
+            for (action, x, col) in steps {
+                rig.engine.pointer(block: block, action, button: .left, mods: [], x: x, y: 10, geometry: geo,
+                                   col: col, row: 0, repeatInterval: 0.5, repeatDistance: 8)
+            }
+        }
+        let sel = await rig.onQueue { rig.engine.selectedText(block: block) }
+        #expect(sel == "hello", "selected: \(String(describing: sel))")
+    }
+
     @Test func keysAndPasteReachTheProgram() async throws {
         let server = try Server(); defer { server.stop() }
         let rig = Rig(server)

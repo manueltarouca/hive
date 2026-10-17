@@ -127,6 +127,25 @@ public final class Engine {
         scheduleFrame(pane)
     }
 
+    /// A click, release or motion: to the program when it tracks the mouse,
+    /// else hive's own selection (press, drag with a button held, release).
+    public func pointer(block: String, _ action: Mirror.PointerAction, button: Mirror.PointerButton?, mods: KeyMods,
+                        x: Double, y: Double, geometry: PointerGeometry, col: Int, row: Int,
+                        repeatInterval: TimeInterval, repeatDistance: Double) {
+        guard let pane = panes[block], let m = pane.mirror else { return }
+        switch m.pointer(action, button: button, mods: mods, x: x, y: y, geometry: geometry) {
+        case .send(let bytes):
+            if action == .press { clearSelection(block) }
+            if !bytes.isEmpty { client.input(block: block, bytes) }
+        case .local:
+            guard button == .left else { return }
+            let type: Mirror.SelectEvent = action == .press ? .press : action == .release ? .release : .drag
+            select(block: block, type, col: col, row: row, x: x, y: y,
+                   cellWidth: Double(geometry.cellWidth), cellHeight: Double(geometry.cellHeight),
+                   repeatInterval: repeatInterval, repeatDistance: repeatDistance)
+        }
+    }
+
     public func selectedText(block: String) -> String? { panes[block]?.mirror?.selectedText() }
 
     private func clearSelection(_ block: String) {

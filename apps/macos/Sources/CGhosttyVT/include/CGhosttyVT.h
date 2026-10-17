@@ -80,3 +80,16 @@ typedef struct {
 // the alternate screen with alternate scroll (1007) on. Shift forces 0.
 int hive_wheel(GhosttyTerminal t, intptr_t rows, bool shift, float x, float y, HivePointerGeometry g,
                uint8_t *out, size_t cap, size_t *written);
+
+// A mouse encoder kept per terminal, so motion within one cell isn't
+// reported twice. Free with hive_mouse_encoder_free.
+GhosttyMouseEncoder hive_mouse_encoder_new(void);
+void hive_mouse_encoder_free(GhosttyMouseEncoder enc);
+
+// A click, release or motion for a program that tracks the mouse.
+// action: 0 press, 1 release, 2 motion. button: 0 none, 1 left, 2 right,
+// 3 middle. any_pressed: a button is held (for motion during a drag).
+// Returns -1 when the program isn't tracking the mouse (the caller selects
+// locally), else the bytes written to out (0 when this event isn't reported).
+intptr_t hive_mouse(GhosttyTerminal t, GhosttyMouseEncoder enc, int action, int button, GhosttyMods mods,
+                    bool any_pressed, float x, float y, HivePointerGeometry g, uint8_t *out, size_t cap);

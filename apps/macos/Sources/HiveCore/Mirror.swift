@@ -113,6 +113,8 @@ public final class Mirror {
     private var scratch = [HiveCell](repeating: HiveCell(), count: 512)
 
     private var gesture: GhosttySelectionGesture?
+    /// For clicks and motion sent to programs; made on first use.
+    private var mouseEncoder: GhosttyMouseEncoder?
     private var last: PaneFrame?
     private var generation: UInt64 = 0
     /// Synchronized output (mode 2026): while held, frame() returns the last
@@ -158,6 +160,7 @@ public final class Mirror {
         // The hold callback holds an unretained self: detach it first.
         hive_set_render_hold(term, nil, nil)
         if let gesture { hive_gesture_free(gesture, term) }
+        hive_mouse_encoder_free(mouseEncoder)
         if let rowCells { ghostty_render_state_row_cells_free(rowCells) }
         if let rowIter { ghostty_render_state_row_iterator_free(rowIter) }
         if let renderState { ghostty_render_state_free(renderState) }
@@ -234,6 +237,25 @@ public final class Mirror {
     }
 
     public enum SelectEvent: Int32 { case press = 0, release = 1, drag = 2 }
+
+    public enum PointerAction: Int32 { case press = 0, release = 1, motion = 2 }
+    public enum PointerButton: Int32 { case left = 1, right = 2, middle = 3 }
+
+    /// A click, release or motion: to the program when it tracks the mouse,
+    /// else hive's own selection (`.local`). Shift always selects locally.
+    /// `button` is the button pressed, released, or held during motion.
+    public func pointer(_ action: PointerAction, button: PointerButton?, mods: KeyMods, x: Double, y: Double,
+                        geometry g: PointerGeometry) -> PointerResult {
+        if mods.contains(.shift) { return .local }
+        if mouseEncoder == nil { mouseEncoder = hive_mouse_encoder_new() }
+        var out = [UInt8](repeating: 0, count: 64)
+        let geo = HivePointerGeometry(screen_width: UInt32(max(g.paneWidth, 1)), screen_height: UInt32(max(g.paneHeight, 1)),
+                                      cell_width: UInt32(max(g.cellWidth, 1)), cell_height: UInt32(max(g.cellHeight, 1)))
+        let held = action == .motion && button != nil
+        let n = hive_mouse(term, mouseEncoder, action.rawValue, button?.rawValue ?? 0, mods.rawValue, held,
+                           Float(x), Float(y), geo, &out, out.count)
+        return n < 0 ? .local : .send(Data(out.prefix(n)))
+    }
 
     /// Feeds a mouse event to libghostty's selection gestures: drag to
     /// select, double-click for a word, triple-click for a line.
@@ -346,5 +368,13 @@ public enum WheelAction: Equatable, Sendable {
     /// Scroll hive's own scrollback by this many rows (negative is up).
     case viewport(rows: Int)
     /// Send these bytes to the program; empty when its mouse mode ignores wheels.
+    case send(Data)
+}
+
+/// Where a click or motion goes.
+public enum PointerResult: Equatable, Sendable {
+    /// hive's own selection handles it.
+    case local
+    /// These bytes go to the program; empty when its mouse mode skips this event.
     case send(Data)
 }

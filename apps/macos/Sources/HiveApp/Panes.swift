@@ -74,20 +74,39 @@ final class PaneView: MTKView, NSTextInputClient {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         model.focus(block: blockID)
-        select(.press, event)
+        pointer(.press, .left, event)
     }
 
-    override func mouseDragged(with event: NSEvent) { select(.drag, event) }
-    override func mouseUp(with event: NSEvent) { select(.release, event) }
+    override func mouseDragged(with event: NSEvent) { pointer(.motion, .left, event) }
+    override func mouseUp(with event: NSEvent) { pointer(.release, .left, event) }
+    override func rightMouseDown(with event: NSEvent) { pointer(.press, .right, event) }
+    override func rightMouseUp(with event: NSEvent) { pointer(.release, .right, event) }
+    override func otherMouseDown(with event: NSEvent) { pointer(.press, .middle, event) }
+    override func otherMouseUp(with event: NSEvent) { pointer(.release, .middle, event) }
+    override func mouseMoved(with event: NSEvent) { pointer(.motion, nil, event) }
 
-    /// Selection runs in the mirror through libghostty's gestures: drag,
-    /// double-click for a word, triple-click for a line.
-    private func select(_ type: Mirror.SelectEvent, _ event: NSEvent) {
+    // Hover reaches programs that track all motion (Claude Code's links).
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self))
+    }
+
+    /// The mouse goes to the program when it tracks it; otherwise it drives
+    /// selection in the mirror through libghostty's gestures: drag,
+    /// double-click for a word, triple-click for a line. Shift always selects.
+    private func pointer(_ action: Mirror.PointerAction, _ button: Mirror.PointerButton?, _ event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        let col = Int(p.x / cellSize.width), row = Int(p.y / cellSize.height)
-        model.select(block: blockID, type, col: col, row: row, x: Double(p.x * scale), y: Double(p.y * scale),
-                     cellWidth: Double(renderer.fonts.cellWidth), cellHeight: Double(renderer.fonts.cellHeight),
-                     repeatInterval: NSEvent.doubleClickInterval, repeatDistance: Double(4 * scale))
+        var mods = KeyMods()
+        let f = event.modifierFlags
+        if f.contains(.shift) { mods.insert(.shift) }
+        if f.contains(.control) { mods.insert(.ctrl) }
+        if f.contains(.option) { mods.insert(.alt) }
+        let geometry = PointerGeometry(cellWidth: renderer.fonts.cellWidth, cellHeight: renderer.fonts.cellHeight,
+                                       paneWidth: Int(drawableSize.width), paneHeight: Int(drawableSize.height))
+        model.pointer(block: blockID, action, button: button, mods: mods, x: Double(p.x * scale), y: Double(p.y * scale),
+                      geometry: geometry, col: Int(p.x / cellSize.width), row: Int(p.y / cellSize.height),
+                      repeatInterval: NSEvent.doubleClickInterval, repeatDistance: Double(4 * scale))
     }
 
     @objc func copy(_ sender: Any?) { model.copySelection(block: blockID) }

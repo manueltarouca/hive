@@ -277,3 +277,43 @@ int hive_wheel(GhosttyTerminal t, intptr_t rows, bool shift, float x, float y, H
   }
   return 1;
 }
+
+GhosttyMouseEncoder hive_mouse_encoder_new(void) {
+  GhosttyMouseEncoder enc = NULL;
+  if (ghostty_mouse_encoder_new(NULL, &enc) != GHOSTTY_SUCCESS) return NULL;
+  bool track = true;
+  ghostty_mouse_encoder_setopt(enc, GHOSTTY_MOUSE_ENCODER_OPT_TRACK_LAST_CELL, &track);
+  return enc;
+}
+
+void hive_mouse_encoder_free(GhosttyMouseEncoder enc) {
+  if (enc) ghostty_mouse_encoder_free(enc);
+}
+
+intptr_t hive_mouse(GhosttyTerminal t, GhosttyMouseEncoder enc, int action, int button, GhosttyMods mods,
+                    bool any_pressed, float x, float y, HivePointerGeometry g, uint8_t *out, size_t cap) {
+  bool tracking = false;
+  ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &tracking);
+  if (!tracking) return -1;
+  if (!enc || action < 0 || action > 2) return 0;
+  GhosttyMouseEvent ev = NULL;
+  if (ghostty_mouse_event_new(NULL, &ev) != GHOSTTY_SUCCESS) return 0;
+  ghostty_mouse_encoder_setopt_from_terminal(enc, t);
+  GhosttyMouseEncoderSize size = GHOSTTY_INIT_SIZED(GhosttyMouseEncoderSize);
+  size.screen_width = g.screen_width;
+  size.screen_height = g.screen_height;
+  size.cell_width = g.cell_width ? g.cell_width : 1;
+  size.cell_height = g.cell_height ? g.cell_height : 1;
+  ghostty_mouse_encoder_setopt(enc, GHOSTTY_MOUSE_ENCODER_OPT_SIZE, &size);
+  ghostty_mouse_encoder_setopt(enc, GHOSTTY_MOUSE_ENCODER_OPT_ANY_BUTTON_PRESSED, &any_pressed);
+  GhosttyMouseAction actions[] = {GHOSTTY_MOUSE_ACTION_PRESS, GHOSTTY_MOUSE_ACTION_RELEASE, GHOSTTY_MOUSE_ACTION_MOTION};
+  ghostty_mouse_event_set_action(ev, actions[action]);
+  if (button > 0) ghostty_mouse_event_set_button(ev, (GhosttyMouseButton)button);
+  else ghostty_mouse_event_clear_button(ev);
+  ghostty_mouse_event_set_mods(ev, mods);
+  ghostty_mouse_event_set_position(ev, (GhosttyMousePosition){.x = x, .y = y});
+  size_t written = 0;
+  if (ghostty_mouse_encoder_encode(enc, ev, (char *)out, cap, &written) != GHOSTTY_SUCCESS) written = 0;
+  ghostty_mouse_event_free(ev);
+  return (intptr_t)written;
+}
