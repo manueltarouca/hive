@@ -122,8 +122,8 @@ func TestSessionNamesMoveAndListDir(t *testing.T) {
 	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
 	sid := created["session_id"].(string)
 	view := h.call("session.view", map[string]any{"session_id": sid})
-	if label, _ := view["label"].(string); len(strings.Fields(label)) != 2 {
-		t.Fatalf("unlabeled session got %q, want a two-word name", label)
+	if label, _ := view["label"].(string); len(strings.Split(label, "-")) != 2 {
+		t.Fatalf("unlabeled session got %q, want a name like drifting-cedar", label)
 	}
 	a := strs(created["block_ids"])[0]
 	b := strs(h.call("session.new_split", map[string]any{"session_id": sid, "block_id": a,

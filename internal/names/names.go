@@ -1,10 +1,12 @@
-// Package names makes friendly session names, like the reference app's "Drifting Cedar":
-// an adjective and a noun from nature, unique among the names in use.
+// Package names makes friendly session names, like the reference app's "drifting-cedar":
+// an adjective and a noun from nature, kebab-cased, unique among the names
+// in use.
 package names
 
 import (
 	"fmt"
 	"math/rand/v2"
+	"strings"
 )
 
 var adjectives = []string{
@@ -26,13 +28,13 @@ var nouns = []string{
 // New returns a name that taken reports as free.
 func New(taken func(string) bool) string {
 	for i := 0; i < 200; i++ {
-		n := adjectives[rand.IntN(len(adjectives))] + " " + nouns[rand.IntN(len(nouns))]
+		n := strings.ToLower(adjectives[rand.IntN(len(adjectives))] + "-" + nouns[rand.IntN(len(nouns))])
 		if !taken(n) {
 			return n
 		}
 	}
 	for i := 2; ; i++ { // every pair in use: number them
-		n := fmt.Sprintf("%s %s%d", adjectives[rand.IntN(len(adjectives))], nouns[rand.IntN(len(nouns))], i)
+		n := strings.ToLower(fmt.Sprintf("%s-%s-%d", adjectives[rand.IntN(len(adjectives))], nouns[rand.IntN(len(nouns))], i))
 		if !taken(n) {
 			return n
 		}
