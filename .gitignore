@@ -1,3 +1,6 @@
 bin/
 third_party/
 .envrc.local
+apps/macos/.build/
+apps/macos/.swiftpm/
+*.xcodeproj/xcuserdata/
