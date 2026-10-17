@@ -65,28 +65,28 @@ struct HexCell: Shape {
 
 /// A program as a honeycomb cell, in the tab bar and sidebar: its vendor's
 /// icon if hive has one, else its logo on its brand colour, else a symbol on
-/// graphite. Other panes' cells sit behind it, to the right.
+/// graphite. A tab with several panes is a small comb of connected cells:
+/// two joined on a slanted edge, three as a triangle with the tab's own
+/// program on top.
 struct ProgramTile: View {
     let program: Program
     var size: CGFloat = 22
-    /// The tab's other panes.
+    /// The tab's other panes (at most two are drawn).
     var behind: [Program] = []
 
     var body: some View {
-        // Each pane behind peeks out by a sliver, a little smaller each time.
-        let peek = size * 0.2
-        ZStack(alignment: .leading) {
-            ForEach(Array(behind.enumerated().reversed()), id: \.offset) { i, p in
-                let k = CGFloat(i + 1)
-                CellFace(program: p, size: size * (1 - 0.12 * k))
-                    .offset(x: peek * k + size * 0.866 * 0.06 * k)
-                    .brightness(-0.12)
+        let cells = [program] + behind.prefix(2)
+        let layout = Comb.layout(count: cells.count, height: size)
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(cells.enumerated()), id: \.offset) { i, p in
+                CellFace(program: p, size: layout.cell * 0.94) // a hairline wall between cells
+                    .frame(width: layout.cell * 0.866, height: layout.cell)
+                    .offset(x: layout.origins[i].x, y: layout.origins[i].y)
             }
-            CellFace(program: program, size: size)
         }
-        .frame(width: size * 0.866 + peek * CGFloat(behind.count) * 1.05, height: size, alignment: .leading)
+        .frame(width: layout.width, height: size, alignment: .topLeading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(program.name)
+        .accessibilityLabel(cells.count > 1 ? "\(program.name) and \(cells.count - 1) more" : program.name)
     }
 }
 

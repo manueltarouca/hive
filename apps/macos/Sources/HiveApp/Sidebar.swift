@@ -68,10 +68,13 @@ struct TabDrop: DropDelegate {
 /// needs the user.
 struct AppTile: View {
     let program: Program
+    var behind: [Program] = []
     let style: Style
     var badge: String? = nil
     var body: some View {
-        ProgramTile(program: program, size: 24)
+        // A fixed column, so titles line up however many panes a tab has.
+        ProgramTile(program: program, size: 24, behind: behind)
+            .frame(width: 24, height: 24)
         .overlay(alignment: .topTrailing) {
             if let badge {
                 Image(systemName: "hexagon.fill").font(.system(size: 8))
@@ -96,7 +99,8 @@ struct TabRow: View {
         let sum = model.summary(of: window)
         let blocked = sum.state == "blocked"
         HStack(alignment: sum.detail == nil ? .center : .top, spacing: 10) {
-            AppTile(program: model.program(of: window), style: s, badge: blocked ? "blocked" : nil)
+            AppTile(program: model.program(of: window), behind: model.otherPrograms(of: window), style: s,
+                    badge: blocked ? "blocked" : nil)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(sum.title).font(.system(size: 12.5, weight: active ? .semibold : .medium))
