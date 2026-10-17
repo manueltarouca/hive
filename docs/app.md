@@ -36,6 +36,14 @@ shows the keys as your keyboard layout types them: on some layouts ⇧⌘[ and
 | ⇧⌘S | Agents sidebar |
 | ⌘/ | Keyboard shortcuts |
 
+## Icons
+
+Tabs and the sidebar show each program as a small app icon: Claude Code's
+coral tile, Node, Python, Vim, Docker and others. Codex, Gemini and docker
+show their Mac app's icon when that app is installed. Any other program
+shows a terminal icon. The logos come from Simple Icons; their licences are
+in the app's third-party notices.
+
 ## Sessions
 
 Click the session name in the title bar, or press ⌘K. Type to filter. Type

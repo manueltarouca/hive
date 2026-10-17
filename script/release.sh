@@ -62,7 +62,7 @@ echo "dist/$name.tar.gz"
 
 if [ "$os" = macos ]; then
   app="$(apps/macos/script/bundle.sh release | tail -1)"
-  { cat "$notices"; echo; cat script/notices/fonts.txt; } > "$app/Contents/Resources/THIRD_PARTY_NOTICES"
+  { cat "$notices"; echo; cat script/notices/fonts.txt; echo; cat script/notices/icons.txt; } > "$app/Contents/Resources/THIRD_PARTY_NOTICES"
   # Re-sign after adding the file, or the signature no longer matches. Clear
   # extended attributes first: they would ship as ._ files that break the
   # seal when the zip is opened with unzip.

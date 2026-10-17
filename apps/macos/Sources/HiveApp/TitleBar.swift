@@ -134,13 +134,8 @@ struct TabPill: View {
         let parts = window.titleParts(model.blocks)
         let status = model.status(of: window)
         HStack(spacing: 7) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(active ? s.accent.swiftUI.opacity(0.18) : s.text.swiftUI.opacity(0.08))
-                Image(systemName: info?.symbol ?? "apple.terminal").font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(active ? s.accent.swiftUI : s.secondary.swiftUI)
-            }
-            .frame(width: 20, height: 16)
+            ProgramTile(program: model.program(of: window), size: 18)
+                .opacity(active ? 1 : 0.85)
             let name = Text(parts.primary).foregroundColor(active ? s.text.swiftUI : s.secondary.swiftUI)
             let font = Font.system(size: 12.5, weight: active ? .medium : .regular)
             // Name and folder if they fit, else the name, else the name fading

@@ -831,7 +831,7 @@ func (s *Server) registerTerminalMethods() {
 		c, rr := r.b.Size()
 		return map[string]any{"cols": c, "rows": rr, "size_owner": r.owner}, nil
 	})
-	s.terminal("process", "Describe the terminal's foreground process.", func(r *rec, _ json.RawMessage) (any, error) {
+	s.terminal("process", "Describe the terminal's foreground process: pid, name, cwd, and program (what runs, as a person would name it: claude, not its version-named binary).", func(r *rec, _ json.RawMessage) (any, error) {
 		fg, err := r.b.Foreground()
 		out := map[string]any{"child_pid": r.b.PID()}
 		if err == nil {

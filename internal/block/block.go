@@ -69,6 +69,8 @@ type Process struct {
 	PID  int    `json:"pid"`
 	Name string `json:"name"`
 	Cwd  string `json:"cwd,omitempty"`
+	// Program names what runs, the way a person would (see programOf).
+	Program string `json:"program,omitempty"`
 }
 
 // Block is a running terminal.
@@ -401,7 +403,7 @@ func (b *Block) processLoop() {
 			continue
 		}
 		b.mu.Lock()
-		changed := p.PID != b.lastFg.PID || p.Name != b.lastFg.Name
+		changed := p.PID != b.lastFg.PID || p.Name != b.lastFg.Name || p.Program != b.lastFg.Program
 		b.lastFg = p
 		b.mu.Unlock()
 		if changed {

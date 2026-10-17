@@ -255,8 +255,7 @@ struct PaneHeader: View {
         let parts: (primary: String, secondary: String) = info?.titleParts ?? ("shell", "")
         let s = model.style
         HStack(spacing: 7) {
-            Image(systemName: info?.symbol ?? "apple.terminal").font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(info?.harness == "claude" ? s.claude.swiftUI : s.text.swiftUI)
+            ProgramGlyph(program: info?.programInfo ?? Programs.lookup(""), color: s.text.swiftUI.opacity(0.9), size: 13)
             (Text(parts.primary).foregroundColor(s.text.swiftUI)
                 + Text(parts.secondary.isEmpty ? "" : "  " + parts.secondary).foregroundColor(s.secondary.swiftUI).fontWeight(.regular))
                 .font(.system(size: 12.5, weight: .semibold))

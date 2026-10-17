@@ -64,19 +64,14 @@ struct TabDrop: DropDelegate {
     func dropExited(info: DropInfo) {}
 }
 
-/// An app tile: a rounded square with a symbol, and a dot on its corner when
-/// the agent needs the user.
+/// An app tile: the program's icon, and a dot on its corner when the agent
+/// needs the user.
 struct AppTile: View {
-    let symbol: String
-    let tint: Color
+    let program: Program
     let style: Style
     var badge: String? = nil
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(tint.opacity(0.16))
-            Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(tint)
-        }
-        .frame(width: 24, height: 24)
+        ProgramTile(program: program, size: 24)
         .overlay(alignment: .topTrailing) {
             if let badge {
                 Image(systemName: "hexagon.fill").font(.system(size: 8))
@@ -101,9 +96,7 @@ struct TabRow: View {
         let sum = model.summary(of: window)
         let blocked = sum.state == "blocked"
         HStack(alignment: sum.detail == nil ? .center : .top, spacing: 10) {
-            AppTile(symbol: sum.isAgent ? "sparkle" : (info?.symbol ?? "apple.terminal"),
-                    tint: sum.isAgent ? s.claude.swiftUI : (active ? s.accent.swiftUI : s.secondary.swiftUI),
-                    style: s, badge: blocked ? "blocked" : nil)
+            AppTile(program: model.program(of: window), style: s, badge: blocked ? "blocked" : nil)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(sum.title).font(.system(size: 12.5, weight: active ? .semibold : .medium))

@@ -51,7 +51,7 @@ extension ISO8601DateFormatter {
 /// overrides are stripped too: they could make a title read as something else.
 func taskName(title: String, harness: String) -> String? {
     let t = cleanTitle(title).drop { !$0.isLetter && !$0.isNumber }.trimmingCharacters(in: .whitespaces)
-    let name = BlockInfo.harnessNames[harness] ?? harness.capitalized
+    let name = Programs.lookup(harness).name
     return t.isEmpty || t == name ? nil : t
 }
 
@@ -95,7 +95,7 @@ struct AgentInfo: Identifiable, Equatable {
     var updatedAt: Date?
 
     /// The task the agent is on, from its title, else the harness name.
-    var task: String { taskName(title: title, harness: harness) ?? (BlockInfo.harnessNames[harness] ?? harness.capitalized) }
+    var task: String { taskName(title: title, harness: harness) ?? Programs.lookup(harness).name }
 }
 
 struct BlockInfo: Equatable {
@@ -111,11 +111,10 @@ struct BlockInfo: Equatable {
     var exitCode = 0
 
     /// The program as people call it: "Node", "Neovim", "Claude Code".
-    var program: String {
-        if let h = harness { return BlockInfo.harnessNames[h] ?? h.capitalized }
-        guard let fg = foreground, !fg.isEmpty else { return "shell" }
-        return BlockInfo.programNames[fg] ?? fg
-    }
+    var program: String { programInfo.name }
+
+    /// The agent if one reports from here, else the foreground program.
+    var programInfo: Program { Programs.lookup(harness ?? foreground ?? "") }
 
     /// An agent's task, from the title it sets ("✳ Arch review" → "Arch review").
     var task: String? { harness.flatMap { taskName(title: title, harness: $0) } }
@@ -134,26 +133,6 @@ struct BlockInfo: Equatable {
         return (program, shortDir)
     }
 
-    var symbol: String {
-        switch harness ?? foreground ?? "" {
-        case "claude": return "sparkle"
-        case "codex": return "hexagon"
-        case "node", "bun", "deno", "pnpm", "npm": return "hexagon.fill"
-        case "nvim", "vim", "hx", "emacs": return "chevron.left.forwardslash.chevron.right"
-        case "lazygit", "git", "tig": return "plusminus.circle"
-        case "htop", "btop", "top": return "chart.bar.xaxis"
-        case "ssh", "mosh": return "network"
-        case "python", "python3": return "chevron.left.forwardslash.chevron.right"
-        default: return "apple.terminal"
-        }
-    }
-
-    static let programNames = [
-        "node": "Node", "nvim": "Neovim", "vim": "Vim", "hx": "Helix", "emacs": "Emacs", "lazygit": "Git Changes",
-        "python3": "Python", "python": "Python", "ruby": "Ruby", "go": "Go", "cargo": "Cargo", "docker": "Docker",
-        "ssh": "SSH", "bun": "Bun", "deno": "Deno", "claude": "Claude Code", "codex": "Codex",
-    ]
-    static let harnessNames = ["claude": "Claude Code", "codex": "Codex", "opencode": "OpenCode", "gemini": "Gemini", "grok": "Grok"]
 }
 
 /// The app's state. Lives on the main thread; talks to the server through
@@ -402,7 +381,7 @@ final class AppModel: ObservableObject {
                 let agentState = b["agent"]["state"].string
                 info[bid] = BlockInfo(title: b["title"].string ?? "", label: b["label"].string ?? "",
                                       cols: b["cols"].int ?? 0, rows: b["rows"].int ?? 0, sizeOwner: b["size_owner"].string,
-                                      foreground: b["foreground"]["name"].string, cwd: cwd,
+                                      foreground: b["foreground"]["program"].string ?? b["foreground"]["name"].string, cwd: cwd,
                                       harness: agentState == "ended" ? nil : b["agent"]["harness"].string,
                                       agentState: agentState, exited: b["exited"].bool ?? false, exitCode: b["exit_code"].int ?? 0)
             }
@@ -547,6 +526,13 @@ final class AppModel: ObservableObject {
     }
 
     /// What a tab's sidebar row says (see TabSummary).
+    /// A tab's program: its agent's if it has one, else the focused pane's.
+    func program(of w: WindowInfo) -> Program {
+        let ids = w.layout?.rects().map(\.0) ?? []
+        if let agent = ids.compactMap({ blocks[$0] }).first(where: { $0.harness != nil }) { return agent.programInfo }
+        return w.focused.flatMap { blocks[$0] }?.programInfo ?? Programs.lookup("")
+    }
+
     func summary(of w: WindowInfo) -> TabSummary {
         let ids = Set(w.layout?.rects().map(\.0) ?? [])
         let mine = agents.filter { ids.contains($0.blockID) }
