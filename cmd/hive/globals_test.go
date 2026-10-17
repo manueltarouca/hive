@@ -21,6 +21,8 @@ func TestCommandSwitchesAreNotGlobals(t *testing.T) {
 		{[]string{"--session", "work", "ls"}, "work", "", []string{"ls"}},
 		{[]string{"close", "--window=3"}, "", "3", []string{"close"}},
 		{[]string{"capture", "--session", "work"}, "work", "", []string{"capture"}},
+		// -C/--client was never wired to anything and is gone.
+		{[]string{"-C", "x", "ls"}, "", "", []string{"-C", "x", "ls"}},
 	}
 	for _, c := range cases {
 		g, rest, err := parseGlobals(c.argv)

@@ -67,7 +67,7 @@ Server
   server start | stop | status
   version
 
-Targets: -s/--session -w/--window -b/--block -C/--client -S/--server, --json.
+Targets: -s/--session -w/--window -b/--block -S/--server, --json.
 A target is an ID, a label, a position from 1, or the end of an ID.
 Inside a hive terminal, HIVE_SESSION and HIVE_BLOCK are the defaults.
 `

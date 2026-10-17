@@ -76,6 +76,8 @@ keep working.
 | `hive api call METHOD [JSON\|@FILE\|-]` | Call a method |
 | `hive server run [--fresh]` | Run the server in the foreground |
 | `hive server start` / `stop` / `status` | Manage a background server |
+| `hive version` | Print the version. It doesn't start a server. |
+| `hive help` | List the commands |
 
 Every command takes `--json` for output a script can parse.
 

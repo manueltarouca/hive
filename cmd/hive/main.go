@@ -41,9 +41,9 @@ func (e exitError) Error() string { return fmt.Sprintf("exit status %d", e.code)
 
 // globals are the target flags every command accepts.
 type globals struct {
-	session, window, block, clientT, server string
-	json                                    bool
-	explicitServer                          bool // -S was passed
+	session, window, block, server string
+	json                           bool
+	explicitServer                 bool // -S was passed
 }
 
 func main() {
@@ -85,7 +85,7 @@ func run(argv []string) int {
 // parseGlobals pulls the target flags out of argv, wherever they appear
 // before a "--".
 func parseGlobals(argv []string) (globals, []string, error) {
-	g := globals{server: os.Getenv("HIVE_SERVER"), clientT: os.Getenv("HIVE_CLIENT")}
+	g := globals{server: os.Getenv("HIVE_SERVER")}
 	var rest []string
 	for i := 0; i < len(argv); i++ {
 		a := argv[i]
@@ -108,8 +108,6 @@ func parseGlobals(argv []string) (globals, []string, error) {
 			dst = &g.window
 		case "-b", "--block":
 			dst = &g.block
-		case "-C", "--client":
-			dst = &g.clientT
 		case "-S", "--server":
 			dst = &g.server
 			g.explicitServer = true

@@ -297,6 +297,33 @@ func TestAPIIntrospection(t *testing.T) {
 	}
 }
 
+// Every method says what it alone does, and the API docs list every method.
+func TestMethodsAreDescribedAndDocumented(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	var list []map[string]any
+	if err := h.c.Call(context.Background(), "api.list", nil, &list); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := os.ReadFile("../../docs/api.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]string{}
+	for _, m := range list {
+		name, desc := m["name"].(string), m["description"].(string)
+		if other, dup := seen[desc]; dup {
+			t.Errorf("%s and %s share the description %q", other, name, desc)
+		}
+		seen[desc] = name
+		// Terminal methods are listed by their short name after hive.terminal.
+		short := strings.TrimPrefix(name, "hive.terminal.")
+		if !strings.Contains(string(docs), "`"+short+"`") {
+			t.Errorf("docs/api.md does not list %s", name)
+		}
+	}
+}
+
 func writeFile(t *testing.T, path, data string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {

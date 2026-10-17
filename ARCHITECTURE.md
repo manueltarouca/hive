@@ -56,24 +56,27 @@ bumps the session's `revision`.
 | `internal/id` | typed UUIDv7 IDs, short suffixes |
 | `internal/vt` | wraps libghostty Terminal behind a mutex: feed, resize, format, snapshot/restore, key encoding. Effects (title, pwd, bell, OSC 7501, OSC 133, notifications, clipboard) are turned into Go hooks, queued and fired after the write returns, so a hook never re-enters the lock |
 | `internal/block` | a terminal block: PTY (creack/pty) plus a vt instance, a read loop feeding the vt and broadcasting bytes to attach subscribers, child wait → exit event, foreground-process poll (`TIOCGPGRP` + sysctl) → `process_changed` |
-| `internal/session` | session/window/layout tree ops: new_window, new_split, close (tree collapse), move/swap, zoom, focus, resize ratio, labels, revision |
+| `internal/session` | session/window/layout tree ops: new_window, new_split, close (tree collapse), move, zoom, focus, resize ratio, labels, revision |
 | `internal/api` | method registry: name, description, Go in/out types → JSON Schema by reflection, strict decoding (unknown field → `bad_request`), errors `{status, code, message}` |
-| `internal/server` | owns the state; HTTP mux on the unix socket: `POST /v1/call`, `GET /v1/events?session=&all=` (NDJSON), `GET /v1/blocks/{id}/attach` (WebSocket, M2); an event bus with per-subscriber buffers (slow consumers dropped, never blocking PTY reads) |
+| `internal/server` | owns the state; HTTP mux on the unix socket: `POST /v1/call`, `GET /v1/events?session=&all=` (NDJSON), `GET /v1/attach` (one WebSocket per client, M2); an event bus with per-subscriber buffers (slow consumers dropped, never blocking PTY reads) |
 | `internal/persist` | debounced (1s) `state.json` plus `blocks/<id>.snap`; atomic write by temp file + rename; periodic flush every 30s, and on SIGTERM |
-| `internal/agents` | harness adapters: hook payload → `{harness, session_id, cwd}` on the block; resume argv templates; installers for Claude Code (`settings.json` SessionStart hook) and Codex (`hooks.json`) |
+| `internal/agents` | harness adapters: hook payload → `{harness, session_id, cwd}` on the block; resume argv templates; the Claude Code hook installer (six hooks in `settings.json`). Other harnesses have no installer |
 | `cmd/hive` | CLI: auto-starts the server; global `-s -w -b -S --json`; exit codes 0/1/2/3/4/130 |
 
-**API methods (M1)**
+**API methods (as built).** `hive api list` is the source of truth, and
+`docs/api.md` lists them; a test fails if it misses one.
 
 | Group | Methods |
 |---|---|
-| server | `server.version`, `server.shutdown`, `api.list`, `api.describe` |
-| sessions | `session.list`, `session.create{label,cwd,command}`, `session.view`, `session.set_label`, `session.close` |
-| windows | `session.new_window{layout\|command,cwd,label,focus}`, `session.close_window`, `session.focus_window`, `session.set_window_label`, `session.move_window` |
-| blocks/layout | `session.new_split{block_id,direction: right\|left\|above\|below,ratio,command,cwd,label,focus,keep_open}`, `session.focus_block`, `session.zoom_block`, `session.swap_blocks`, `session.resize_pane`, `session.set_block_label`, `block.close`, `block.inspect` |
-| terminal | `terminal.write{data}`, `terminal.send_key{key}`, `terminal.format{format: text\|vt\|html,trim,unwrap}`, `terminal.resize{cols,rows}`, `terminal.process`, `terminal.program_status`, `terminal.wait{timeout}` (long-poll until child exits) |
-| targets | `target.resolve{kind,target,session_id}` → id, or a `not_found`/`ambiguous` error (CLI exit 3) |
-| agents | `agent.report{block_id,harness,session_id,cwd,event}` (called from hooks), `agent.list` (every agent block across sessions, with its status) |
+| server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `client.list` |
+| sessions | `session.list`, `session.create{label,cwd,command,layout}`, `session.view`, `session.list_blocks`, `session.set_label`, `session.close` |
+| windows | `session.new_window{layout,label,focus}`, `session.close_window`, `session.focus_window`, `session.focus_next_window`, `session.focus_previous_window`, `session.set_window_label` |
+| blocks/layout | `session.new_split{block_id,direction: horizontal\|vertical,side: before\|after,ratio,focus,layout}`, `session.move_block`, `session.describe_block`, `session.focus_block`, `session.focus_direction`, `session.focus_next_pane`, `session.focus_previous_pane`, `session.zoom_block`, `session.resize_pane`, `session.set_block_label`, `block.close`, `block.method` |
+| terminal | through `block.method`, as `hive.terminal.*`: `format{format: text\|vt,trim,unwrap}`, `write`, `send_key`, `resize`, `size`, `title`, `pwd`, `process`, `program_status`, `list_dir`, `wait{timeout}` (long-poll, at most 60 s) |
+| targets | `target.resolve{kind,target,session_id,window_id}` → id, or a `not_found`/`ambiguous` error (CLI exit 3) |
+| agents | `agent.report{block_id,harness,state,session_id,cwd,message}` (called from hooks), `agent.list` (every agent block across sessions, with its state) |
+
+The CLI's `--split right|left|above|below` maps onto `direction` and `side`.
 
 **Events (NDJSON):** session events wrap block events (`session_event` →
 `block_event`). Additionally `agent_changed{block_id, harness, session_id}`.
@@ -191,14 +194,15 @@ These amendments win over the M1 detail above where they conflict.
   - Tests for: shutdown with a WebSocket attached; a child ignoring SIGHUP
     with a grandchild holding the pty.
 
-## Milestone 2 plan: the Mac app (draft, under review)
+## Milestone 2 plan: the Mac app
 
 A native app that attaches to the local hive server over `/v1/attach`.
 Each pane mirrors its block in a client-side libghostty-vt terminal and is
 drawn with Metal.
 
-**Layout:** `apps/macos/`, a SwiftPM package, so it builds with the Command
-Line Tools.
+**Layout:** `apps/macos/`, a SwiftPM package. It was planned for the Command
+Line Tools alone. The tests need Xcode's toolchain (swift-testing), set
+with `DEVELOPER_DIR`.
 - `script/bundle.sh` assembles `Hive.app` (Info.plist, icon, ad-hoc codesign).
 - An Xcode project only for signing and notarization when publishing.
 

@@ -336,10 +336,13 @@ func (s *Server) registerMethods() {
 		SessionID string `json:"session_id" required:"true"`
 	}
 	for _, step := range []struct {
-		name string
-		d    int
-	}{{"session.focus_next_window", 1}, {"session.focus_previous_window", -1}} {
-		api.Register(r, step.name, "Focus the next or previous window.",
+		name, desc string
+		d          int
+	}{
+		{"session.focus_next_window", "Focus the window after the active one, wrapping to the first.", 1},
+		{"session.focus_previous_window", "Focus the window before the active one, wrapping to the last.", -1},
+	} {
+		api.Register(r, step.name, step.desc,
 			func(ctx context.Context, in stepIn) (revisionOut, error) {
 				return s.withSession(in.SessionID, func(ss *session.Session) error {
 					if len(ss.Windows) == 0 {
@@ -503,10 +506,13 @@ func (s *Server) registerMethods() {
 			return map[string]any{"block_id": to, "revision": rev.Revision}, err
 		})
 	for _, step := range []struct {
-		name string
-		d    int
-	}{{"session.focus_next_pane", 1}, {"session.focus_previous_pane", -1}} {
-		api.Register(r, step.name, "Focus the next or previous pane in the active window.",
+		name, desc string
+		d          int
+	}{
+		{"session.focus_next_pane", "Focus the next pane in the active window, in layout order, wrapping to the first.", 1},
+		{"session.focus_previous_pane", "Focus the previous pane in the active window, in layout order, wrapping to the last.", -1},
+	} {
+		api.Register(r, step.name, step.desc,
 			func(ctx context.Context, in stepIn) (revisionOut, error) {
 				return s.withSession(in.SessionID, func(ss *session.Session) error {
 					w := ss.ActiveWindow()
