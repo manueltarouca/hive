@@ -42,8 +42,13 @@ final class SettingsStore: ObservableObject {
         p.standardOutput = out
         p.standardError = err
         do { try p.run() } catch { return nil }
+        // Both pipes at once: a full stderr pipe must not stall the process.
+        var errData = Data()
+        let reading = DispatchGroup()
+        reading.enter()
+        DispatchQueue.global().async { errData = err.fileHandleForReading.readDataToEndOfFile(); reading.leave() }
         let data = out.fileHandleForReading.readDataToEndOfFile()
-        let errData = err.fileHandleForReading.readDataToEndOfFile()
+        reading.wait()
         p.waitUntilExit()
         return (data, String(decoding: errData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines), p.terminationStatus)
     }
@@ -68,12 +73,13 @@ final class SettingsStore: ObservableObject {
     }
 
     /// Changes one setting in the file, keeping the rest of it.
-    func set(_ key: String, _ value: String) {
+    func set(_ key: String, _ value: String, then: (@MainActor () -> Void)? = nil) {
         io.async {
             let r = Self.run(["config", "set", key, value])
             Task { @MainActor in
                 if let r, r.status == 0 {
                     self.writeError = nil
+                    then?()
                 } else {
                     self.writeError = r.map { $0.err.replacingOccurrences(of: "Error: ", with: "") } ?? "hive isn't installed with the app"
                 }

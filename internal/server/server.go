@@ -94,6 +94,7 @@ type Server struct {
 	conf      config.Config
 	confDiags []config.Diagnostic
 	confStamp fileStamp
+	confMu    sync.Mutex // serializes reloadConfig
 
 	cfg   Config
 	log   *slog.Logger

@@ -195,6 +195,24 @@ These amendments win over the M1 detail above where they conflict.
   - Tests for: shutdown with a WebSocket attached; a child ignoring SIGHUP
     with a grandchild holding the pty.
 
+**Mac app polish, agent identity and settings: done (2026-10-17).**
+Each piece was reviewed by Fable 5.1, the settings as a plan first.
+- Shortcuts window, dead keys, icons: input-method commits, arrow replay,
+  licence attributions, ß, columns: fixed with tests.
+- Agent identity: nested agents (agent_pid + controlling terminal),
+  revivable shell-return endings, grok subagent events, restore leaving
+  skipped agents ended, shell argument parsing: fixed with tests.
+- Settings plan: one reader (the app runs `hive config`), HIVE_CONFIG for
+  tests, server keys through its own API, lazy file creation, font swap
+  waiting for in-flight frames: adopted.
+- Settings code: non-finite values (`font-size = nan` broke every reader),
+  relative and chained links, line breaks in values, prose comments taken
+  for defaults, concurrent writes, the picker and FontSet disagreeing on
+  "monospaced", bare booleans: fixed with tests.
+- Deferred: a dangling link's target folder isn't watched until another
+  event; the pane menu's tracking check waits for the vt queue's current
+  job (a stutter under heavy output, no deadlock).
+
 ## Milestone 2 plan: the Mac app
 
 A native app that attaches to the local hive server over `/v1/attach`.

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -175,5 +176,103 @@ func TestSetCreatesOneFolderOnly(t *testing.T) {
 	deep := filepath.Join(t.TempDir(), "a", "b", "config")
 	if err := Set(deep, "theme", "night"); err == nil {
 		t.Fatal("created a missing chain of folders")
+	}
+}
+
+// Fable's review: non-finite numbers passed range checks and broke JSON.
+func TestNonFiniteValuesAreRejected(t *testing.T) {
+	c, diags := Parse("font-size = nan\nscrollback-limit = inf\n")
+	if c.FontSize != 13 || c.ScrollbackLimit != 16<<20 || len(diags) != 2 {
+		t.Fatalf("config = %+v, diags = %v", c, diags)
+	}
+	for _, v := range []string{"1e400", "1e30g", "inf", "nan"} {
+		if _, err := parseSize(v); err == nil {
+			t.Errorf("parseSize(%q) accepted", v)
+		}
+	}
+	if _, err := json.Marshal(c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A newline in a value would write a second line: refused.
+func TestSetRefusesLineBreaks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config")
+	if err := Set(path, "font-family", "Menlo\nscrollback-limit = 1"); err == nil {
+		t.Fatal("a value with a newline was written")
+	}
+}
+
+// Only a commented setting is the commented default, not a person's prose.
+func TestSetKeepsProseComments(t *testing.T) {
+	in := "# font-size = 13 was too small for me\n"
+	if got := setIn(in, "font-size", "15"); got != in+"font-size = 15\n" {
+		t.Fatalf("setIn = %q", got)
+	}
+}
+
+// A relative symlink resolves from the link's real folder, as the kernel
+// does, and a chain of links is followed to the end.
+func TestSetFollowsRelativeAndChainedLinks(t *testing.T) {
+	root := t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// ~/.config is itself a link into dotfiles; the file is a relative link.
+	must(os.MkdirAll(filepath.Join(root, "dotfiles", "config", "hive"), 0o755))
+	must(os.MkdirAll(filepath.Join(root, "dotfiles", "x"), 0o755))
+	must(os.Symlink(filepath.Join(root, "dotfiles", "config"), filepath.Join(root, ".config")))
+	must(os.Symlink("../../x/config", filepath.Join(root, ".config", "hive", "config")))
+	must(Set(filepath.Join(root, ".config", "hive", "config"), "theme", "night"))
+	if b, err := os.ReadFile(filepath.Join(root, "dotfiles", "x", "config")); err != nil || !strings.Contains(string(b), "theme = night") {
+		t.Fatalf("relative link target: %q %v", b, err)
+	}
+	// link -> link -> missing file.
+	must(os.Symlink(filepath.Join(root, "end"), filepath.Join(root, "mid")))
+	must(os.Symlink(filepath.Join(root, "mid"), filepath.Join(root, "start")))
+	must(Create(filepath.Join(root, "start")))
+	if _, err := os.Stat(filepath.Join(root, "end")); err != nil {
+		t.Fatalf("chained link: %v", err)
+	}
+}
+
+// Concurrent writers don't lose each other's edits.
+func TestConcurrentSetsKeepBothEdits(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config")
+	done := make(chan error, 2)
+	go func() { done <- Set(path, "theme", "night") }()
+	go func() { done <- Set(path, "bell", "none") }()
+	for i := 0; i < 2; i++ {
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, _ := Load(path)
+	if c.Theme != "night" || c.Bell != "none" {
+		t.Fatalf("an edit was lost: %+v", c)
+	}
+}
+
+// A repeat that fails doesn't claim to win.
+func TestFailedRepeatSaysTheEarlierLineStays(t *testing.T) {
+	c, diags := Parse("theme = night\ntheme = bogus\n")
+	if c.Theme != "night" {
+		t.Fatalf("theme = %s", c.Theme)
+	}
+	for _, d := range diags {
+		if strings.Contains(d.Message, "wins") {
+			t.Fatalf("a failed repeat claims to win: %v", d)
+		}
+	}
+}
+
+// As in Ghostty, a boolean setting alone on its line means true.
+func TestBareBooleanIsTrue(t *testing.T) {
+	c, diags := Parse("confirm-paste = false\nconfirm-paste\n")
+	if !c.ConfirmPaste || len(diags) != 1 || diags[0].Level != Warning {
+		t.Fatalf("config = %+v, diags = %v", c, diags)
 	}
 }

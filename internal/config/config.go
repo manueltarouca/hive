@@ -6,6 +6,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -56,6 +57,10 @@ type Key struct {
 
 const minScrollback = 64 << 10
 
+// maxSize caps sizes at 1 TiB: anything larger is a typo, and floats that
+// big no longer convert to an integer exactly.
+const maxSize = 1 << 40
+
 // Keys lists every setting, in the order the template shows them.
 var Keys = []Key{
 	{Name: "theme", Default: "system", Help: "system, day or night", Choices: []string{"system", "day", "night"},
@@ -65,7 +70,7 @@ var Keys = []Key{
 	{Name: "font-size", Default: "13", Help: "points, 8 to 32",
 		set: func(c *Config, v string) error {
 			f, err := strconv.ParseFloat(v, 64)
-			if err != nil || f < 8 || f > 32 {
+			if err != nil || math.IsNaN(f) || f < 8 || f > 32 {
 				return errors.New("must be a number from 8 to 32")
 			}
 			c.FontSize = f
@@ -167,25 +172,30 @@ func Parse(src string) (Config, []Diagnostic) {
 		if skip {
 			continue
 		}
-		if !hasEq {
-			diags = append(diags, Diagnostic{n, name, Error, fmt.Sprintf("%q needs a value: key = value", name)})
-			continue
-		}
 		k := key(name)
+		if !hasEq {
+			if k != nil && (k.Default == "true" || k.Default == "false") {
+				value = "true" // a boolean alone means true, as in Ghostty
+			} else {
+				diags = append(diags, Diagnostic{n, name, Error, fmt.Sprintf("%q needs a value: key = value", name)})
+				continue
+			}
+		}
 		if k == nil {
 			diags = append(diags, Diagnostic{n, name, Warning, fmt.Sprintf("unknown setting %q", name)})
 			continue
 		}
-		if prev, ok := seen[name]; ok {
-			diags = append(diags, Diagnostic{n, name, Warning, fmt.Sprintf("%s is also set on line %d; this one wins", name, prev)})
-		}
-		seen[name] = n
 		if value == "" {
 			value = k.Default // an empty value resets, as in Ghostty
 		}
 		if err := k.set(&c, value); err != nil {
 			diags = append(diags, Diagnostic{n, name, Error, fmt.Sprintf("%s %v (got %q)", name, err, value)})
+			continue // an earlier line's value, if any, stays
 		}
+		if prev, ok := seen[name]; ok {
+			diags = append(diags, Diagnostic{n, name, Warning, fmt.Sprintf("%s is also set on line %d; this one wins", name, prev)})
+		}
+		seen[name] = n
 	}
 	return c, diags
 }
@@ -203,7 +213,7 @@ func parseSize(s string) (uint64, error) {
 		mult, s = 1<<30, s[:len(s)-1]
 	}
 	f, err := strconv.ParseFloat(s, 64)
-	if err != nil || f < 0 {
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) || f < 0 || f*mult > maxSize {
 		return 0, fmt.Errorf("bad size %q", s)
 	}
 	return uint64(f * mult), nil

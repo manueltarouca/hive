@@ -441,6 +441,10 @@ final class AppModel: ObservableObject {
                                       agentState: agentState, exited: b["exited"].bool ?? false, exitCode: b["exit_code"].int ?? 0)
             }
             blocks = info
+            // Closed panes leave no bell behind.
+            let live = Set(info.keys)
+            if rang.contains(where: { !live.contains($0) }) { rang = rang.filter(live.contains) }
+            bellPolicy.prune(keeping: live)
             attachVisible()
             markSeen()
             onLayout?()

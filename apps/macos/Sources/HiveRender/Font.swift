@@ -40,9 +40,9 @@ public final class FontSet {
         if !family.isEmpty {
             let attrs = [kCTFontFamilyNameAttribute: family] as CFDictionary
             let f = CTFontCreateWithFontDescriptor(CTFontDescriptorCreateWithAttributes(attrs), px, nil)
-            if (CTFontCopyFamilyName(f) as String) != family {
+            if (CTFontCopyFamilyName(f) as String).caseInsensitiveCompare(family) != .orderedSame {
                 problem = "font-family \"\(family)\" isn't installed here; using JetBrains Mono"
-            } else if !CTFontGetSymbolicTraits(f).contains(.traitMonoSpace) {
+            } else if !FontSet.isMonospaced(f) {
                 problem = "font-family \"\(family)\" isn't a monospaced font; using JetBrains Mono"
             } else {
                 chosen = f
@@ -82,6 +82,20 @@ public final class FontSet {
         baseline = (descent + leading / 2).rounded()
         underlineThickness = max(1, CTFontGetUnderlineThickness(regular).rounded())
         underlinePosition = max(1, (baseline + CTFontGetUnderlinePosition(regular)).rounded())
+    }
+
+    /// Whether a font is monospaced: the one test the Settings picker and
+    /// font-family both use.
+    static func isMonospaced(_ f: CTFont) -> Bool { CTFontGetSymbolicTraits(f).contains(.traitMonoSpace) }
+
+    /// The installed families font-family accepts, for the Settings picker.
+    public static func monospacedFamilies() -> [String] {
+        let names = CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? []
+        return names.filter { family in
+            let attrs = [kCTFontFamilyNameAttribute: family] as CFDictionary
+            let f = CTFontCreateWithFontDescriptor(CTFontDescriptorCreateWithAttributes(attrs), 13, nil)
+            return (CTFontCopyFamilyName(f) as String) == family && isMonospaced(f)
+        }.sorted()
     }
 
     /// The resource bundle, found without Bundle.module, which crashes when

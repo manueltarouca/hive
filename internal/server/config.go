@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -44,6 +45,10 @@ func (s *Server) readConfig() (config.Config, []config.Diagnostic, fileStamp) {
 // reloadConfig reads the file again and applies what can change live:
 // scrollback-limit to every terminal. resume-agents is read at start.
 func (s *Server) reloadConfig() {
+	// The poll and config.set can both reload: one at a time, so the newest
+	// read is the one kept.
+	s.confMu.Lock()
+	defer s.confMu.Unlock()
 	c, diags, stamp := s.readConfig()
 	s.mu.Lock()
 	old := s.conf.ScrollbackLimit
@@ -59,8 +64,8 @@ func (s *Server) reloadConfig() {
 		s.log.Warn("config", "path", s.cfg.ConfigPath, "problem", d.String())
 	}
 	for _, r := range blocks {
-		if err := r.b.SetScrollbackLimit(c.ScrollbackLimit); err != nil {
-			s.log.Warn("scrollback limit", "err", err)
+		if err := r.b.SetScrollbackLimit(c.ScrollbackLimit); err != nil && !strings.Contains(err.Error(), "closed") {
+			s.log.Warn("scrollback limit", "err", err) // a pane closed meanwhile isn't news
 		}
 	}
 }

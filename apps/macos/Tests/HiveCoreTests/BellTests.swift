@@ -46,3 +46,14 @@ import Testing
         #expect(!r11.isEmpty)
     }
 }
+
+@Suite struct BellPruneTests {
+    /// Closed panes are forgotten: the policy's memory doesn't grow forever.
+    @Test func forgetsClosedPanes() {
+        var p = BellPolicy()
+        _ = p.ring(block: "a", setting: "flash", appActive: true, now: Date(timeIntervalSince1970: 1))
+        _ = p.ring(block: "b", setting: "flash", appActive: true, now: Date(timeIntervalSince1970: 1))
+        p.prune(keeping: ["b"])
+        #expect(p.remembered == ["b"])
+    }
+}

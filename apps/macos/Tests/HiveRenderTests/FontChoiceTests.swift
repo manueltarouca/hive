@@ -46,3 +46,17 @@ import Testing
         #expect(r.fonts.cellWidth > before)
     }
 }
+
+/// The Settings picker and FontSet agree (Fable's review): a family the
+/// picker offers is one FontSet accepts, whatever its capitalisation.
+@Suite struct MonospacedFamilyTests {
+    @Test func pickerAndFontSetAgree() {
+        let families = FontSet.monospacedFamilies()
+        #expect(families.contains("Menlo"))
+        #expect(!families.contains("Helvetica"))
+        for family in families.prefix(40) {
+            #expect(FontSet(family: family, pointSize: 13, scale: 2).problem == nil, "\(family)")
+        }
+        #expect(CTFontCopyFamilyName(FontSet(family: "menlo", pointSize: 13, scale: 2).regular) as String == "Menlo")
+    }
+}

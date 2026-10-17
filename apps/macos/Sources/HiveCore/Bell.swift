@@ -17,6 +17,14 @@ public struct BellPolicy: Sendable {
 
     public init() {}
 
+    /// The panes it remembers a ring for.
+    public var remembered: Set<String> { Set(lastRing.keys) }
+
+    /// Forgets closed panes, so its memory doesn't grow forever.
+    public mutating func prune(keeping live: Set<String>) {
+        lastRing = lastRing.filter { live.contains($0.key) }
+    }
+
     public mutating func ring(block: String, setting: String, appActive: Bool, now: Date = Date()) -> [Effect] {
         guard setting != "none" else { return [] }
         if let last = lastRing[block], now.timeIntervalSince(last) < 1 { return [] }

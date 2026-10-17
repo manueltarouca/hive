@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Set changes one setting in the file at path, keeping every other byte:
@@ -15,6 +16,12 @@ import (
 // symlink's target (stow-managed dotfiles keep their link) and are atomic.
 // A missing file is created from the template, never over an existing one.
 func Set(path, name, value string) error {
+	// Edits from one process don't race each other (the server's config.set).
+	writeMu.Lock()
+	defer writeMu.Unlock()
+	if strings.ContainsAny(value, "\r\n") {
+		return fmt.Errorf("%s: a value can't hold a line break", name)
+	}
 	k := key(name)
 	if k == nil {
 		return fmt.Errorf("unknown setting %q", name)
@@ -45,6 +52,8 @@ func Set(path, name, value string) error {
 	return replace(target, setIn(string(b), name, value), fi.Mode().Perm())
 }
 
+var writeMu sync.Mutex
+
 // Create makes the file from the template if it doesn't exist (through a
 // symlink, like Set), and leaves an existing one alone.
 func Create(path string) error {
@@ -58,29 +67,43 @@ func Create(path string) error {
 	return nil
 }
 
-// resolve follows symlinks to the file to write. A link to a missing file
-// resolves to that file. A missing folder is created only one level deep
-// (~/.config/hive when ~/.config exists), never a whole missing path.
+// resolve follows symlinks to the file to write, as the kernel would:
+// a relative link from its link's real folder, and chains of links to their
+// end, even when that end doesn't exist yet. A missing folder is created
+// only one level deep (~/.config/hive when ~/.config exists), and only for
+// the path given, never at a link's far end.
 func resolve(path string) (string, error) {
 	if t, err := filepath.EvalSymlinks(path); err == nil {
 		return t, nil
 	}
-	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
-		dest, err := os.Readlink(path)
+	p := path
+	for hops := 0; ; hops++ {
+		fi, err := os.Lstat(p)
+		if err != nil || fi.Mode()&os.ModeSymlink == 0 {
+			break
+		}
+		if hops == 40 {
+			return "", fmt.Errorf("%s: too many links", path)
+		}
+		dest, err := os.Readlink(p)
 		if err != nil {
 			return "", err
 		}
 		if !filepath.IsAbs(dest) {
-			dest = filepath.Join(filepath.Dir(path), dest)
+			dir := filepath.Dir(p)
+			if d, err := filepath.EvalSymlinks(dir); err == nil {
+				dir = d
+			}
+			dest = filepath.Join(dir, dest)
 		}
-		if _, err := os.Stat(filepath.Dir(dest)); err != nil {
-			return "", fmt.Errorf("%s links to %s, whose folder doesn't exist", path, dest)
-		}
-		return dest, nil
+		p = dest
 	}
-	dir := filepath.Dir(path)
+	dir := filepath.Dir(p)
 	if d, err := filepath.EvalSymlinks(dir); err == nil {
-		return filepath.Join(d, filepath.Base(path)), nil
+		return filepath.Join(d, filepath.Base(p)), nil
+	}
+	if p != path {
+		return "", fmt.Errorf("%s links to %s, whose folder doesn't exist", path, p)
 	}
 	if err := os.Mkdir(dir, 0o755); err != nil && !errors.Is(err, fs.ErrExist) {
 		return "", fmt.Errorf("can't create %s: %w", dir, err)
@@ -122,6 +145,12 @@ func replace(path, text string, mode fs.FileMode) error {
 	return os.Rename(tmp.Name(), path)
 }
 
+func validValue(name, v string) bool {
+	k := key(name)
+	var c Config
+	return k != nil && (v == "" || k.set(&c, v) == nil)
+}
+
 // setIn returns text with name set to value, every other byte kept.
 func setIn(text, name, value string) string {
 	nl := "\n"
@@ -136,7 +165,9 @@ func setIn(text, name, value string) string {
 		if k, _, hasEq, skip := line(raw); !skip && hasEq && k == name {
 			active = i
 		} else if commented < 0 && strings.HasPrefix(s, "#") {
-			if k, _, hasEq, skip := line(strings.TrimSpace(s[1:])); !skip && hasEq && k == name {
+			// A commented setting, not prose that starts like one
+			// ("# font-size = 13 was too small for me").
+			if k, v, hasEq, skip := line(strings.TrimSpace(s[1:])); !skip && hasEq && k == name && validValue(name, v) {
 				commented = i
 			}
 		}

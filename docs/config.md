@@ -21,6 +21,7 @@ hive config path --create
 ## The file
 
 One setting per line, `key = value`. A line starting with `#` is a comment.
+A true-or-false setting alone on its line (`confirm-paste`) means true.
 Quotes around a value are optional. An empty value (`font-size =`) resets a
 setting to its default.
 

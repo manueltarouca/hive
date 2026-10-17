@@ -1,5 +1,6 @@
 import AppKit
 import HiveCore
+import HiveRender
 import SwiftUI
 
 /// Hive → Settings… (⌘,): the common settings, written into the settings
@@ -39,8 +40,7 @@ struct SettingsView: View {
 
     /// Writes a server setting into the file and asks the server to read it.
     private func setServer(_ key: String, _ value: String) {
-        store.set(key, value)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { model.call("config.reload") }
+        store.set(key, value) { model.call("config.reload") } // once the file is written
     }
 
     var body: some View {
@@ -118,12 +118,8 @@ struct SettingsView: View {
     }
 }
 
-/// The installed font families whose regular face is fixed-pitch.
+/// The installed families font-family accepts (FontSet's own test).
 @MainActor
 enum MonospacedFonts {
-    static let families: [String] = NSFontManager.shared.availableFontFamilies.filter { family in
-        guard let first = NSFontManager.shared.availableMembers(ofFontFamily: family)?.first,
-              let name = first.first as? String, let font = NSFont(name: name, size: 13) else { return false }
-        return font.isFixedPitch
-    }
+    static let families: [String] = FontSet.monospacedFamilies()
 }

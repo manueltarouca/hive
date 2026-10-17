@@ -50,7 +50,10 @@ func cmdConfig(g globals, args []string) error {
 	case "show":
 		asJSON := g.json || (len(args) > 1 && args[1] == "--json")
 		c, diags := config.Load(path)
-		b, _ := json.Marshal(c)
+		b, err := json.Marshal(c)
+		if err != nil {
+			return fmt.Errorf("settings: %v", err) // never print a half answer
+		}
 		var values map[string]any
 		_ = json.Unmarshal(b, &values)
 		if asJSON {
