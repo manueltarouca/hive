@@ -61,6 +61,16 @@ type Config struct {
 	// (tests). ConfigPoll is how often it's checked for edits (default 2s).
 	ConfigPath string
 	ConfigPoll time.Duration
+	// OnFlush, when set, hears about every save (benchmarks).
+	OnFlush func(FlushStats)
+}
+
+// FlushStats describes one save: how long it took, from waiting for the
+// previous one to state.json written, and how many terminals it snapshotted.
+type FlushStats struct {
+	Took      time.Duration
+	Wait      time.Duration // waiting for another save to finish
+	Snapshots int
 }
 
 type exitRec struct {
@@ -582,9 +592,22 @@ var flushMu sync.Mutex
 
 // flush snapshots every block whose output changed and writes state.json.
 // With all, every block is snapshotted.
-func (s *Server) flush(all bool) error {
+func (s *Server) flush(all bool) error { return s.save(all, true) }
+
+// flushState saves sessions, layouts and agents, but no terminal snapshots:
+// for agent.report, whose record must reach the disk now, while snapshots
+// (scrollback) can wait for the next timed save.
+func (s *Server) flushState() error { return s.save(false, false) }
+
+func (s *Server) save(all, snapshots bool) error {
+	start := time.Now()
 	flushMu.Lock()
 	defer flushMu.Unlock()
+	locked := time.Now()
+	snaps := 0
+	if s.cfg.OnFlush != nil {
+		defer func() { s.cfg.OnFlush(FlushStats{Took: time.Since(start), Wait: locked.Sub(start), Snapshots: snaps}) }()
+	}
 	s.mu.Lock()
 	sessions, err := json.Marshal(s.sessions)
 	if err != nil {
@@ -620,6 +643,9 @@ func (s *Server) flush(all bool) error {
 	}
 	var jobs []snapJob
 	for bid, r := range recs {
+		if !snapshots {
+			break
+		}
 		if seq := r.b.Seq(); all || seq != lastSnap[bid] {
 			jobs = append(jobs, snapJob{bid, r, seq})
 		}
@@ -633,6 +659,7 @@ func (s *Server) flush(all bool) error {
 		s.mu.Lock()
 		j.r.snapSeq = j.seq
 		s.mu.Unlock()
+		snaps++
 	}
 	st := &persist.State{}
 	if err := json.Unmarshal(sessions, &st.Sessions); err != nil {

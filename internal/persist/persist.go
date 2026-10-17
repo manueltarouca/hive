@@ -6,6 +6,7 @@
 package persist
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"io"
@@ -113,9 +114,19 @@ func (s *Store) SaveState(st *State) error {
 	})
 }
 
-// SaveSnapshot writes a block's snapshot with write.
+// SaveSnapshot writes a block's snapshot with write, buffered and without
+// forcing it to the disk: a snapshot only carries scrollback, and one that
+// a power cut leaves unreadable costs that scrollback, never the pane (see
+// restore). Forcing every snapshot out (F_FULLFSYNC, ~4 ms each on a Mac
+// SSD) made each save cost ~5 ms per busy pane.
 func (s *Store) SaveSnapshot(blockID string, write func(io.Writer) error) error {
-	return s.atomic(s.snapPath(blockID), write)
+	return s.atomicWith(s.snapPath(blockID), func(w io.Writer) error {
+		bw := bufio.NewWriterSize(w, 256<<10)
+		if err := write(bw); err != nil {
+			return err
+		}
+		return bw.Flush()
+	}, false)
 }
 
 // LoadSnapshot reads a block's snapshot.
@@ -141,6 +152,12 @@ func (s *Store) GC(live map[string]bool) {
 }
 
 func (s *Store) atomic(path string, write func(io.Writer) error) error {
+	return s.atomicWith(path, write, true)
+}
+
+// atomicWith writes path through a temp file and a rename; durable forces
+// the data to the disk before the rename.
+func (s *Store) atomicWith(path string, write func(io.Writer) error, durable bool) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
@@ -159,8 +176,10 @@ func (s *Store) atomic(path string, write func(io.Writer) error) error {
 	if err := write(f); err != nil {
 		return err
 	}
-	if err := f.Sync(); err != nil {
-		return err
+	if durable {
+		if err := f.Sync(); err != nil {
+			return err
+		}
 	}
 	if err := f.Close(); err != nil {
 		return err

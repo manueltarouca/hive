@@ -1,0 +1,184 @@
+{
+  "scenario": "flush",
+  "meta": {
+    "when": "2026-10-17T21:26:18Z",
+    "machine": "Mac17,8",
+    "cpu": "Apple M5 Pro",
+    "cores": 18,
+    "memory_gb": 48,
+    "os": "macOS 27.0.1",
+    "go": "go1.26.2",
+    "commit": "6c24b56+dirty",
+    "power": "Battery Power",
+    "load_before": "6.15 5.98 5.65",
+    "load_after": "6.45 6.04 5.69",
+    "pty_max": 511,
+    "pty_in_use": 35,
+    "open_files_limit": "1048576",
+    "gomaxprocs": 18,
+    "fit_for_baseline": false,
+    "why_not_baseline": "load average 6.15 5.98 5.65; on battery"
+  },
+  "params": {
+    "limit_ms": 50,
+    "rate_bytes_per_s": 102400,
+    "secs": 5,
+    "steps": "1 8 32 64 128 192 256"
+  },
+  "steps": [
+    {
+      "panes": 1,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 250,
+        "p50_ms": 9.52,
+        "p99_ms": 17.47,
+        "max_ms": 21.61
+      },
+      "save": {
+        "n": 250,
+        "p50_ms": 9.27,
+        "p99_ms": 17.26,
+        "max_ms": 18.96
+      },
+      "save_wait": {
+        "n": 250,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 0
+      },
+      "snapshots_per_save_max": 1,
+      "memory": {
+        "resident_mb": 30,
+        "go_heap_mb": 11,
+        "native_mb": 19,
+        "goroutines": 11
+      },
+      "degraded": false
+    },
+    {
+      "panes": 8,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 122,
+        "p50_ms": 40.11,
+        "p99_ms": 54.87,
+        "max_ms": 59.12
+      },
+      "save": {
+        "n": 122,
+        "p50_ms": 39.96,
+        "p99_ms": 54.7,
+        "max_ms": 58.97
+      },
+      "save_wait": {
+        "n": 122,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 0
+      },
+      "snapshots_per_save_max": 8,
+      "memory": {
+        "resident_mb": 90,
+        "go_heap_mb": 10,
+        "native_mb": 80,
+        "goroutines": 46
+      },
+      "degraded": true
+    },
+    {
+      "panes": 32,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 33,
+        "p50_ms": 152.19,
+        "p99_ms": 182.88,
+        "max_ms": 182.88
+      },
+      "save": {
+        "n": 33,
+        "p50_ms": 152.01,
+        "p99_ms": 182.72,
+        "max_ms": 182.72
+      },
+      "save_wait": {
+        "n": 33,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 0
+      },
+      "snapshots_per_save_max": 32,
+      "memory": {
+        "resident_mb": 302,
+        "go_heap_mb": 15,
+        "native_mb": 287,
+        "goroutines": 166
+      },
+      "degraded": true
+    },
+    {
+      "panes": 1,
+      "scrollback": "full (12 MB written first)",
+      "agent_report": {
+        "n": 245,
+        "p50_ms": 14.13,
+        "p99_ms": 52.54,
+        "max_ms": 59.59
+      },
+      "save": {
+        "n": 245,
+        "p50_ms": 13.71,
+        "p99_ms": 52.07,
+        "max_ms": 59.19
+      },
+      "save_wait": {
+        "n": 245,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 0
+      },
+      "snapshots_per_save_max": 1,
+      "memory": {
+        "resident_mb": 48,
+        "go_heap_mb": 17,
+        "native_mb": 31,
+        "goroutines": 11
+      },
+      "degraded": true
+    },
+    {
+      "panes": 8,
+      "scrollback": "full (12 MB written first)",
+      "agent_report": {
+        "n": 97,
+        "p50_ms": 50.92,
+        "p99_ms": 76.43,
+        "max_ms": 76.43
+      },
+      "save": {
+        "n": 97,
+        "p50_ms": 50.76,
+        "p99_ms": 75.86,
+        "max_ms": 75.86
+      },
+      "save_wait": {
+        "n": 97,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 0
+      },
+      "snapshots_per_save_max": 8,
+      "memory": {
+        "resident_mb": 158,
+        "go_heap_mb": 16,
+        "native_mb": 142,
+        "goroutines": 46
+      },
+      "degraded": true
+    }
+  ],
+  "knee_panes": {
+    "empty": 1
+  },
+  "note": ""
+}
