@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import Wordmark from '#lib/Wordmark.svelte';
   import CopyPrompt from '#lib/CopyPrompt.svelte';
+  import Mark from '#lib/Mark.svelte';
 
   // What hive is for, one at a time.
   const uses = ['coding agents.', 'long builds.', 'dev servers.', 'test runs.', 'all your sessions.'];
@@ -35,7 +36,7 @@
     </h1>
 
     <a class="badge" href={resolve('/docs/[slug]', { slug: 'installation' })}>
-      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 27.7 9.25v13.5L16 29.5 4.3 22.75V9.25Z" fill="var(--honey)"/><path d="M16 9.5 21.6 12.75v6.5L16 22.5l-5.6-3.25v-6.5Z" fill="var(--paper)"/></svg>
+      <span class="mark"><Mark /></span>
       <p>hive is open source.</p>
       <span>Read the docs</span>
     </a>
@@ -128,7 +129,7 @@ make vt build
   .badge { display: flex; align-items: center; gap: 16px; padding: 14px 20px 14px 14px; border: 1px solid var(--rule); border-radius: 28px;
            text-decoration: none; font-size: clamp(17px, 1.47vw, 21px); line-height: 1.3; letter-spacing: -0.01em; transition: border-color 0.2s var(--ease); }
   .badge:hover { border-color: var(--honey); }
-  .badge svg { width: 44px; height: 44px; flex: none; }
+  .badge .mark { width: 44px; height: 44px; flex: none; }
   .badge p { margin: 0; flex: 1; }
   .badge span { color: var(--honey); }
   .agent { display: flex; align-items: center; gap: 16px; margin-top: 14px; }

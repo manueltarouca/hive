@@ -1,4 +1,5 @@
-// Draws the Hive app icon at 1024×1024: the hexagon mark on a dark squircle.
+// Draws the Hive app icon at 1024×1024: three honeycomb cells, one lit, on a
+// dark squircle. Many sessions; one needs you.
 // Usage: swift script/icon.swift out.png
 import AppKit
 
@@ -41,10 +42,6 @@ ctx.saveGState()
 ctx.addPath(squircle); ctx.clip()
 let bg = CGGradient(colorsSpace: space, colors: [hex(0x30343C), hex(0x1D1F21)] as CFArray, locations: [0, 1])!
 ctx.drawLinearGradient(bg, start: CGPoint(x: 0, y: body.maxY), end: CGPoint(x: 0, y: body.minY), options: [])
-// A warm glow behind the mark.
-let glow = CGGradient(colorsSpace: space, colors: [hex(0xF2A93B, 0.22), hex(0xF2A93B, 0)] as CFArray, locations: [0, 1])!
-ctx.drawRadialGradient(glow, startCenter: CGPoint(x: 512, y: 500), startRadius: 0,
-                       endCenter: CGPoint(x: 512, y: 500), endRadius: 400, options: [])
 ctx.restoreGState()
 
 // A hairline on the squircle's top edge, like light catching glass.
@@ -54,25 +51,43 @@ ctx.addPath(CGPath(roundedRect: body.insetBy(dx: 1.5, dy: 1.5), cornerWidth: 184
 ctx.setStrokeColor(hex(0xFFFFFF, 0.10)); ctx.setLineWidth(3); ctx.strokePath()
 ctx.restoreGState()
 
-// The mark: a honey hexagon with a prompt cut into it.
-let c = CGPoint(x: 512, y: 512)
+// The mark: three pointy-top cells packed as in a honeycomb, the top one lit.
+// Neighbouring centres are d apart, at 60° below the top cell. The group's
+// bounding box is centred on the canvas.
+let r: CGFloat = 150, gap: CGFloat = 24
+let d = 3.squareRoot() * r + gap
+let topY = 512 + d * 3.squareRoot() / 4
+let lowY = topY - d * 3.squareRoot() / 2
+let lit = CGPoint(x: 512, y: topY)
+let cells = [CGPoint(x: 512 - d / 2, y: lowY), CGPoint(x: 512 + d / 2, y: lowY)]
+let corner = r * 0.17
+
+// A soft honey glow under the lit cell, inside the tile only.
 ctx.saveGState()
-ctx.addPath(hexagon(center: c, radius: 300, corner: 44)); ctx.clip()
-let honey = CGGradient(colorsSpace: space, colors: [hex(0xF7BE5A), hex(0xE8922A)] as CFArray, locations: [0, 1])!
-ctx.drawLinearGradient(honey, start: CGPoint(x: 0, y: 812), end: CGPoint(x: 0, y: 212), options: [])
+ctx.addPath(squircle); ctx.clip()
+let glow = CGGradient(colorsSpace: space, colors: [hex(0xF2A93B, 0.30), hex(0xF2A93B, 0)] as CFArray, locations: [0, 1])!
+ctx.drawRadialGradient(glow, startCenter: lit, startRadius: 0, endCenter: lit, endRadius: r * 2.1, options: [])
 ctx.restoreGState()
 
-// "›_", centred optically: the chevron and the underscore share a baseline.
-let ink = hex(0x24272D)
-let chevron = CGMutablePath()
-chevron.move(to: CGPoint(x: 398, y: 600))
-chevron.addLine(to: CGPoint(x: 488, y: 512))
-chevron.addLine(to: CGPoint(x: 398, y: 424))
-ctx.addPath(chevron)
-ctx.setStrokeColor(ink); ctx.setLineWidth(46); ctx.setLineCap(.round); ctx.setLineJoin(.round)
-ctx.strokePath()
-ctx.addPath(CGPath(roundedRect: CGRect(x: 526, y: 401, width: 122, height: 46), cornerWidth: 23, cornerHeight: 23, transform: nil))
-ctx.setFillColor(ink); ctx.fillPath()
+// Unlit cells: a step lighter than the tile, with a faint top edge.
+for c in cells {
+    ctx.saveGState()
+    ctx.addPath(hexagon(center: c, radius: r, corner: corner)); ctx.clip()
+    let slate = CGGradient(colorsSpace: space, colors: [hex(0x535963), hex(0x3D424A)] as CFArray, locations: [0, 1])!
+    ctx.drawLinearGradient(slate, start: CGPoint(x: 0, y: c.y + r), end: CGPoint(x: 0, y: c.y - r), options: [])
+    ctx.restoreGState()
+    ctx.addPath(hexagon(center: c, radius: r - 1.5, corner: corner))
+    ctx.setStrokeColor(hex(0xFFFFFF, 0.07)); ctx.setLineWidth(3); ctx.strokePath()
+}
+
+// The lit cell: honey, brighter at the top.
+ctx.saveGState()
+ctx.addPath(hexagon(center: lit, radius: r, corner: corner)); ctx.clip()
+let honey = CGGradient(colorsSpace: space, colors: [hex(0xFAC66A), hex(0xE8922A)] as CFArray, locations: [0, 1])!
+ctx.drawLinearGradient(honey, start: CGPoint(x: 0, y: lit.y + r), end: CGPoint(x: 0, y: lit.y - r), options: [])
+ctx.restoreGState()
+ctx.addPath(hexagon(center: lit, radius: r - 1.5, corner: corner))
+ctx.setStrokeColor(hex(0xFFFFFF, 0.22)); ctx.setLineWidth(3); ctx.strokePath()
 
 let img = ctx.makeImage()!
 let rep = NSBitmapImageRep(cgImage: img)
