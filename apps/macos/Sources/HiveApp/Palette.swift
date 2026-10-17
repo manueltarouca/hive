@@ -36,6 +36,9 @@ final class PalettePanel {
         p.setFrame(NSRect(x: x, y: top - 360, width: width, height: 360), display: true)
         window.addChildWindow(p, ordered: .above)
         p.makeKeyAndOrderFront(nil)
+        // A clear panel's shadow follows its drawn content: recompute it once
+        // SwiftUI has drawn the card.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { p.invalidateShadow() }
         panel = p
         // Clicking anywhere else closes it.
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] e in
@@ -79,8 +82,15 @@ struct PaletteView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(style.secondary.swiftUI)
-                TextField(placeholder, text: $query)
+                // The placeholder is drawn by hand: macOS ignores prompt colors.
+                TextField("", text: $query)
                     .textFieldStyle(.plain)
+                    .tint(style.accent.swiftUI)
+                    .overlay(alignment: .leading) {
+                        if query.isEmpty {
+                            Text(placeholder).font(.system(size: 13.5)).foregroundStyle(style.secondary.swiftUI).allowsHitTesting(false)
+                        }
+                    }
                     .font(.system(size: 13.5))
                     .foregroundStyle(style.text.swiftUI)
                     .focused($focused)
@@ -89,7 +99,7 @@ struct PaletteView: View {
             .padding(.horizontal, 12).frame(height: 40)
             Divider().overlay(style.border.swiftUI)
             ScrollViewReader { proxy in
-                ScrollView {
+                ScrollView(showsIndicators: total > 9) {
                     VStack(alignment: .leading, spacing: 1) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { i, item in
                             if !item.section.isEmpty, i == 0 || rows[i - 1].section != item.section {
@@ -108,18 +118,25 @@ struct PaletteView: View {
                     }
                     .padding(6)
                 }
+                .frame(height: min(CGFloat(total) * 31 + 12 + sectionHeight(rows), 9 * 31 + 12 + sectionHeight(rows)))
                 .onChange(of: selected) { _, v in proxy.scrollTo(v) }
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(style.card.swiftUI))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(style.border.swiftUI, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .frame(maxHeight: .infinity, alignment: .top) // the panel is clear below the card
         .onAppear { focused = true }
         .onChange(of: query) { _, _ in selected = 0 }
         .onKeyPress(.downArrow) { selected = min(selected + 1, max(0, total - 1)); return .handled }
         .onKeyPress(.upArrow) { selected = max(selected - 1, 0); return .handled }
         .onKeyPress(.escape) { dismiss(); return .handled }
+    }
+
+    private func sectionHeight(_ rows: [PaletteItem]) -> CGFloat {
+        var n = 0
+        for (i, r) in rows.enumerated() where !r.section.isEmpty && (i == 0 || rows[i - 1].section != r.section) { n += 1 }
+        return CGFloat(n) * 22
     }
 
     private func run(_ rows: [PaletteItem], _ creating: Bool) {

@@ -3,6 +3,7 @@
 # Usage: script/shot.sh [light|dark]  ->  /tmp/hive-shot/<style>.png + crops
 set -eu
 style="${1:-dark}"
+overlay="${2:-}"   # palette | picker
 here="$(cd "$(dirname "$0")/.." && pwd)"
 root="$(cd "$here/../.." && pwd)"
 out=/tmp/hive-shot; mkdir -p "$out"
@@ -29,10 +30,17 @@ sleep 2
 
 pkill -f 'Hive.app/Contents/MacOS/Hive' 2>/dev/null || true
 defaults delete xyz.matm.hive >/dev/null 2>&1 || true
-open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" "$here/build/Hive.app"
+open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" --env HIVE_OPEN="$overlay" "$here/build/Hive.app"
 sleep 4
 W=$($tools/winid Hive)
+# Only Hive's own windows are captured (by window ID), never a screen
+# region, so nothing else on the screen can end up in a shot.
 screencapture -x -o -l "$W" "$out/$style.png"
+if [ -n "$overlay" ]; then
+  P=$($tools/winid Hive small)
+  screencapture -x -o -l "$P" "$out/$style-$overlay.png"
+  cwebp -quiet -q 85 "$out/$style-$overlay.png" -o "$out/$style-$overlay.webp"
+fi
 cwebp -quiet -q 75 -resize 1400 0 "$out/$style.png" -o "$out/$style.webp"
 # 1:1 detail crops (retina pixels): title bar, chip+first tab, a pane header.
 ffmpeg -v error -y -i "$out/$style.png" -vf "crop=1400:110:0:0" "$out/$style-titlebar.png"
