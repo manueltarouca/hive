@@ -97,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         model.onFrame = { [weak self] block in self?.panes.redraw(block) }
         model.openSettings = { [weak self] in self?.showSettings() }
+        model.onFlash = { [weak self] block in self?.panes.card(block)?.flash() }
         model.contextActions = { [weak self] in self?.paneContextActions() ?? [] }
         model.onLayout = { [weak self] in
             self?.panes.sync()

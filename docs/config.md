@@ -41,7 +41,7 @@ comment.
 | `theme` | `system` | `system`, `day` (Hive Day) or `night` (Hive Night) |
 | `font-family` | empty | A monospaced font; empty is the bundled JetBrains Mono |
 | `font-size` | `13` | Points, 8 to 32 |
-| `bell` | `flash` | When a program rings the bell: `flash`, `sound`, `flash+sound` or `none` |
+| `bell` | `flash` | When a program rings the bell: `flash`, `sound`, `flash+sound` or `none`. Its tab also gets a bell until you look, and the Dock bounces once if hive is in the background; `none` turns all of that off |
 | `notify` | `background` | Agent notifications: `background` (when hive isn't in front), `always` or `never` |
 | `confirm-paste` | `true` | Ask before pasting lines into a program that would run each one |
 | `scrollback-limit` | `16m` | History kept per terminal, in bytes (`k`, `m`, `g`), at least `64k`. Read by the server; lowering it drops old lines at once |

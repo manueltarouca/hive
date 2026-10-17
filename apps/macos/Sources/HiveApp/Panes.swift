@@ -392,6 +392,25 @@ final class CardView: NSView {
     let header: NSHostingView<PaneHeader>
     let contentInset: CGFloat = 10
 
+    /// A brief honey flash over the pane: its program rang the bell.
+    func flash() {
+        guard let layer else { return }
+        let f = CALayer()
+        f.frame = layer.bounds
+        f.backgroundColor = NSColor(srgbRed: 0xF2 / 255, green: 0xA9 / 255, blue: 0x3B / 255, alpha: 1).cgColor
+        f.opacity = 0
+        layer.addSublayer(f)
+        let a = CABasicAnimation(keyPath: "opacity")
+        a.fromValue = 0.22
+        a.toValue = 0
+        a.duration = 0.35
+        a.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { f.removeFromSuperlayer() }
+        f.add(a, forKey: "flash")
+        CATransaction.commit()
+    }
+
     init(pane: PaneView, model: AppModel) {
         self.pane = pane
         header = NSHostingView(rootView: PaneHeader(model: model, blockID: pane.blockID))

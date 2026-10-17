@@ -518,6 +518,7 @@ final class AppModel: ObservableObject {
                     scheduleAgentReload()
                     if sid == currentSession { scheduleReload() }
                 }
+                if name == "bell", sid == currentSession, let b = inner["payload"]["block_id"].string { bell(block: b) }
                 if name == "clipboard_written" {
                     programCopied(block: inner["payload"]["block_id"].string ?? "", text: inner["payload"]["payload"]["text"].string ?? "")
                 }
@@ -587,8 +588,38 @@ final class AppModel: ObservableObject {
     }
 
     /// Marks finished agents in the window the user is looking at as seen.
+    // MARK: bell
+
+    private var bellPolicy = BellPolicy()
+    /// Panes that rang the bell since they were last seen: a mark on their tab.
+    @Published private(set) var rang: Set<String> = []
+    /// Flashes a pane (set by the app).
+    var onFlash: ((String) -> Void)?
+
+    /// A program rang the terminal bell (BEL). What happens is the `bell`
+    /// setting's, rate-limited by BellPolicy. Only the open session's panes
+    /// have a tab to mark; bells elsewhere are dropped.
+    func bell(block: String) {
+        guard blocks[block] != nil else { return }
+        for effect in bellPolicy.ring(block: block, setting: settings.bell, appActive: NSApp.isActive) {
+            switch effect {
+            case .flash: onFlash?(block)
+            case .sound: NSSound.beep()
+            case .mark:
+                if !(NSApp.isActive && active.map({ isIn(block, $0) }) == true) { rang.insert(block) }
+            case .bounce: NSApp.requestUserAttention(.informationalRequest)
+            }
+        }
+    }
+
+    func isIn(_ block: String, _ w: WindowInfo) -> Bool { w.layout?.rects().contains { $0.0 == block } ?? false }
+
+    /// Whether a tab has a pane that rang unseen.
+    func rangUnseen(_ w: WindowInfo) -> Bool { !rang.isEmpty && rang.contains { isIn($0, w) } }
+
     func markSeen() {
         guard NSApp.isActive, let w = active else { return }
+        if rangUnseen(w) { rang = rang.filter { !isIn($0, w) } }
         let ids = Set(w.layout?.rects().map(\.0) ?? [])
         for a in agents where a.state == "done" && ids.contains(a.blockID) {
             if let d = a.updatedAt, seenDone[a.blockID] != d { seenDone[a.blockID] = d }
