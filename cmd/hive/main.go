@@ -94,6 +94,12 @@ func parseGlobals(argv []string) (globals, []string, error) {
 			break
 		}
 		name, val, hasVal := strings.Cut(a, "=")
+		// label and close have --session and --window switches of their
+		// own. After those commands, the bare long forms are theirs.
+		if !hasVal && (name == "--session" || name == "--window") && len(rest) > 0 && (rest[0] == "label" || rest[0] == "close") {
+			rest = append(rest, a)
+			continue
+		}
 		var dst *string
 		switch name {
 		case "-s", "--session":

@@ -2,7 +2,8 @@ import { docs } from '#lib/docs.js';
 import { resolve } from '$app/paths';
 export const prerender = true;
 export function GET({ url }) {
-  const lines = ['# hive', '', '> A terminal multiplexer for agent-heavy work. Every docs page is also Markdown at the same address plus .md.', ''];
+  const lines = ['# hive', '', '> A terminal multiplexer for agent-heavy work. Every docs page is also Markdown at the same address plus .md.', '',
+    `To set up hive and its skills for an agent, follow ${url.origin}${resolve('/agent-setup/prompt.md')}`, ''];
   let section = '';
   for (const d of docs) {
     if (d.section !== section) { section = d.section; lines.push('', `## ${section}`, ''); }

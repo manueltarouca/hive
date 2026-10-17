@@ -2,6 +2,7 @@
   import { asset, resolve } from '$app/paths';
   import { onMount } from 'svelte';
   import Wordmark from '#lib/Wordmark.svelte';
+  import CopyPrompt from '#lib/CopyPrompt.svelte';
 
   // What hive is for, one at a time.
   const uses = ['coding agents.', 'long builds.', 'dev servers.', 'test runs.', 'all your sessions.'];
@@ -36,6 +37,10 @@
       <p>hive is open source.</p>
       <span>Read the docs</span>
     </a>
+    <div class="agent">
+      <CopyPrompt />
+      <p>Paste it into Claude Code, Codex or any agent. It installs hive and teaches the agent to use it.</p>
+    </div>
 
     <section class="essay">
       <p>
@@ -124,6 +129,9 @@ make vt build
   .badge svg { width: 44px; height: 44px; flex: none; }
   .badge p { margin: 0; flex: 1; }
   .badge span { color: var(--honey); }
+  .agent { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
+  .agent p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--muted); letter-spacing: 0; }
+  @media (max-width: 720px) { .agent { flex-direction: column; align-items: flex-start; } }
 
   section { margin-top: 56px; }
   p, li { font-size: clamp(17px, 1.47vw, 21px); line-height: 1.3; letter-spacing: -0.01em; }

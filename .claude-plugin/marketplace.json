@@ -1,0 +1,23 @@
+{
+  "name": "hive",
+  "owner": {
+    "name": "Manuel Tarouca"
+  },
+  "metadata": {
+    "description": "Skills for hive, the terminal multiplexer for agent-heavy work",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "hive",
+      "description": "Drive hive from an agent, set it up, and move work over from tmux",
+      "source": "./skills",
+      "strict": false,
+      "skills": [
+        "./hive",
+        "./hive-setup",
+        "./hive-from-tmux"
+      ]
+    }
+  ]
+}
