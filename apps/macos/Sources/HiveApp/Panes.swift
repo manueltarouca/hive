@@ -488,6 +488,16 @@ final class PanesView: NSView {
         }
     }
 
+    /// Applies a theme to every card. Takes the style explicitly: a caller
+    /// reacting to model.$style runs before model.style changes.
+    func restyle(_ s: Style) {
+        let focused = model.focusedBlock
+        for (id, c) in cards {
+            c.apply(style: s, focused: id == focused)
+            c.pane.needsDisplay = true
+        }
+    }
+
     override func layout() {
         super.layout()
         let area = bounds.insetBy(dx: gap, dy: 0)

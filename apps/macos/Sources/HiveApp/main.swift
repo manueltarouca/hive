@@ -196,7 +196,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         renderer.theme = s.terminal
         let engine = model.engine
         model.vt.async { engine.theme = s.terminal }
-        panes.sync()
+        // s, not model.style: @Published sends before the property changes,
+        // so model.style still holds the old theme here.
+        panes.restyle(s)
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
