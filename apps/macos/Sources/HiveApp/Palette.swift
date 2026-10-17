@@ -1,9 +1,14 @@
 import AppKit
+import HiveCore
 import SwiftUI
 
 /// One row of the command palette or session picker.
 struct PaletteItem: Identifiable {
-    let id = UUID()
+    /// What the row stands for, when its title isn't unique (a session's ID).
+    var key: String = ""
+    /// Stable across redraws: a new identity each time would rebuild the
+    /// row under the pointer and lose its hover.
+    var id: String { key.isEmpty ? section + "\u{1}" + title : key }
     var title: String
     var detail: String = ""   // shortcut or current value, right-aligned
     var symbol: String? = nil
@@ -28,7 +33,15 @@ final class PalettePanel {
         p.backgroundColor = .clear
         p.hasShadow = true
         p.level = .floating
-        let view = PaletteView(placeholder: placeholder, style: style, items: items, onCreate: onCreate) { [weak self] in self?.close() }
+        p.acceptsMouseMovedEvents = true // hover picks rows
+        // The panel fits the card: a taller clear panel would catch hovers
+        // and clicks meant for the window below and swallow them.
+        let view = PaletteView(placeholder: placeholder, style: style, items: items, onCreate: onCreate,
+                               onHeight: { [weak p] h in
+                                   guard let p, h > 0, abs(p.frame.height - h) > 0.5 else { return }
+                                   p.setFrame(NSRect(x: p.frame.minX, y: p.frame.maxY - h, width: p.frame.width, height: h), display: true)
+                                   p.invalidateShadow()
+                               }) { [weak self] in self?.close() }
         p.contentView = NSHostingView(rootView: view)
         let frame = window.frame
         let x = origin.map { frame.minX + $0.x } ?? frame.midX - width / 2
@@ -69,9 +82,11 @@ struct PaletteView: View {
     let style: Style
     let items: (String) -> [PaletteItem]
     let onCreate: ((String) -> Void)?
+    var onHeight: (CGFloat) -> Void = { _ in }
     let dismiss: () -> Void
     @State private var query = ""
     @State private var selected = 0
+    @State private var hoverGate = HoverGate()
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -109,11 +124,19 @@ struct PaletteView: View {
                             }
                             row(item, selected: i == selected).id(i)
                                 .onTapGesture { item.action(); dismiss() }
+                                .onContinuousHover { phase in
+                                    // The pointer picks the row it moves onto; rows
+                                    // scrolling under a resting pointer don't.
+                                    if case .active = phase, hoverGate.accept(pointer: pointerOnScreen()) { selected = i }
+                                }
                         }
                         if creating {
                             row(PaletteItem(title: "Create “\(query)”", symbol: "plus", action: {}), selected: selected == rows.count)
                                 .id(rows.count)
                                 .onTapGesture { onCreate?(query); dismiss() }
+                                .onContinuousHover { phase in
+                                    if case .active = phase, hoverGate.accept(pointer: pointerOnScreen()) { selected = rows.count }
+                                }
                         }
                     }
                     .padding(6)
@@ -125,7 +148,9 @@ struct PaletteView: View {
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(style.card.swiftUI))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(style.border.swiftUI, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .frame(maxHeight: .infinity, alignment: .top) // the panel is clear below the card
+        .background(GeometryReader { g in Color.clear.preference(key: CardHeight.self, value: g.size.height) })
+        .onPreferenceChange(CardHeight.self) { onHeight($0) }
+        .frame(maxHeight: .infinity, alignment: .top)
         .onAppear { focused = true }
         .onChange(of: query) { _, _ in selected = 0 }
         .onKeyPress(.downArrow) { selected = min(selected + 1, max(0, total - 1)); return .handled }
@@ -164,6 +189,23 @@ struct PaletteView: View {
         .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(selected ? style.accent.swiftUI.opacity(0.16) : .clear))
         .contentShape(Rectangle())
     }
+}
+
+/// Where the pointer is, as the event being handled says: a mouse event's
+/// own location (posted or real), else the pointer's (a key press moved the
+/// rows under it).
+@MainActor
+func pointerOnScreen() -> CGPoint {
+    if let e = NSApp.currentEvent, let w = e.window,
+       [.mouseMoved, .leftMouseDragged, .mouseEntered, .mouseExited].contains(e.type) {
+        return w.convertPoint(toScreen: e.locationInWindow)
+    }
+    return NSEvent.mouseLocation
+}
+
+private struct CardHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 /// Simple subsequence fuzzy match.

@@ -207,8 +207,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let need = self.model.attention(session: s.id)
                 let detail = !need.isEmpty
                     ? [need.blocked > 0 ? "\(need.blocked) blocked" : nil, need.done > 0 ? "\(need.done) done" : nil].compactMap { $0 }.joined(separator: " · ")
-                    : s.agents > 0 ? "\(s.agents) agent\(s.agents == 1 ? "" : "s")" : (i < 9 ? "⌃\(i + 1)" : "")
-                return PaletteItem(title: s.label.isEmpty ? String(s.id.suffix(6)) : s.label,
+                    : s.agents > 0 ? "\(s.agents) agent\(s.agents == 1 ? "" : "s")" : ""  // no keys switch sessions by number
+                return PaletteItem(key: s.id, title: s.label.isEmpty ? String(s.id.suffix(6)) : s.label,
                             detail: detail,
                             symbol: "rectangle.split.2x1", checked: s.id == self.model.currentSession, section: self.model.host) { [weak self] in
                     self?.model.select(session: s.id)
