@@ -67,3 +67,16 @@ void hive_select(GhosttyTerminal t, GhosttySelectionGesture g, int type, uint16_
 // The selected text, or NULL. Free with hive_free.
 bool hive_selection_text(GhosttyTerminal t, uint8_t **out, size_t *len);
 void hive_clear_selection(GhosttyTerminal t);
+
+// Pointer geometry in surface pixels, for the mouse encoder.
+typedef struct {
+  uint32_t screen_width, screen_height, cell_width, cell_height;
+} HivePointerGeometry;
+
+// Scroll-wheel routing, as Ghostty does it. rows < 0 scrolls up.
+// Returns 0 when the caller should scroll its own viewport, or 1 with the
+// bytes for the program in out (none when its tracking mode ignores wheels):
+// wheel reports when the program enabled mouse tracking, else arrow keys on
+// the alternate screen with alternate scroll (1007) on. Shift forces 0.
+int hive_wheel(GhosttyTerminal t, intptr_t rows, bool shift, float x, float y, HivePointerGeometry g,
+               uint8_t *out, size_t cap, size_t *written);

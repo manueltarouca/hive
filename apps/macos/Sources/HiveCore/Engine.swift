@@ -157,6 +157,21 @@ public final class Engine {
         client.input(block: block, m.encodePaste(s))
     }
 
+    /// A scroll-wheel movement: to the program, as arrow keys, or scrolling
+    /// hive's scrollback (see Mirror.wheel). Sending doesn't jump to the
+    /// bottom, unlike typing.
+    public func wheel(block: String, rows: Int, shift: Bool, x: Double, y: Double, geometry: PointerGeometry) {
+        guard let pane = panes[block], let m = pane.mirror else { return }
+        switch m.wheel(rows: rows, shift: shift, x: x, y: y, geometry: geometry) {
+        case .viewport(let r):
+            m.scroll(rows: r)
+            scheduleFrame(pane)
+        case .send(let bytes):
+            clearSelection(block)
+            if !bytes.isEmpty { client.input(block: block, bytes) }
+        }
+    }
+
     public func scroll(block: String, rows: Int) {
         guard let pane = panes[block], let m = pane.mirror else { return }
         m.scroll(rows: rows)

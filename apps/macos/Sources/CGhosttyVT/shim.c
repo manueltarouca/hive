@@ -230,3 +230,50 @@ bool hive_selection_text(GhosttyTerminal t, uint8_t **out, size_t *len) {
 void hive_clear_selection(GhosttyTerminal t) {
   ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_SELECTION, NULL);
 }
+
+int hive_wheel(GhosttyTerminal t, intptr_t rows, bool shift, float x, float y, HivePointerGeometry g,
+               uint8_t *out, size_t cap, size_t *written) {
+  *written = 0;
+  if (shift || rows == 0) return 0;
+  size_t n = (size_t)(rows < 0 ? -rows : rows);
+  bool tracking = false;
+  ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &tracking);
+  if (tracking) {
+    GhosttyMouseEncoder enc = NULL;
+    GhosttyMouseEvent ev = NULL;
+    if (ghostty_mouse_encoder_new(NULL, &enc) != GHOSTTY_SUCCESS) return 1;
+    if (ghostty_mouse_event_new(NULL, &ev) != GHOSTTY_SUCCESS) { ghostty_mouse_encoder_free(enc); return 1; }
+    ghostty_mouse_encoder_setopt_from_terminal(enc, t);
+    // Without a size the encoder assumes 1x1 px cells and every report
+    // lands on the wrong cell.
+    GhosttyMouseEncoderSize size = GHOSTTY_INIT_SIZED(GhosttyMouseEncoderSize);
+    size.screen_width = g.screen_width;
+    size.screen_height = g.screen_height;
+    size.cell_width = g.cell_width ? g.cell_width : 1;
+    size.cell_height = g.cell_height ? g.cell_height : 1;
+    ghostty_mouse_encoder_setopt(enc, GHOSTTY_MOUSE_ENCODER_OPT_SIZE, &size);
+    ghostty_mouse_event_set_action(ev, GHOSTTY_MOUSE_ACTION_PRESS);
+    ghostty_mouse_event_set_button(ev, rows < 0 ? GHOSTTY_MOUSE_BUTTON_FOUR : GHOSTTY_MOUSE_BUTTON_FIVE);
+    ghostty_mouse_event_set_position(ev, (GhosttyMousePosition){.x = x, .y = y});
+    // One press per line, no release, as Ghostty sends them.
+    for (size_t i = 0; i < n; i++) {
+      size_t w = 0;
+      if (ghostty_mouse_encoder_encode(enc, ev, (char *)out + *written, cap - *written, &w) != GHOSTTY_SUCCESS) break;
+      *written += w;
+    }
+    ghostty_mouse_event_free(ev);
+    ghostty_mouse_encoder_free(enc);
+    return 1;
+  }
+  GhosttyTerminalScreen screen = GHOSTTY_TERMINAL_SCREEN_PRIMARY;
+  ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_ACTIVE_SCREEN, &screen);
+  if (screen != GHOSTTY_TERMINAL_SCREEN_ALTERNATE || !hive_mode(t, 1007, false)) return 0;
+  for (size_t i = 0; i < n; i++) {
+    size_t needed = 0;
+    size_t w = hive_encode_key(t, rows < 0 ? GHOSTTY_KEY_ARROW_UP : GHOSTTY_KEY_ARROW_DOWN, 0, "", 0, 0,
+                               out + *written, cap - *written, &needed);
+    if (w == 0) break;
+    *written += w;
+  }
+  return 1;
+}

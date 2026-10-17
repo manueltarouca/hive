@@ -92,9 +92,22 @@ final class PaneView: MTKView, NSTextInputClient {
 
     @objc func copy(_ sender: Any?) { model.copySelection(block: blockID) }
 
+    /// Trackpad movement smaller than a line, kept until it adds up to one.
+    private var wheelRemainder: CGFloat = 0
+
     override func scrollWheel(with event: NSEvent) {
-        let lines = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY / cellSize.height : event.scrollingDeltaY * 3
-        if abs(lines) >= 1 { model.scroll(block: blockID, rows: -Int(lines.rounded())) }
+        if event.phase == .began || event.phase == .mayBegin { wheelRemainder = 0 }
+        let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY / cellSize.height : event.scrollingDeltaY * 3
+        wheelRemainder += delta
+        let lines = Int(wheelRemainder.rounded(.towardZero))
+        guard lines != 0 else { return }
+        wheelRemainder -= CGFloat(lines)
+        let p = convert(event.locationInWindow, from: nil)
+        let geometry = PointerGeometry(cellWidth: renderer.fonts.cellWidth, cellHeight: renderer.fonts.cellHeight,
+                                       paneWidth: Int(drawableSize.width), paneHeight: Int(drawableSize.height))
+        // Wheel up (positive delta) scrolls back: negative rows.
+        model.wheel(block: blockID, rows: -lines, shift: event.modifierFlags.contains(.shift),
+                    x: Double(p.x * scale), y: Double(p.y * scale), geometry: geometry)
     }
 
     // MARK: keyboard

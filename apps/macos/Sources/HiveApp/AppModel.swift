@@ -614,6 +614,11 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func wheel(block: String, rows: Int, shift: Bool, x: Double, y: Double, geometry: PointerGeometry) {
+        let engine = engine
+        vt.async { engine.wheel(block: block, rows: rows, shift: shift, x: x, y: y, geometry: geometry) }
+    }
+
     func scroll(block: String, rows: Int) {
         let engine = engine
         vt.async { engine.scroll(block: block, rows: rows) }

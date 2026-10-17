@@ -109,6 +109,34 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         #expect(await rig.onQueue { rig.engine.resyncCount } == 0)
     }
 
+    /// A program that asked for the mouse gets wheel reports through the
+    /// server, encoded for the cell under the pointer.
+    @Test func wheelReachesAProgramTrackingTheMouse() async throws {
+        let server = try Server(); defer { server.stop() }
+        let rig = Rig(server)
+        try await rig.connect()
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; head -c 10 | od -An -c"], "cols": 80, "rows": 24])
+        let block = try #require(created["block_ids"][0].string)
+        await rig.onQueue { rig.engine.attach(block: block) { _ in } }
+        // Wait until the mirror has seen the mode switches.
+        let geo = PointerGeometry(cellWidth: 10, cellHeight: 20, paneWidth: 800, paneHeight: 480)
+        let report = Data("\u{1b}[<64;3;3M".utf8)
+        for _ in 0..<100 {
+            let action = await rig.onQueue { rig.engine.mirror(block: block)?.wheel(rows: -1, shift: false, x: 25, y: 45, geometry: geo) }
+            if action == .send(report) { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        await rig.onQueue { rig.engine.wheel(block: block, rows: -1, shift: false, x: 25, y: 45, geometry: geo) }
+        var out = ""
+        for _ in 0..<150 {
+            out = try await rig.call("hive.terminal.format", ["block_id": .string(block), "args": ["trim": true]])["content"].string ?? ""
+            if out.contains("M") { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        // od -c shows ESC as 033: the SGR report for wheel-up at column 3, row 3.
+        #expect(out.contains("033   [   <   6   4   ;   3   ;   3   M"), "got: \(out)")
+    }
+
     @Test func keysAndPasteReachTheProgram() async throws {
         let server = try Server(); defer { server.stop() }
         let rig = Rig(server)

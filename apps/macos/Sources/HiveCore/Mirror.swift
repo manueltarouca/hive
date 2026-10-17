@@ -182,6 +182,22 @@ public final class Mirror {
     }
 
     public func scroll(rows: Int) { hive_scroll_delta(term, rows) }
+
+    /// Where a scroll-wheel movement of `rows` lines goes (negative is up):
+    /// to the program when it asked for the mouse, as arrow keys on the
+    /// alternate screen, or to hive's own scrollback. Shift forces the last.
+    /// x and y are pixels in the pane.
+    public func wheel(rows: Int, shift: Bool, x: Double, y: Double, geometry g: PointerGeometry) -> WheelAction {
+        var out = [UInt8](repeating: 0, count: min(abs(rows), 64) * 32)
+        var written = 0
+        let geo = HivePointerGeometry(screen_width: UInt32(max(g.paneWidth, 1)), screen_height: UInt32(max(g.paneHeight, 1)),
+                                      cell_width: UInt32(max(g.cellWidth, 1)), cell_height: UInt32(max(g.cellHeight, 1)))
+        let lines = max(-64, min(64, rows))
+        if hive_wheel(term, lines, shift, Float(x), Float(y), geo, &out, out.count, &written) == 0 {
+            return .viewport(rows: rows)
+        }
+        return .send(Data(out.prefix(written)))
+    }
     public func scrollToBottom() { hive_scroll_bottom(term) }
 
     /// Encodes a key press for the program's current modes.
@@ -315,4 +331,20 @@ extension Cell {
         invisible = c.invisible; strikethrough = c.strikethrough; blink = c.blink
         underline = c.underline; selected = c.selected
     }
+}
+
+/// A pane's size and its cells' size, in pixels.
+public struct PointerGeometry: Equatable, Sendable {
+    public var cellWidth, cellHeight, paneWidth, paneHeight: Int
+    public init(cellWidth: Int, cellHeight: Int, paneWidth: Int, paneHeight: Int) {
+        self.cellWidth = cellWidth; self.cellHeight = cellHeight; self.paneWidth = paneWidth; self.paneHeight = paneHeight
+    }
+}
+
+/// What a scroll-wheel movement does.
+public enum WheelAction: Equatable, Sendable {
+    /// Scroll hive's own scrollback by this many rows (negative is up).
+    case viewport(rows: Int)
+    /// Send these bytes to the program; empty when its mouse mode ignores wheels.
+    case send(Data)
 }
