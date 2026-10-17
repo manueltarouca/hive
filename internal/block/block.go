@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -185,9 +186,23 @@ func Start(blockID string, opts Options, emit func(Event)) (*Block, error) {
 	return b, nil
 }
 
+// agentSessionVars belong to the coding agent that started the server, not
+// to the user. Passed on, they make a nested claude think it runs inside that
+// agent, and they leak its messaging token. Configuration variables the user
+// sets (CLAUDE_CODE_SUBAGENT_MODEL and the like) are kept.
+var agentSessionVars = map[string]bool{
+	"CLAUDECODE": true, "CLAUDE_PID": true, "CLAUDE_CODE_ENTRYPOINT": true,
+	"CLAUDE_CODE_SESSION_ID": true, "CLAUDE_CODE_CHILD_SESSION": true,
+	"CLAUDE_CODE_SESSION_ATTENDED": true, "CLAUDE_CODE_EXECPATH": true,
+	"CLAUDE_CODE_MESSAGING_SOCKET": true, "CLAUDE_CODE_MESSAGING_TOKEN": true,
+}
+
 func baseEnv() []string {
 	env := []string{}
 	for _, kv := range os.Environ() {
+		if name, _, _ := strings.Cut(kv, "="); agentSessionVars[name] {
+			continue
+		}
 		switch {
 		case len(kv) > 5 && kv[:5] == "TERM=",
 			len(kv) > 10 && kv[:10] == "COLORTERM=",

@@ -229,3 +229,28 @@ func TestCorruptRestoreStartsFresh(t *testing.T) {
 		t.Fatalf("screen = %q pid = %d", screen(b), b.PID())
 	}
 }
+
+// A server started from inside a coding agent must not pass the agent's own
+// session variables to every terminal: a nested claude would think it runs
+// inside that agent, and Claude's messaging token would leak.
+func TestAgentSessionVariablesDontLeak(t *testing.T) {
+	for k, v := range map[string]string{
+		"CLAUDECODE":                  "1",
+		"CLAUDE_PID":                  "123",
+		"CLAUDE_CODE_SESSION_ID":      "s",
+		"CLAUDE_CODE_MESSAGING_TOKEN": "secret",
+		"CLAUDE_CODE_ENTRYPOINT":      "cli",
+		"HIVE_KEEP_ME":                "yes",
+	} {
+		t.Setenv(k, v)
+	}
+	env := strings.Join(baseEnv(), "\n")
+	for _, k := range []string{"CLAUDECODE=", "CLAUDE_PID=", "CLAUDE_CODE_SESSION_ID=", "CLAUDE_CODE_MESSAGING_TOKEN=", "CLAUDE_CODE_ENTRYPOINT="} {
+		if strings.Contains(env, k) {
+			t.Errorf("%s leaked into the terminal environment", k)
+		}
+	}
+	if !strings.Contains(env, "HIVE_KEEP_ME=yes") {
+		t.Error("an unrelated variable was dropped")
+	}
+}
