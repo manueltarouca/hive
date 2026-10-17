@@ -133,6 +133,13 @@ public enum Programs {
         return n
     }
 
+    /// Whether an interactive shell is in front: the pane's agent, if it had
+    /// one, has exited, even if it didn't get to report so.
+    public static func atShell(_ foreground: String?) -> Bool {
+        guard let foreground, !foreground.isEmpty else { return false }
+        return shells.contains(canonical(foreground))
+    }
+
     /// What a pane shows. The agent that reported from it, unless the
     /// program running there says otherwise: another agent (grok runs Claude
     /// Code's hooks and reports as claude), or a shell (the agent ended
@@ -141,7 +148,7 @@ public enum Programs {
         let fg = foreground.map(canonical) ?? ""
         guard let harness else { return lookup(foreground ?? "") }
         if agents.contains(fg) && fg != harness { return lookup(fg) }
-        if shells.contains(fg) { return lookup(fg) }
+        if atShell(fg) { return lookup(fg) }
         return lookup(harness)
     }
 }

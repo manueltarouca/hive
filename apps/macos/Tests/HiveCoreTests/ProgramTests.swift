@@ -121,6 +121,17 @@ import Testing
         #expect(Programs.shown(harness: "claude", foreground: "codex").name == "Codex")
     }
 
+    /// The shell in front means the pane's agent is gone: interactive
+    /// shells only (servers name a shell running a script by the script).
+    @Test func atTheShell() {
+        #expect(Programs.atShell("zsh"))
+        #expect(Programs.atShell("-zsh"))
+        #expect(!Programs.atShell("2.1.302"))
+        #expect(!Programs.atShell("claude"))
+        #expect(!Programs.atShell(nil))
+        #expect(!Programs.atShell(""))
+    }
+
     /// An agent that ended without saying so (killed) leaves the shell.
     @Test func backAtTheShell() {
         #expect(Programs.shown(harness: "claude", foreground: "zsh").name == "Zsh")

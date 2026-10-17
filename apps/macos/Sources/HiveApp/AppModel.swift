@@ -344,9 +344,10 @@ final class AppModel: ObservableObject {
             // says SessionStart once it's up): carry it into the pane, so its
             // icon and name follow without waiting for another reload.
             for a in list where blocks[a.blockID] != nil {
-                let harness = a.state == "ended" || a.harness.isEmpty ? nil : a.harness
+                let gone = a.state == "ended" || a.harness.isEmpty || Programs.atShell(blocks[a.blockID]?.foreground)
+                let harness = gone ? nil : a.harness, state = gone ? "ended" : a.state
                 if blocks[a.blockID]?.harness != harness { blocks[a.blockID]?.harness = harness }
-                if blocks[a.blockID]?.agentState != a.state { blocks[a.blockID]?.agentState = a.state }
+                if blocks[a.blockID]?.agentState != state { blocks[a.blockID]?.agentState = state }
             }
             let live = Set(list.map(\.blockID))
             if seenDone.keys.contains(where: { !live.contains($0) }) { seenDone = seenDone.filter { live.contains($0.key) } }
@@ -387,11 +388,16 @@ final class AppModel: ObservableObject {
                 var cwd = b["foreground"]["cwd"].string
                 if let pwd = b["pwd"].string, let u = URL(string: pwd), u.isFileURL { cwd = u.path }
                 if cwd == nil || cwd!.isEmpty { cwd = b["agent"]["cwd"].string ?? b["cwd"].string }
-                let agentState = b["agent"]["state"].string
+                let foreground = b["foreground"]["program"].string ?? b["foreground"]["name"].string
+                // An agent is gone once it ended or its shell is back in front
+                // (killed before it could report; servers before 0.1 don't
+                // notice that themselves).
+                let gone = b["agent"]["state"].string == "ended" || Programs.atShell(foreground)
+                let agentState = gone && b["agent"]["state"].string != nil ? "ended" : b["agent"]["state"].string
                 info[bid] = BlockInfo(title: b["title"].string ?? "", label: b["label"].string ?? "",
                                       cols: b["cols"].int ?? 0, rows: b["rows"].int ?? 0, sizeOwner: b["size_owner"].string,
-                                      foreground: b["foreground"]["program"].string ?? b["foreground"]["name"].string, cwd: cwd,
-                                      harness: agentState == "ended" ? nil : b["agent"]["harness"].string,
+                                      foreground: foreground, cwd: cwd,
+                                      harness: gone ? nil : b["agent"]["harness"].string,
                                       agentState: agentState, exited: b["exited"].bool ?? false, exitCode: b["exit_code"].int ?? 0)
             }
             blocks = info
@@ -559,7 +565,7 @@ final class AppModel: ObservableObject {
 
     func summary(of w: WindowInfo) -> TabSummary {
         let ids = Set(w.layout?.rects().map(\.0) ?? [])
-        let mine = agents.filter { ids.contains($0.blockID) }
+        let mine = agents.filter { ids.contains($0.blockID) && isLive($0) }
         let info = w.focused.flatMap { blocks[$0] }
         let label = w.label.isEmpty ? (info?.label ?? "") : w.label
         return TabSummary.make(label: label, program: info?.program ?? "shell", dir: info?.shortDir ?? "",
@@ -567,8 +573,12 @@ final class AppModel: ObservableObject {
                                doneSeen: mine.filter { $0.state == "done" }.allSatisfy(doneSeen))
     }
 
+    /// An agent counts while its pane hasn't gone back to the shell. Only
+    /// the open session's panes are known here; the server ends the others.
+    func isLive(_ a: AgentInfo) -> Bool { blocks[a.blockID].map { $0.harness != nil } ?? true }
+
     private var places: [AgentPlace] {
-        agents.map { AgentPlace(session: $0.sessionID, state: $0.state, doneSeen: doneSeen($0)) }
+        agents.filter(isLive).map { AgentPlace(session: $0.sessionID, state: $0.state, doneSeen: doneSeen($0)) }
     }
 
     /// The agent in another session that needs the user most: blocked first,
