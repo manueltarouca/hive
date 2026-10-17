@@ -35,3 +35,22 @@ private let macKeys: [UInt16: GhosttyKey] = [
     0x43: GHOSTTY_KEY_NUMPAD_MULTIPLY, 0x45: GHOSTTY_KEY_NUMPAD_ADD, 0x4B: GHOSTTY_KEY_NUMPAD_DIVIDE,
     0x4E: GHOSTTY_KEY_NUMPAD_SUBTRACT, 0x4C: GHOSTTY_KEY_NUMPAD_ENTER, 0x51: GHOSTTY_KEY_NUMPAD_EQUAL,
 ]
+
+/// Mac text-editing keys that terminals send as readline bytes, so they work
+/// in shells and in Claude Code: Ghostty's built-in ⌘ bindings, plus the ⌥
+/// word jumps and ⇧↩ newline from the maintainer's Ghostty config. Only these exact
+/// combinations: ⌥⌘ and ⌃⌘ arrows stay with the menu (focus, resize).
+public enum MacBindings {
+    public static func text(key: Key, mods: KeyMods) -> String? {
+        let m = mods.subtracting(.capsLock)
+        switch (key, m) {
+        case (.arrowLeft, .command): return "\u{01}"   // start of line (ctrl-a)
+        case (.arrowRight, .command): return "\u{05}"  // end of line (ctrl-e)
+        case (.backspace, .command): return "\u{15}"   // delete to start of line (ctrl-u)
+        case (.arrowLeft, .alt): return "\u{1b}b"      // back a word
+        case (.arrowRight, .alt): return "\u{1b}f"     // forward a word
+        case (.enter, .shift): return "\n"              // a newline, not submit
+        default: return nil
+        }
+    }
+}

@@ -115,6 +115,12 @@ public final class Mirror {
     private var gesture: GhosttySelectionGesture?
     /// For clicks and motion sent to programs; made on first use.
     private var mouseEncoder: GhosttyMouseEncoder?
+    /// While a button is down: whether its press went to hive's selection.
+    /// The drag and release follow the press, whatever Shift does meanwhile.
+    private var pressWasLocal: Bool?
+    /// Whether the program tracked the mouse at the last event, to forget
+    /// the encoder's last cell when tracking starts again.
+    private var wasTracking = false
     private var last: PaneFrame?
     private var generation: UInt64 = 0
     /// Synchronized output (mode 2026): while held, frame() returns the last
@@ -196,6 +202,7 @@ public final class Mirror {
         let geo = HivePointerGeometry(screen_width: UInt32(max(g.paneWidth, 1)), screen_height: UInt32(max(g.paneHeight, 1)),
                                       cell_width: UInt32(max(g.cellWidth, 1)), cell_height: UInt32(max(g.cellHeight, 1)))
         let lines = max(-64, min(64, rows))
+        let (x, y) = Mirror.clamp(x: x, y: y, g)
         if hive_wheel(term, lines, shift, Float(x), Float(y), geo, &out, out.count, &written) == 0 {
             return .viewport(rows: rows)
         }
@@ -246,15 +253,45 @@ public final class Mirror {
     /// `button` is the button pressed, released, or held during motion.
     public func pointer(_ action: PointerAction, button: PointerButton?, mods: KeyMods, x: Double, y: Double,
                         geometry g: PointerGeometry) -> PointerResult {
-        if mods.contains(.shift) { return .local }
+        // A drag or release follows its press's route.
+        let latched = button != nil && action != .press ? pressWasLocal : nil
+        if action == .release { pressWasLocal = nil }
+        if latched == true || (latched == nil && mods.contains(.shift)) {
+            if action == .press { pressWasLocal = true }
+            return .local
+        }
+        let result = sendPointer(action, button: button, mods: mods, x: x, y: y, geometry: g)
+        if action == .press { pressWasLocal = result == .local }
+        return result
+    }
+
+    private func sendPointer(_ action: PointerAction, button: PointerButton?, mods: KeyMods, x: Double, y: Double,
+                             geometry g: PointerGeometry) -> PointerResult {
         if mouseEncoder == nil { mouseEncoder = hive_mouse_encoder_new() }
+        let (x, y) = Mirror.clamp(x: x, y: y, g)
         var out = [UInt8](repeating: 0, count: 64)
         let geo = HivePointerGeometry(screen_width: UInt32(max(g.paneWidth, 1)), screen_height: UInt32(max(g.paneHeight, 1)),
                                       cell_width: UInt32(max(g.cellWidth, 1)), cell_height: UInt32(max(g.cellHeight, 1)))
         let held = action == .motion && button != nil
         let n = hive_mouse(term, mouseEncoder, action.rawValue, button?.rawValue ?? 0, mods.rawValue, held,
                            Float(x), Float(y), geo, &out, out.count)
-        return n < 0 ? .local : .send(Data(out.prefix(n)))
+        let tracking = n >= 0
+        if tracking, !wasTracking, let enc = mouseEncoder {
+            // Tracking just (re)started: forget the last reported cell, then
+            // encode this event again. wasTracking is set first, so this
+            // happens once.
+            wasTracking = true
+            ghostty_mouse_encoder_reset(enc)
+            return sendPointer(action, button: button, mods: mods, x: x, y: y, geometry: g)
+        }
+        wasTracking = tracking
+        return tracking ? .send(Data(out.prefix(n))) : .local
+    }
+
+    /// Pointer positions outside the pane (a release past its edge) are
+    /// clamped to it before they reach libghostty.
+    static func clamp(x: Double, y: Double, _ g: PointerGeometry) -> (Double, Double) {
+        (min(max(x, 0), Double(max(g.paneWidth, 1) - 1)), min(max(y, 0), Double(max(g.paneHeight, 1) - 1)))
     }
 
     /// Feeds a mouse event to libghostty's selection gestures: drag to

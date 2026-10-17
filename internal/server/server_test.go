@@ -353,7 +353,12 @@ func TestMoveWindowReorders(t *testing.T) {
 		return
 	}
 	_, ids := order()
-	h.call("session.move_window", map[string]any{"session_id": sid, "window_id": ids["c"], "index": 0})
+	before := h.call("session.view", map[string]any{"session_id": sid})["revision"].(float64)
+	moved := h.call("session.move_window", map[string]any{"session_id": sid, "window_id": ids["c"], "index": 0})
+	// Other clients learn of it: the revision moves on.
+	if moved["revision"].(float64) <= before {
+		t.Fatalf("revision %v did not advance past %v", moved["revision"], before)
+	}
 	if got, _ := order(); strings.Join(got, ",") != "c,a,b" {
 		t.Fatalf("after moving c first: %v", got)
 	}

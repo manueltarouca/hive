@@ -44,4 +44,25 @@ import Testing
         // Motion with no button: 35 = 32 + 3 (no button).
         #expect(m.pointer(.motion, button: nil, mods: [], x: 45, y: 65, geometry: geo) == .send(Data("\u{1b}[<35;5;4M".utf8)))
     }
+
+    /// A drag keeps the route its press chose: Shift pressed or released
+    /// mid-drag can't leave the program's button stuck down.
+    @Test func dragKeepsTheRouteOfItsPress() throws {
+        let m = try mirror("\u{1b}[?1049h\u{1b}[?1002h\u{1b}[?1006h")
+        #expect(m.pointer(.press, button: .left, mods: [], x: 25, y: 45, geometry: geo) != .local)
+        #expect(m.pointer(.motion, button: .left, mods: .shift, x: 35, y: 45, geometry: geo) != .local)
+        // Still sent to the program, with Shift reported (4).
+        #expect(m.pointer(.release, button: .left, mods: .shift, x: 35, y: 45, geometry: geo) == .send(Data("\u{1b}[<4;4;3m".utf8)))
+        // And the other way: a Shift-drag stays local after Shift is let go.
+        #expect(m.pointer(.press, button: .left, mods: .shift, x: 25, y: 45, geometry: geo) == .local)
+        #expect(m.pointer(.motion, button: .left, mods: [], x: 35, y: 45, geometry: geo) == .local)
+        #expect(m.pointer(.release, button: .left, mods: [], x: 35, y: 45, geometry: geo) == .local)
+    }
+
+    /// A release outside the pane is clamped to its edge.
+    @Test func positionsOutsideThePaneAreClamped() throws {
+        let m = try mirror("\u{1b}[?1049h\u{1b}[?1000h\u{1b}[?1006h")
+        #expect(m.pointer(.press, button: .left, mods: [], x: -5, y: 10_000, geometry: geo) == .send(Data("\u{1b}[<0;1;24M".utf8)))
+        #expect(m.wheel(rows: -1, shift: false, x: 99_999, y: -3, geometry: geo) == .send(Data("\u{1b}[<64;80;1M".utf8)))
+    }
 }

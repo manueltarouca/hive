@@ -360,6 +360,8 @@ final class AppModel: ObservableObject {
             }
             let order = ["blocked": 0, "done": 1, "working": 2, "idle": 3]
             agents = list.sorted { (order[$0.state] ?? 9) < (order[$1.state] ?? 9) }
+            let live = Set(list.map(\.blockID))
+            if seenDone.keys.contains(where: { !live.contains($0) }) { seenDone = seenDone.filter { live.contains($0.key) } }
             markSeen()
             notifyChanges(list)
         }
@@ -559,6 +561,13 @@ final class AppModel: ObservableObject {
         agents.map { AgentPlace(session: $0.sessionID, state: $0.state, doneSeen: doneSeen($0)) }
     }
 
+    /// The agent in another session that needs the user most: blocked first,
+    /// then finished and not yet seen.
+    var mostUrgentElsewhere: AgentInfo? {
+        let others = agents.filter { $0.sessionID != currentSession }
+        return others.first { $0.state == "blocked" } ?? others.first { $0.state == "done" && !doneSeen($0) }
+    }
+
     /// Agents in other sessions that need the user.
     var attentionElsewhere: Attention { Attention.elsewhere(places, current: currentSession) }
 
@@ -566,6 +575,11 @@ final class AppModel: ObservableObject {
 
     /// Moves a tab to a new position.
     func moveWindow(_ id: String, to index: Int) {
+        // Show it at once; the server's view follows.
+        if let from = windows.firstIndex(where: { $0.id == id }) {
+            let w = windows.remove(at: from)
+            windows.insert(w, at: min(index, windows.count))
+        }
         call("session.move_window", ["session_id": sid, "window_id": .string(id), "index": .number(Double(index))])
     }
 

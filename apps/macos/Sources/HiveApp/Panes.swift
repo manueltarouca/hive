@@ -86,10 +86,13 @@ final class PaneView: MTKView, NSTextInputClient {
     override func mouseMoved(with event: NSEvent) { pointer(.motion, nil, event) }
 
     // Hover reaches programs that track all motion (Claude Code's links).
+    private var hoverArea: NSTrackingArea?
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self))
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        hoverArea = area
     }
 
     /// The mouse goes to the program when it tracks it; otherwise it drives
@@ -137,6 +140,17 @@ final class PaneView: MTKView, NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
+        // ⌘←, ⌘→, ⌘⌫, ⌥←, ⌥→ and ⇧↩, as Ghostty sends them (see MacBindings).
+        var mods = KeyMods()
+        let f = event.modifierFlags
+        if f.contains(.shift) { mods.insert(.shift) }
+        if f.contains(.control) { mods.insert(.ctrl) }
+        if f.contains(.option) { mods.insert(.alt) }
+        if f.contains(.command) { mods.insert(.command) }
+        if let text = MacBindings.text(key: .mac(event.keyCode), mods: mods) {
+            model.text(text)
+            return
+        }
         if event.modifierFlags.contains(.command) { super.keyDown(with: event); return }
         composedText = nil
         let hadMarked = marked.length > 0

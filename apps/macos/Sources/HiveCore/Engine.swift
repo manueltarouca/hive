@@ -1,3 +1,4 @@
+import os
 import Foundation
 import HiveKit
 
@@ -5,6 +6,7 @@ import HiveKit
 /// (the app's `hive.vt` queue): socket bytes go straight into libghostty,
 /// and only immutable frames leave it.
 public final class Engine {
+    static let log = Logger(subsystem: "xyz.matm.hive", category: "pointer")
     public let client: HiveClient
     public var queue: DispatchQueue { client.queue }
 
@@ -133,7 +135,10 @@ public final class Engine {
                         x: Double, y: Double, geometry: PointerGeometry, col: Int, row: Int,
                         repeatInterval: TimeInterval, repeatDistance: Double) {
         guard let pane = panes[block], let m = pane.mirror else { return }
-        switch m.pointer(action, button: button, mods: mods, x: x, y: y, geometry: geometry) {
+        let result = m.pointer(action, button: button, mods: mods, x: x, y: y, geometry: geometry)
+        // `log stream --level debug --predicate 'subsystem == "xyz.matm.hive"'`
+        Engine.log.debug("pointer \(String(describing: action), privacy: .public) button \(button?.rawValue ?? 0) at \(Int(x)),\(Int(y)) -> \(String(describing: result), privacy: .public)")
+        switch result {
         case .send(let bytes):
             if action == .press { clearSelection(block) }
             if !bytes.isEmpty { client.input(block: block, bytes) }

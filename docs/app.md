@@ -62,7 +62,8 @@ type "theme" in the command palette. hive remembers your choice.
 Some programs use the mouse themselves, such as Claude Code. In those
 programs, clicks, drags and the scroll wheel go to the program. That's how
 you scroll Claude Code and copy from it. When a program copies text, it goes
-on your clipboard, and the pane says **Copied**.
+on your clipboard, and the pane says **Copied**. Like anything on the Mac
+clipboard, it can reach your other devices through Universal Clipboard.
 
 Hold **Shift** to select and scroll in hive instead.
 

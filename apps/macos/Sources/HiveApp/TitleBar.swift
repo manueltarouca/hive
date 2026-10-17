@@ -21,6 +21,7 @@ struct TitleBar: View {
                     .padding(.trailing, -4)
             }
             SessionChip(model: model, action: openPicker)
+            AttentionBadge(model: model)
             // With the sidebar open, the tabs live there.
             if !model.sidebar { Tabs(model: model) }
             Spacer(minLength: 4)
@@ -39,6 +40,34 @@ struct TitleBar: View {
 func attentionHelp(_ a: Attention) -> String {
     [a.blocked > 0 ? "\(a.blocked) blocked" : nil, a.done > 0 ? "\(a.done) done" : nil]
         .compactMap { $0 }.joined(separator: " · ") + " in other sessions"
+}
+
+/// Agents in other sessions that need the user. Click to go to the one
+/// that needs you most.
+struct AttentionBadge: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        let s = model.style
+        let a = model.attentionElsewhere
+        if !a.isEmpty {
+            let tint = (a.blocked > 0 ? s.blocked : s.done).swiftUI
+            Button {
+                if let agent = model.mostUrgentElsewhere { model.jump(to: agent) }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "hexagon.fill").font(.system(size: 8))
+                    Text("\(a.blocked + a.done)").font(.system(size: 10.5, weight: .semibold)).monospacedDigit()
+                }
+                .foregroundStyle(tint)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Capsule().fill(tint.opacity(0.14)))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help(attentionHelp(a) + " · click to go there")
+            .padding(.leading, -6)
+        }
+    }
 }
 
 /// The session and host. Opens the session picker.
@@ -60,18 +89,6 @@ struct SessionChip: View {
                     Text(model.host).font(.system(size: 10)).foregroundStyle(s.secondary.swiftUI)
                 }
                 .lineLimit(1)
-                // Agents in other sessions that need the user.
-                let elsewhere = model.attentionElsewhere
-                if !elsewhere.isEmpty {
-                    HStack(spacing: 3) {
-                        Image(systemName: "hexagon.fill").font(.system(size: 8))
-                        Text("\(elsewhere.blocked + elsewhere.done)").font(.system(size: 10.5, weight: .semibold)).monospacedDigit()
-                    }
-                    .foregroundStyle(elsewhere.blocked > 0 ? s.blocked.swiftUI : s.done.swiftUI)
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(Capsule().fill((elsewhere.blocked > 0 ? s.blocked : s.done).swiftUI.opacity(0.14)))
-                    .help(attentionHelp(elsewhere))
-                }
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
                     .foregroundStyle(s.secondary.swiftUI.opacity(hover ? 1 : 0.6))
             }

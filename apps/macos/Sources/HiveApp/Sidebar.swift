@@ -25,7 +25,6 @@ struct AgentSidebar: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(model.windows.enumerated()), id: \.element.id) { i, w in
                         TabRow(model: model, window: w, index: i)
-                            .opacity(dragging == w.id ? 0.4 : 1)
                             .onDrag {
                                 dragging = w.id
                                 return NSItemProvider(object: w.id as NSString)
