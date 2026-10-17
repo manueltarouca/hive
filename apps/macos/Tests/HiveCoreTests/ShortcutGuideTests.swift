@@ -11,6 +11,8 @@ import Testing
         #expect(ShortcutText.display(key: "\r", control: false, option: false, shift: true, command: true) == "⇧⌘↩")
         #expect(ShortcutText.display(key: "]", control: false, option: false, shift: true, command: true) == "⇧⌘]")
         #expect(ShortcutText.display(key: "/", control: false, option: false, shift: false, command: true) == "⌘/")
+        // Keys whose capital is two letters stay as they are.
+        #expect(ShortcutText.display(key: "ß", control: false, option: false, shift: false, command: true) == "⌘ß")
     }
 
     /// Every editing key the guide lists really is bound, so the guide can't
@@ -73,6 +75,7 @@ import Testing
         #expect(ShortcutGuide.columns([3, 2, 9, 1, 6, 1, 4], count: 2) == [0, 0, 0, 1, 1, 1, 1])
         #expect(ShortcutGuide.columns([5], count: 3) == [0])
         #expect(ShortcutGuide.columns([], count: 3) == [])
+        #expect(ShortcutGuide.columns([2, 3], count: 0) == [0, 0])
     }
 
     @Test func filterMatchesModifierWords() {

@@ -7,7 +7,14 @@ public enum ShortcutText {
 
     public static func display(key: String, control: Bool, option: Bool, shift: Bool, command: Bool) -> String {
         (control ? "⌃" : "") + (option ? "⌥" : "") + (shift ? "⇧" : "") + (command ? "⌘" : "")
-            + (keyNames[key] ?? key.uppercased())
+            + (keyNames[key] ?? capital(key))
+    }
+
+    /// The key's capital, as keycaps show it; ß, whose capital is two
+    /// letters, stays as it is.
+    static func capital(_ key: String) -> String {
+        let up = key.uppercased()
+        return up.count == key.count ? up : key
     }
 }
 
@@ -88,6 +95,7 @@ extension ShortcutGuide {
     /// columns left to right, using the shortest height at which they fit.
     /// A section is its rows plus two for the heading and gap.
     public static func columns(_ rowCounts: [Int], count: Int) -> [Int] {
+        guard count > 1 else { return rowCounts.map { _ in 0 } }
         let heights = rowCounts.map { $0 + 2 }
         func fill(_ limit: Int) -> [Int]? {
             var out: [Int] = [], column = 0, used = 0

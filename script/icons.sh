@@ -31,18 +31,31 @@ licence_urls = {
     "CC-BY-SA-3.0": "https://creativecommons.org/licenses/by-sa/3.0/",
     "CC-BY-SA-4.0": "https://creativecommons.org/licenses/by-sa/4.0/",
 }
+# Who to credit, from each project's own logo page: CC BY and CC BY-SA
+# require naming the creator.
+attribution = {
+    "git": "Git Logo by Jason Long (git-scm.com/community/logos)",
+    "neovim": "Neovim logo by Jason Long (neovim.io, which states CC BY 3.0)",
+    "ruby": "The Ruby logo is Copyright (c) 2006, Yukihiro Matsumoto (ruby-lang.org/en/about/logo)",
+    "rust": "The Rust logo is owned by the Rust Foundation (foundation.rust-lang.org, CC BY)",
+    "zig": "Official Zig project logo (github.com/ziglang/logo)",
+    "php": "PHP logo by Colin Viebrock (php.net/download-logos.php)",
+}
 swift, notice = [], []
 for slug in slugs:
     svg = open(f"{pkg}/icons/{slug}.svg").read()
     paths = re.findall(r'<path d="([^"]+)"', svg)
     assert len(paths) == 1 and 'viewBox="0 0 24 24"' in svg, slug
     i = data[slug]
-    lic = (i.get("license") or {}).get("type", "CC0-1.0")
-    assert lic == "CC0-1.0" or lic in licence_urls, f"{slug}: {lic} needs review"
+    lic = (i.get("license") or {}).get("type")
+    assert lic is None or lic == "CC0-1.0" or lic in licence_urls, f"{slug}: {lic} needs review"
+    assert lic not in licence_urls or slug in attribution, f"{slug}: {lic} needs an attribution"
+    assert not re.search(r'["\\]', i["title"] + paths[0]), f"{slug}: quote or backslash in Swift literal"
     swift.append(f'        "{slug}": BrandIcon(title: "{i["title"]}", hex: 0x{i["hex"]}, path: "{paths[0]}"),')
-    line = f'{i["title"]} ({slug}): {lic}. Source: {i.get("source", "")}'
+    shown = lic or "no licence recorded for this icon (the Simple Icons collection is CC0-1.0)"
+    line = f'{i["title"]} ({slug}): {shown}. Source: {i.get("source", "")}'
     if lic in licence_urls:
-        line += f"\n  Licence: {licence_urls[lic]}. Shipped unmodified, drawn in one colour."
+        line += f"\n  {attribution[slug]}.\n  Licence: {licence_urls[lic]}. Shipped unmodified, drawn in one colour."
     notice.append(line)
 
 with open(f"{root}/apps/macos/Sources/HiveCore/Icons.generated.swift", "w") as f:

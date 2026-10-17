@@ -17,7 +17,8 @@ final class PaneView: MTKView, NSTextInputClient {
     /// The accent or IME text being composed, drawn at the cursor until it's
     /// committed, as Ghostty draws it: underlined, in the terminal's colours.
     private let preedit = PreeditView()
-    private var composedText: String?
+    /// What the input method inserted during this key press.
+    private var committed: [String] = []
     private var inKeyDown = false
 
     init(blockID: String, model: AppModel, renderer: Renderer) {
@@ -36,7 +37,8 @@ final class PaneView: MTKView, NSTextInputClient {
     }
 
     private func showPreedit() {
-        guard marked.length > 0, let c = model.frames[blockID]?.cursor else { preedit.isHidden = true; return }
+        // Hidden when the program hides its cursor or it's scrolled away.
+        guard marked.length > 0, let c = model.frames[blockID]?.cursor, c.visible else { preedit.isHidden = true; return }
         let t = style.terminal
         func color(_ c: RGB) -> NSColor { NSColor(srgbRed: CGFloat(c.r) / 255, green: CGFloat(c.g) / 255, blue: CGFloat(c.b) / 255, alpha: 1) }
         let font = NSFont(descriptor: CTFontCopyFontDescriptor(renderer.fonts.regular), size: CTFontGetSize(renderer.fonts.regular) / scale)
@@ -98,6 +100,8 @@ final class PaneView: MTKView, NSTextInputClient {
             var d = PaneDraw(frame: frame, origin: .zero, size: SIMD2(Float(drawableSize.width), Float(drawableSize.height)),
                              focused: focused && (window?.isKeyWindow ?? false))
             d.scrollY = Float(rowOffset * renderer.fonts.cellHeight)
+            // Composing text follows the cursor as the program redraws.
+            if marked.length > 0 { showPreedit() }
             if !focused {
                 let c = style.cardUnfocused.usingColorSpace(.sRGB) ?? style.cardUnfocused
                 let a = Float(style.unfocusedTint)
@@ -191,20 +195,16 @@ final class PaneView: MTKView, NSTextInputClient {
             return
         }
         if event.modifierFlags.contains(.command) { super.keyDown(with: event); return }
-        composedText = nil
+        committed = []
         let hadMarked = marked.length > 0
         inKeyDown = true
         interpretKeyEvents([event])
         inKeyDown = false
-        if marked.length > 0 || hadMarked && composedText == nil { return } // composing
-        if hadMarked, let text = composedText {
-            // A dead key's accent, committed by this key: send it as text.
-            // Control characters committed while composing belong to the
-            // input method, as in Ghostty.
-            if !text.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) { model.key(.committed(text)) }
-            return
-        }
-        model.key(keyInput(event, text: composedText))
+        let o = Composition.decide(hadMarked: hadMarked, markedNow: marked.length > 0, committed: committed,
+                                   key: .mac(event.keyCode), mods: mods)
+        for t in o.texts { model.key(.committed(t)) }
+        for t in o.keyTexts { model.key(keyInput(event, text: t)) }
+        if o.plainKey { model.key(keyInput(event, text: nil)) }
     }
 
     private func keyInput(_ event: NSEvent, text: String?) -> KeyInput {
@@ -244,7 +244,7 @@ final class PaneView: MTKView, NSTextInputClient {
         let s = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
         marked = NSAttributedString()
         // A dead key then a consonant commits twice ("~", then "h").
-        if inKeyDown { composedText = (composedText ?? "") + s } else { model.text(s) }
+        if inKeyDown { committed.append(s) } else { model.text(s) }
     }
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         marked = (string as? NSAttributedString) ?? NSAttributedString(string: string as? String ?? "")
@@ -275,6 +275,7 @@ struct PaneHeader: View {
         let s = model.style
         HStack(spacing: 7) {
             ProgramGlyph(program: info?.programInfo ?? Programs.lookup(""), color: s.text.swiftUI.opacity(0.9), size: 13)
+                .accessibilityHidden(true)  // the title beside it names the pane
             (Text(parts.primary).foregroundColor(s.text.swiftUI)
                 + Text(parts.secondary.isEmpty ? "" : "  " + parts.secondary).foregroundColor(s.secondary.swiftUI).fontWeight(.regular))
                 .font(.system(size: 12.5, weight: .semibold))

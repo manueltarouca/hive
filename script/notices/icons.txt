@@ -6,39 +6,45 @@ come from Simple Icons 16.35.0 (https://simpleicons.org, CC0-1.0 as a
 collection). They are not covered by hive's MIT licence: each logo keeps its
 own licence, below, and remains a trademark of its owner.
 
-Bun (bun): CC0-1.0. Source: https://bun.sh/press-kit
-Claude (claude): CC0-1.0. Source: https://claude.ai
-Docker (docker): CC0-1.0. Source: https://www.docker.com/company/newsroom/media-resources
-Elixir (elixir): CC0-1.0. Source: https://github.com/elixir-lang/elixir-lang.github.com/tree/031746384ee23b9be19298c92a9699c56cc05845/images/logo
+Bun (bun): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://bun.sh/press-kit
+Claude (claude): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://claude.ai
+Docker (docker): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://www.docker.com/company/newsroom/media-resources
+Elixir (elixir): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/elixir-lang/elixir-lang.github.com/tree/031746384ee23b9be19298c92a9699c56cc05845/images/logo
 Git (git): CC-BY-3.0. Source: https://git-scm.com/community/logos
+  Git Logo by Jason Long (git-scm.com/community/logos).
   Licence: https://creativecommons.org/licenses/by/3.0/. Shipped unmodified, drawn in one colour.
-Go (go): CC0-1.0. Source: https://blog.golang.org/go-brand
-Helix (helix): CC0-1.0. Source: https://helix-editor.com
-htop (htop): CC0-1.0. Source: https://github.com/htop-dev/htop/blob/03d5e4746f53bd07daf68638d714a7fec336297b/htop.svg
-Kotlin (kotlin): CC0-1.0. Source: https://www.jetbrains.com/company/brand/logos/
-Kubernetes (kubernetes): CC0-1.0. Source: https://github.com/kubernetes/kubernetes/tree/cac53883f4714452f3084a22e4be20d042a9df33/logo
-Lua (lua): CC0-1.0. Source: https://www.lua.org/images/
-MySQL (mysql): CC0-1.0. Source: https://www.mysql.com/about/legal/logos.html
+Go (go): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://blog.golang.org/go-brand
+Helix (helix): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://helix-editor.com
+htop (htop): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/htop-dev/htop/blob/03d5e4746f53bd07daf68638d714a7fec336297b/htop.svg
+Kotlin (kotlin): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://www.jetbrains.com/company/brand/logos/
+Kubernetes (kubernetes): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/kubernetes/kubernetes/tree/cac53883f4714452f3084a22e4be20d042a9df33/logo
+Lua (lua): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://www.lua.org/images/
+MySQL (mysql): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://www.mysql.com/about/legal/logos.html
 Neovim (neovim): CC-BY-SA-3.0. Source: https://neovim.io
+  Neovim logo by Jason Long (neovim.io, which states CC BY 3.0).
   Licence: https://creativecommons.org/licenses/by-sa/3.0/. Shipped unmodified, drawn in one colour.
-Node.js (nodedotjs): CC0-1.0. Source: https://nodejs.org/en/about/branding
-Ollama (ollama): CC0-1.0. Source: https://github.com/ollama/ollama/issues/2152#issuecomment-1905286922
-OpenCode (opencode): CC0-1.0. Source: https://github.com/anomalyco/opencode/blob/1251a870cb384543c150c4a72fb101b55eec971b/packages/identity/mark.svg
-OpenTofu (opentofu): CC0-1.0. Source: https://github.com/opentofu/brand-artifacts/blob/0d4d0d6050ca0ff06471400bc3249a64c145f659/symbol-only/transparent/SVG/on-light-mono.svg
-Perl (perl): CC0-1.0. Source: https://github.com/metacpan/perl-assets/blob/56b555711934dde8fd0b20ec29ecc3bf81a3d493/blessed/src/010.svg
+Node.js (nodedotjs): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://nodejs.org/en/about/branding
+Ollama (ollama): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/ollama/ollama/issues/2152#issuecomment-1905286922
+OpenCode (opencode): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/anomalyco/opencode/blob/1251a870cb384543c150c4a72fb101b55eec971b/packages/identity/mark.svg
+OpenTofu (opentofu): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/opentofu/brand-artifacts/blob/0d4d0d6050ca0ff06471400bc3249a64c145f659/symbol-only/transparent/SVG/on-light-mono.svg
+Perl (perl): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/metacpan/perl-assets/blob/56b555711934dde8fd0b20ec29ecc3bf81a3d493/blessed/src/010.svg
 PHP (php): CC-BY-SA-4.0. Source: https://php.net/download-logos.php
+  PHP logo by Colin Viebrock (php.net/download-logos.php).
   Licence: https://creativecommons.org/licenses/by-sa/4.0/. Shipped unmodified, drawn in one colour.
-PostgreSQL (postgresql): CC0-1.0. Source: https://wiki.postgresql.org/wiki/Logo
-Python (python): CC0-1.0. Source: https://www.python.org/community/logos/
-Redis (redis): CC0-1.0. Source: https://redis.io/brand-guidelines
+PostgreSQL (postgresql): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://wiki.postgresql.org/wiki/Logo
+Python (python): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://www.python.org/community/logos/
+Redis (redis): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://redis.io/brand-guidelines
 Ruby (ruby): CC-BY-SA-2.5. Source: https://www.ruby-lang.org/en/about/logo/
+  The Ruby logo is Copyright (c) 2006, Yukihiro Matsumoto (ruby-lang.org/en/about/logo).
   Licence: https://creativecommons.org/licenses/by-sa/2.5/. Shipped unmodified, drawn in one colour.
 Rust (rust): CC-BY-SA-4.0. Source: https://www.rust-lang.org
+  The Rust logo is owned by the Rust Foundation (foundation.rust-lang.org, CC BY).
   Licence: https://creativecommons.org/licenses/by-sa/4.0/. Shipped unmodified, drawn in one colour.
-SQLite (sqlite): CC0-1.0. Source: https://github.com/sqlite/sqlite/blob/43e862723ec680542ca6f608f9963c0993dd7324/art/sqlite370.eps
-Swift (swift): CC0-1.0. Source: https://developer.apple.com/swift/resources/
-tmux (tmux): CC0-1.0. Source: https://github.com/tmux/tmux/blob/e26356607e38cbb4676a7c91815ae2d5734443c3/logo/tmux-logo-1-color.svg
-Vim (vim): CC0-1.0. Source: https://commons.wikimedia.org/wiki/File:Vimlogo.svg
+SQLite (sqlite): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/sqlite/sqlite/blob/43e862723ec680542ca6f608f9963c0993dd7324/art/sqlite370.eps
+Swift (swift): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://developer.apple.com/swift/resources/
+tmux (tmux): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/tmux/tmux/blob/e26356607e38cbb4676a7c91815ae2d5734443c3/logo/tmux-logo-1-color.svg
+Vim (vim): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://commons.wikimedia.org/wiki/File:Vimlogo.svg
 Zig (zig): CC-BY-SA-4.0. Source: https://github.com/ziglang/logo/blob/6446ba8e37a0651da720d8869e1ce9264fa0c0b9/zig-mark.svg
+  Official Zig project logo (github.com/ziglang/logo).
   Licence: https://creativecommons.org/licenses/by-sa/4.0/. Shipped unmodified, drawn in one colour.
-Zsh (zsh): CC0-1.0. Source: https://github.com/Zsh-art/logo/blob/17617f2f6c70c65943a48745c91d997e7561f19d/svg/white_logomark.svg
+Zsh (zsh): no licence recorded for this icon (the Simple Icons collection is CC0-1.0). Source: https://github.com/Zsh-art/logo/blob/17617f2f6c70c65943a48745c91d997e7561f19d/svg/white_logomark.svg
