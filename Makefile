@@ -5,10 +5,11 @@ VT_PREFIX   := $(CURDIR)/third_party/ghostty-vt
 ZIG         ?= $(shell brew --prefix zig@0.16 2>/dev/null)/bin/zig
 # Semver from the git tag: v0.1.0 builds as 0.1.0. Commits after it add build
 # metadata (0.1.0+3.abc1234, +dirty for local changes), which sorts after the
-# release, unlike a -pre-release suffix. Without a tag: 0.0.0-dev+<commit>.
+# release, unlike a -pre-release suffix. Without a tag: 0.0.0-dev+<commit>,
+# plus .dirty when the build includes uncommitted changes.
 VERSION     ?= $(shell git describe --tags --match 'v[0-9]*' --dirty 2>/dev/null | sed -E 's/^v//; s/-([0-9]+)-g([0-9a-f]+)/+\1.\2/; s/\+(.*)-dirty$$/+\1.dirty/; s/-dirty$$/+dirty/' || true)
 ifeq ($(VERSION),)
-VERSION     := 0.0.0-dev+$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+VERSION     := 0.0.0-dev+$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)$(shell git diff --quiet HEAD 2>/dev/null || echo .dirty)
 endif
 # ZIG_TARGET (such as x86_64-linux-gnu.2.28) builds libghostty-vt and hive's C
 # parts for that target with Zig, so a Linux release runs on older glibc.
