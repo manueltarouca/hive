@@ -43,6 +43,7 @@ struct AgentSidebar: View {
         .frame(width: AgentSidebar.width)
         .background(s.sidebar.swiftUI)
         .overlay(alignment: .trailing) { Rectangle().fill(s.border.swiftUI).frame(width: 1) }
+        .contextMenu { HiveContextMenu(model: model) }
     }
 }
 

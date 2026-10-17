@@ -44,19 +44,21 @@ func (d Diagnostic) String() string { return fmt.Sprintf("line %d: %s", d.Line, 
 
 // Key describes one setting.
 type Key struct {
-	Name    string
-	Default string
+	Name    string `json:"name"`
+	Default string `json:"default"`
 	// Who reads it: the app, or the server (which may run elsewhere).
-	Server bool
-	Help   string
-	set    func(c *Config, v string) error
+	Server bool   `json:"server"`
+	Help   string `json:"help"`
+	// The values it takes, when they're a fixed list.
+	Choices []string `json:"choices,omitempty"`
+	set     func(c *Config, v string) error
 }
 
 const minScrollback = 64 << 10
 
 // Keys lists every setting, in the order the template shows them.
 var Keys = []Key{
-	{Name: "theme", Default: "system", Help: "system, day or night",
+	{Name: "theme", Default: "system", Help: "system, day or night", Choices: []string{"system", "day", "night"},
 		set: oneOf(func(c *Config, v string) { c.Theme = v }, "system", "day", "night")},
 	{Name: "font-family", Default: "", Help: "a monospaced font; empty is hive's bundled JetBrains Mono",
 		set: func(c *Config, v string) error { c.FontFamily = v; return nil }},
@@ -69,9 +71,9 @@ var Keys = []Key{
 			c.FontSize = f
 			return nil
 		}},
-	{Name: "bell", Default: "flash", Help: "when a program rings the bell: flash, sound, flash+sound or none (none also skips the Dock bounce)",
+	{Name: "bell", Default: "flash", Choices: []string{"flash", "sound", "flash+sound", "none"}, Help: "when a program rings the bell: flash, sound, flash+sound or none (none also skips the Dock bounce)",
 		set: oneOf(func(c *Config, v string) { c.Bell = v }, "flash", "sound", "flash+sound", "none")},
-	{Name: "notify", Default: "background", Help: "agent notifications: background (when hive isn't in front), always or never",
+	{Name: "notify", Default: "background", Choices: []string{"background", "always", "never"}, Help: "agent notifications: background (when hive isn't in front), always or never",
 		set: oneOf(func(c *Config, v string) { c.Notify = v }, "background", "always", "never")},
 	{Name: "confirm-paste", Default: "true", Help: "ask before pasting lines into a program that would run each one",
 		set: boolean(func(c *Config, b bool) { c.ConfirmPaste = b })},

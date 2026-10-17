@@ -11,7 +11,20 @@ public struct Settings: Equatable, Sendable {
     public var bell = "flash"
     public var notify = "background"
     public var confirmPaste = true
+    /// Read by the server; shown and set in the Settings window.
+    public var scrollbackLimit: UInt64 = 16 << 20
+    public var resumeAgents = true
     public var diagnostics: [Diagnostic] = []
+    /// Every setting: its name, default, help, and whether the server reads it.
+    public var keys: [Key] = []
+
+    public struct Key: Equatable, Sendable, Decodable {
+        public var name: String
+        public var `default`: String
+        public var server: Bool
+        public var help: String
+        public var choices: [String]?
+    }
 
     public struct Diagnostic: Equatable, Sendable, Decodable {
         public var line: Int
@@ -33,6 +46,7 @@ public struct Settings: Equatable, Sendable {
         var path: String
         var values: Values
         var diagnostics: [Diagnostic]
+        var keys: [Key]?
         struct Values: Decodable {
             var theme: String
             var fontFamily: String
@@ -40,9 +54,12 @@ public struct Settings: Equatable, Sendable {
             var bell: String
             var notify: String
             var confirmPaste: Bool
+            var scrollbackLimit: UInt64
+            var resumeAgents: Bool
             enum CodingKeys: String, CodingKey {
                 case theme, bell, notify
                 case fontFamily = "font-family", fontSize = "font-size", confirmPaste = "confirm-paste"
+                case scrollbackLimit = "scrollback-limit", resumeAgents = "resume-agents"
             }
         }
     }
@@ -51,6 +68,7 @@ public struct Settings: Equatable, Sendable {
         let s = try JSONDecoder().decode(Shown.self, from: data)
         return Settings(path: s.path, theme: Appearance(stored: s.values.theme), fontFamily: s.values.fontFamily,
                         fontSize: s.values.fontSize, bell: s.values.bell, notify: s.values.notify,
-                        confirmPaste: s.values.confirmPaste, diagnostics: s.diagnostics)
+                        confirmPaste: s.values.confirmPaste, scrollbackLimit: s.values.scrollbackLimit,
+                        resumeAgents: s.values.resumeAgents, diagnostics: s.diagnostics, keys: s.keys ?? [])
     }
 }

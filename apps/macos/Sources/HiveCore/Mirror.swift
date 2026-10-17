@@ -270,6 +270,10 @@ public final class Mirror {
         return result
     }
 
+    /// Whether the program has turned on mouse reporting: then a click or a
+    /// right-click is the program's, not hive's.
+    public var tracksMouse: Bool { hive_mouse_tracking(term) }
+
     private func sendPointer(_ action: PointerAction, button: PointerButton?, mods: KeyMods, x: Double, y: Double,
                              geometry g: PointerGeometry) -> PointerResult {
         if mouseEncoder == nil { mouseEncoder = hive_mouse_encoder_new() }

@@ -93,3 +93,7 @@ void hive_mouse_encoder_free(GhosttyMouseEncoder enc);
 // locally), else the bytes written to out (0 when this event isn't reported).
 intptr_t hive_mouse(GhosttyTerminal t, GhosttyMouseEncoder enc, int action, int button, GhosttyMods mods,
                     bool any_pressed, float x, float y, HivePointerGeometry g, uint8_t *out, size_t cap);
+
+/// Whether the program in the terminal has turned on mouse reporting.
+bool hive_mouse_tracking(GhosttyTerminal t);
+

@@ -57,7 +57,8 @@ func cmdConfig(g globals, args []string) error {
 			if diags == nil {
 				diags = []config.Diagnostic{}
 			}
-			return json.NewEncoder(os.Stdout).Encode(map[string]any{"path": path, "values": values, "diagnostics": diags})
+			return json.NewEncoder(os.Stdout).Encode(map[string]any{"path": path, "values": values, "diagnostics": diags,
+				"keys": config.Keys})
 		}
 		set := setKeys(path)
 		for _, k := range config.Keys {

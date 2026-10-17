@@ -205,4 +205,7 @@ public final class Engine {
     /// The mirror's text, for tests and debugging.
     public func plainText(block: String) -> String? { panes[block]?.mirror?.plainText() }
     public func mirror(block: String) -> Mirror? { panes[block]?.mirror }
+
+    /// Whether the program in a block has turned on mouse reporting.
+    public func tracksMouse(block: String) -> Bool { panes[block]?.mirror?.tracksMouse ?? false }
 }

@@ -71,6 +71,10 @@ func TestConfigCommands(t *testing.T) {
 	}
 	out, code = run("config", "show", "--json")
 	var shown struct {
+		Keys []struct {
+			Name, Default, Help string
+			Server              bool
+		} `json:"keys"`
 		Path        string         `json:"path"`
 		Values      map[string]any `json:"values"`
 		Diagnostics []struct {
@@ -80,6 +84,9 @@ func TestConfigCommands(t *testing.T) {
 	}
 	if code != 0 || json.Unmarshal([]byte(out), &shown) != nil {
 		t.Fatalf("show --json = %q %d", out, code)
+	}
+	if len(shown.Keys) != 8 || shown.Keys[0].Name != "theme" || shown.Keys[0].Help == "" || !shown.Keys[6].Server {
+		t.Fatalf("keys = %+v", shown.Keys)
 	}
 	if shown.Path != conf || shown.Values["theme"] != "night" || shown.Values["font-size"] != 13.0 || len(shown.Diagnostics) != 2 {
 		t.Fatalf("shown = %+v", shown)

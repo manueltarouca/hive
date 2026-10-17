@@ -317,3 +317,9 @@ intptr_t hive_mouse(GhosttyTerminal t, GhosttyMouseEncoder enc, int action, int 
   ghostty_mouse_event_free(ev);
   return (intptr_t)written;
 }
+
+bool hive_mouse_tracking(GhosttyTerminal t) {
+  bool tracking = false;
+  ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &tracking);
+  return tracking;
+}

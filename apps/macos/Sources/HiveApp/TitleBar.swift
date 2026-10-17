@@ -34,6 +34,8 @@ struct TitleBar: View {
         .padding(.leading, model.sidebar ? 12 : TitleBar.leading)
         .padding(.trailing, 10)
         .frame(height: TitleBar.height)
+        .contentShape(Rectangle())
+        .contextMenu { HiveContextMenu(model: model) }
     }
 }
 
@@ -231,6 +233,23 @@ struct SettingsBanner: View {
             .help(text + "\nClick to open the settings file.")
             .accessibilityLabel(text)
         }
+    }
+}
+
+/// The title bar's and sidebar's context menu: tabs, sessions, the sidebar,
+/// the theme, and Settings.
+struct HiveContextMenu: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        Button("New Tab") { model.newTab() }
+        Button("New Session") { model.newSession() }
+        Button(model.sidebar ? "Hide Sidebar" : "Show Sidebar") { model.sidebar.toggle() }
+        Picker("Theme", selection: Binding(get: { model.appearance }, set: { model.setAppearance($0) })) {
+            ForEach(Appearance.allCases, id: \.self) { Text($0.title).tag($0) }
+        }
+        Divider()
+        Button("Settings…") { model.openSettings?() }
     }
 }
 

@@ -149,3 +149,16 @@ private func bytes(_ s: String) -> Data { Data(s.utf8) }
         #expect(out == Data(text.utf8))
     }
 }
+
+/// Whether the program uses the mouse decides who gets a right-click: the
+/// program, or hive's context menu.
+@Suite struct MouseTrackingTests {
+    @Test func followsTheProgramsMouseMode() throws {
+        let m = try Mirror(cols: 20, rows: 5)
+        #expect(!m.tracksMouse)
+        m.feed(Data("\u{1b}[?1000h".utf8))
+        #expect(m.tracksMouse)
+        m.feed(Data("\u{1b}[?1000l".utf8))
+        #expect(!m.tracksMouse)
+    }
+}

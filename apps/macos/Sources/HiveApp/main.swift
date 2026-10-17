@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var renderer: Renderer!
     let palette = PalettePanel()
     let shortcuts = ShortcutsPanel()
+    let settingsWindow = SettingsWindow()
     var bag: Set<AnyCancellable> = []
     var appearanceObserver: NSKeyValueObservation?
     var appearanceItems: [(Appearance, NSMenuItem)] = []
@@ -95,6 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         model.onFrame = { [weak self] block in self?.panes.redraw(block) }
+        model.openSettings = { [weak self] in self?.showSettings() }
+        model.contextActions = { [weak self] in self?.paneContextActions() ?? [] }
         model.onLayout = { [weak self] in
             self?.panes.sync()
             self?.panes.claimSizes()
@@ -125,6 +128,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
                 if what == "palette" { self?.showPalette() } else if what == "picker" { self?.showSessionPicker() }
                 if what == "shortcuts" { self?.toggleShortcuts() }
+                if what == "settings" { self?.showSettings() }
+                if what == "panemenu", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
+                    card.pane.showContextMenuForTesting()
+                }
                 if what == "preedit", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
                     // A dead key waiting for the next key, as ~ on a Portuguese layout.
                     card.pane.setMarkedText("~", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -223,6 +230,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func toggleShortcuts() { shortcuts.toggle(over: window, style: model.style) }
 
+    func showSettings() { settingsWindow.show(model: model) }
+
+    /// The pane's context menu, after Copy and Paste: the menu bar's own
+    /// items, so it shows the same keys.
+    func paneContextActions() -> [NSMenuItem] {
+        let m = model
+        var items: [NSMenuItem] = []
+        func add(_ title: String, _ action: @escaping () -> Void) {
+            let i = ClosureMenuItem(title: title, key: "", action: action)
+            // The key the menu bar shows for it, as the keyboard layout types it.
+            if let bar = NSApp.mainMenu?.items.compactMap({ $0.submenu?.items.first { $0.title == title } }).first {
+                i.keyEquivalent = bar.keyEquivalent
+                i.keyEquivalentModifierMask = bar.keyEquivalentModifierMask
+            }
+            items.append(i)
+        }
+        add("Split Right") { [weak self] in self?.split(true) }
+        add("Split Down") { [weak self] in self?.split(false) }
+        add("Zoom Pane") { m.toggleZoom() }
+        items.append(.separator())
+        add("Close Pane") { m.closePane() }
+        items.append(.separator())
+        add("Settings…") { [weak self] in self?.showSettings() }
+        return items
+    }
+
     func commands() -> [PaletteItem] {
         let m = model
         let k = ShortcutsPanel.keys(for:)
@@ -230,6 +263,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             PaletteItem(title: "Keyboard Shortcuts", detail: k("Keyboard Shortcuts"), symbol: "keyboard") { [weak self] in
                 DispatchQueue.main.async { self?.toggleShortcuts() }
             },
+            PaletteItem(title: "Settings…", detail: k("Settings…"), symbol: "gearshape") { [weak self] in
+                DispatchQueue.main.async { self?.showSettings() }
+            },
+            PaletteItem(title: "Open Config File", symbol: "doc.text") { m.settingsStore.openInEditor() },
             PaletteItem(title: "New Tab", detail: k("New Tab"), symbol: "plus.square") { m.newTab() },
             PaletteItem(title: m.sidebar ? "Hide Agents Sidebar" : "Show Agents Sidebar", detail: k("Toggle Agents Sidebar"), symbol: "sidebar.left") { m.sidebar.toggle() },
             PaletteItem(title: "New Session", detail: k("New Session"), symbol: "plus.rectangle.on.rectangle") { m.newSession() },
@@ -291,6 +328,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         menu("Hive", [
             NSMenuItem(title: "About Hive", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""),
+            .separator(),
+            item("Settings…", ",") { [weak self] in self?.showSettings() },
             .separator(),
             item("Command Palette…", "p", [.command, .shift]) { [weak self] in self?.showPalette() },
             .separator(),

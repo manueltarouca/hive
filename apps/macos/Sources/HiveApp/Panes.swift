@@ -124,8 +124,34 @@ final class PaneView: MTKView, NSTextInputClient {
 
     override func mouseDragged(with event: NSEvent) { pointer(.motion, .left, event) }
     override func mouseUp(with event: NSEvent) { pointer(.release, .left, event) }
-    override func rightMouseDown(with event: NSEvent) { pointer(.press, .right, event) }
+    /// A right-click is the program's when it uses the mouse; otherwise, or
+    /// with Shift, it opens hive's menu for the pane.
+    override func rightMouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.shift) || !model.tracksMouse(block: blockID) {
+            window?.makeFirstResponder(self)
+            model.focus(block: blockID)
+            NSMenu.popUpContextMenu(contextMenu(), with: event, for: self)
+            return
+        }
+        pointer(.press, .right, event)
+    }
     override func rightMouseUp(with event: NSEvent) { pointer(.release, .right, event) }
+
+    #if DEBUG
+    /// The screenshot loop: the context menu, as a right-click opens it.
+    func showContextMenuForTesting() {
+        contextMenu().popUp(positioning: nil, at: NSPoint(x: bounds.midX, y: bounds.midY), in: self)
+    }
+    #endif
+
+    private func contextMenu() -> NSMenu {
+        let m = NSMenu()
+        m.addItem(NSMenuItem(title: "Copy", action: #selector(copy(_:)), keyEquivalent: "c"))
+        m.addItem(NSMenuItem(title: "Paste", action: #selector(paste(_:)), keyEquivalent: "v"))
+        m.addItem(.separator())
+        for item in model.contextActions?() ?? [] { m.addItem(item) }
+        return m
+    }
     override func otherMouseDown(with event: NSEvent) { pointer(.press, .middle, event) }
     override func otherMouseUp(with event: NSEvent) { pointer(.release, .middle, event) }
     override func mouseMoved(with event: NSEvent) { pointer(.motion, nil, event) }

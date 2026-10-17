@@ -678,6 +678,18 @@ final class AppModel: ObservableObject {
         call("session.focus_direction", ["session_id": sid, "block_id": .string(b), "direction": .string(direction)])
     }
 
+    /// Opens the Settings window (set by the app).
+    var openSettings: (() -> Void)?
+    /// Hive's actions for a context menu, by the app: the pane's own come first.
+    var contextActions: (() -> [NSMenuItem])?
+
+    /// Whether the program in a block uses the mouse. A quick read on the vt
+    /// queue, which never waits on the main thread.
+    func tracksMouse(block: String) -> Bool {
+        let engine = engine
+        return vt.sync { engine.tracksMouse(block: block) }
+    }
+
     func focus(block: String) {
         guard block != focusedBlock else { return }
         call("session.focus_block", ["session_id": sid, "block_id": .string(block)])
