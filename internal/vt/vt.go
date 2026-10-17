@@ -23,6 +23,9 @@ import (
 	ghostty "go.mitchellh.com/libghostty"
 )
 
+// MaxClipboardBytes is the largest OSC 52 copy passed on (1 MiB).
+const MaxClipboardBytes = 1 << 20
+
 // Hooks receive what the terminal reports. Every field is optional. They run
 // after the terminal call that caused them, never with Term locked.
 type Hooks struct {
@@ -163,7 +166,9 @@ func (v *Term) install() {
 				break
 			}
 		}
-		if h.Clipboard != nil {
+		// Empty and oversized copies are dropped, not truncated: the text goes
+		// to every event subscriber, and half a paste could be half a command.
+		if h.Clipboard != nil && text != "" && len(text) <= MaxClipboardBytes {
 			v.queue(func() { h.Clipboard(text) })
 		}
 		return ghostty.ClipboardWriteReply{Result: ghostty.ClipboardWriteSuccess}

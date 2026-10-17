@@ -203,6 +203,13 @@ struct PaneHeader: View {
             if let st = info?.agentState, st == "working" || st == "blocked" || st == "done" {
                 StatusBadge(state: st, style: s)
             }
+            if model.copiedBlock == blockID {
+                Text("Copied").font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .background(Capsule().fill(s.accent.swiftUI.opacity(0.16)))
+                    .foregroundStyle(s.accent.swiftUI)
+                    .transition(.opacity)
+            }
             if info?.exited == true {
                 Text("Exited\(info!.exitCode != 0 ? " \(info!.exitCode)" : "")").font(.system(size: 10, weight: .medium))
                     .padding(.horizontal, 6).padding(.vertical, 1)

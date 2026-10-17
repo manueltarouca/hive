@@ -446,6 +446,24 @@ final class AppModel: ObservableObject {
         attached = want
     }
 
+    /// The block whose program just copied to the clipboard, for a moment.
+    @Published var copiedBlock: String?
+    private var copiedReset: DispatchWorkItem?
+
+    /// A program copied text (OSC 52): put it on the Mac clipboard if it came
+    /// from the pane the user is working in, and say so in the pane header.
+    private func programCopied(block: String, text: String) {
+        guard ClipboardPolicy.accepts(text: text, from: block, focusedBlock: focusedBlock,
+                                      appActive: NSApp.isActive) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        copiedBlock = block
+        copiedReset?.cancel()
+        let reset = DispatchWorkItem { [weak self] in self?.copiedBlock = nil }
+        copiedReset = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: reset)
+    }
+
     private func handleEvent(_ ev: JSON) {
         switch ev["type"].string {
         case "session_created", "session_destroyed":
@@ -458,6 +476,9 @@ final class AppModel: ObservableObject {
             if type == "block_event" {
                 let name = inner["payload"]["name"].string
                 if name == "agent_changed" { reloadAgents() }
+                if name == "clipboard_written" {
+                    programCopied(block: inner["payload"]["block_id"].string ?? "", text: inner["payload"]["payload"]["text"].string ?? "")
+                }
                 if name == "title_changed" || name == "size_changed" || name == "process_changed", sid == currentSession { scheduleReload() }
             } else if sid == currentSession {
                 scheduleReload()

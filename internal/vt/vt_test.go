@@ -1,6 +1,7 @@
 package vt
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 	"time"
@@ -118,5 +119,31 @@ func TestHookMayCallBackIntoTerm(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("deadlock: hook could not call back into Term")
+	}
+}
+
+// OSC 52 copies reach the hook, but not empty or oversized ones: the text
+// goes to every event subscriber, and a truncated paste could be half a
+// command.
+func TestClipboardWritesAreBounded(t *testing.T) {
+	var got []string
+	term, err := New(80, 24, Hooks{Clipboard: func(s string) { got = append(got, s) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer term.Close()
+	osc52 := func(s string) []byte {
+		return []byte("\x1b]52;c;" + base64.StdEncoding.EncodeToString([]byte(s)) + "\x07")
+	}
+	term.Feed(osc52("copied text"))
+	term.Feed(osc52(""))
+	term.Feed(osc52(strings.Repeat("x", MaxClipboardBytes+1)))
+	term.Feed(osc52(strings.Repeat("y", MaxClipboardBytes)))
+	if len(got) != 2 || got[0] != "copied text" || len(got[1]) != MaxClipboardBytes {
+		lens := []int{}
+		for _, g := range got {
+			lens = append(lens, len(g))
+		}
+		t.Fatalf("hook got %d writes, lengths %v", len(got), lens)
 	}
 }
