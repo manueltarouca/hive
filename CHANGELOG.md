@@ -44,7 +44,8 @@ The first release.
   terminal engine. It has an agents sidebar, a command palette, a session
   picker, native selection and scrollback, and a Hive Day / Hive Night /
   Match System theme setting. The sidebar shows each tab's agent, its task
-  and state; tabs reorder by dragging.
+  and state; tabs reorder by dragging. ⌘/ shows every shortcut. Accents typed
+  with dead keys (~, ´, ^) reach programs as typed, Claude Code included.
 - **The mouse in terminal programs:** the scroll wheel, clicks and drags
   reach programs that use the mouse (Claude Code's scrolling and copy), and a
   program's copy (OSC 52) lands on the clipboard from the focused pane.

@@ -16,6 +16,11 @@ is no copy mode.
 
 ## Shortcuts
 
+Press ⌘/ (or **Help → Keyboard Shortcuts**) to see them all in the app, with
+the editing keys and mouse gestures. The window reads the menu bar, so it
+shows the keys as your keyboard layout types them: on some layouts ⇧⌘[ and
+⇧⌘] are other keys.
+
 | Keys | Does |
 | --- | --- |
 | ⌘T | New tab |
@@ -29,6 +34,7 @@ is no copy mode.
 | ⇧⌘N | New session |
 | ⇧⌘P | Command palette |
 | ⇧⌘S | Agents sidebar |
+| ⌘/ | Keyboard shortcuts |
 
 ## Sessions
 

@@ -72,6 +72,11 @@ public struct KeyInput: Sendable {
     public init(key: Key, mods: KeyMods = [], text: String = "", unshifted: Character? = nil) {
         self.key = key; self.mods = mods; self.text = text; self.unshifted = unshifted
     }
+
+    /// Text an input method committed, such as ~ from a dead key then Space:
+    /// sent as text with no key, as Ghostty does. Attached to the key that
+    /// committed it, kitty's report-all mode would send that key instead.
+    public static func committed(_ text: String) -> KeyInput { KeyInput(key: .unidentified, text: text) }
 }
 
 public struct KeyMods: OptionSet, Sendable {

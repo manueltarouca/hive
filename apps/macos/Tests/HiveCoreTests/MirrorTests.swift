@@ -84,6 +84,26 @@ private func bytes(_ s: String) -> Data { Data(s.utf8) }
         #expect(m.encodeKey(KeyInput(key: .mac(0x33))) == Data([0x7F]))                    // backspace
         #expect(Key.mac(0xFF) == .unidentified)
     }
+
+    /// Dead keys (~ ´ ` ^ on a Portuguese layout): the key that completes the
+    /// accent carries the composed text, and that text is what's sent.
+    @Test func deadKeyCompletionSendsTheComposedText() throws {
+        let m = try Mirror(cols: 10, rows: 2)
+        #expect(m.encodeKey(KeyInput(key: .mac(0x31), text: "~", unshifted: " ")) == Data("~".utf8))   // ~ then space
+        #expect(m.encodeKey(KeyInput(key: .mac(0x00), text: "ã", unshifted: "a")) == Data("ã".utf8))  // ~ then a
+        #expect(m.encodeKey(KeyInput(key: .mac(0x31), mods: [.shift], text: "^", unshifted: " ")) == Data("^".utf8))
+    }
+
+    /// Text a dead key commits (~ then Space) is sent as text, with no key,
+    /// as Ghostty does. Attached to Space, the kitty protocol's report-all
+    /// mode (which Claude Code turns on) would send Space instead of ~.
+    @Test(arguments: [0, 1, 3, 15, 31])
+    func committedTextArrivesAsItselfUnderKittyKeyboard(flags: Int) throws {
+        let m = try Mirror(cols: 10, rows: 2)
+        if flags > 0 { m.feed(Data("\u{1b}[>\(flags)u".utf8)) }
+        #expect(m.encodeKey(.committed("~")) == Data("~".utf8))
+        #expect(m.encodeKey(.committed("ã")) == Data("ã".utf8))
+    }
 }
 
 @Suite struct SelectionTests {

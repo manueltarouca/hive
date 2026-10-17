@@ -158,6 +158,13 @@ final class PaneView: MTKView, NSTextInputClient {
         interpretKeyEvents([event])
         inKeyDown = false
         if marked.length > 0 || hadMarked && composedText == nil { return } // composing
+        if hadMarked, let text = composedText {
+            // A dead key's accent, committed by this key: send it as text.
+            // Control characters committed while composing belong to the
+            // input method, as in Ghostty.
+            if !text.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) { model.key(.committed(text)) }
+            return
+        }
         model.key(keyInput(event, text: composedText))
     }
 
@@ -197,7 +204,8 @@ final class PaneView: MTKView, NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
         let s = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
         marked = NSAttributedString()
-        if inKeyDown { composedText = s } else { model.text(s) }
+        // A dead key then a consonant commits twice ("~", then "h").
+        if inKeyDown { composedText = (composedText ?? "") + s } else { model.text(s) }
     }
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         marked = (string as? NSAttributedString) ?? NSAttributedString(string: string as? String ?? "")

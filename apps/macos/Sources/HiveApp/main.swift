@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var panes: PanesView!
     var renderer: Renderer!
     let palette = PalettePanel()
+    let shortcuts = ShortcutsPanel()
     var bag: Set<AnyCancellable> = []
     var appearanceObserver: NSKeyValueObservation?
     var appearanceItems: [(Appearance, NSMenuItem)] = []
@@ -123,6 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let what = ProcessInfo.processInfo.environment["HIVE_OPEN"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
                 if what == "palette" { self?.showPalette() } else if what == "picker" { self?.showSessionPicker() }
+                if what == "shortcuts" { self?.toggleShortcuts() }
                 if what == "select", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
                     // The mouse path, driven by hand: press, drag along row 1.
                     let p = card.pane, cw = Double(p.renderer.fonts.cellWidth), ch = Double(p.renderer.fonts.cellHeight)
@@ -209,28 +211,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
             if q.isEmpty {
-                rows.append(PaletteItem(title: "New Session", detail: "⇧⌘N", symbol: "plus", section: "") { [weak self] in self?.model.newSession() })
+                rows.append(PaletteItem(title: "New Session", detail: ShortcutsPanel.keys(for: "New Session"), symbol: "plus", section: "") { [weak self] in self?.model.newSession() })
             }
             return rows
         }, onCreate: { [weak self] name in self?.model.newSession(label: name) })
     }
 
+    func toggleShortcuts() { shortcuts.toggle(over: window, style: model.style) }
+
     func commands() -> [PaletteItem] {
         let m = model
+        let k = ShortcutsPanel.keys(for:)
         return [
-            PaletteItem(title: "New Tab", detail: "⌘T", symbol: "plus.square") { m.newTab() },
-            PaletteItem(title: m.sidebar ? "Hide Agents Sidebar" : "Show Agents Sidebar", detail: "⇧⌘S", symbol: "sidebar.left") { m.sidebar.toggle() },
-            PaletteItem(title: "New Session", detail: "⇧⌘N", symbol: "plus.rectangle.on.rectangle") { m.newSession() },
-            PaletteItem(title: "Change Session…", detail: "⌘K", symbol: "rectangle.stack") { [weak self] in
+            PaletteItem(title: "Keyboard Shortcuts", detail: k("Keyboard Shortcuts"), symbol: "keyboard") { [weak self] in
+                DispatchQueue.main.async { self?.toggleShortcuts() }
+            },
+            PaletteItem(title: "New Tab", detail: k("New Tab"), symbol: "plus.square") { m.newTab() },
+            PaletteItem(title: m.sidebar ? "Hide Agents Sidebar" : "Show Agents Sidebar", detail: k("Toggle Agents Sidebar"), symbol: "sidebar.left") { m.sidebar.toggle() },
+            PaletteItem(title: "New Session", detail: k("New Session"), symbol: "plus.rectangle.on.rectangle") { m.newSession() },
+            PaletteItem(title: "Change Session…", detail: k("Change Session…"), symbol: "rectangle.stack") { [weak self] in
                 DispatchQueue.main.async { self?.showSessionPicker() }
             },
-            PaletteItem(title: "Split Right", detail: "⌘D", symbol: "rectangle.split.2x1") { [weak self] in self?.split(true) },
-            PaletteItem(title: "Split Down", detail: "⇧⌘D", symbol: "rectangle.split.1x2") { [weak self] in self?.split(false) },
-            PaletteItem(title: "Zoom Pane", detail: "⇧⌘↩", symbol: "arrow.up.left.and.arrow.down.right") { m.toggleZoom() },
-            PaletteItem(title: "Close Pane", detail: "⌘W", symbol: "xmark") { m.closePane() },
-            PaletteItem(title: "Close Tab", detail: "⇧⌘W", symbol: "xmark.square") { m.closeTab() },
-            PaletteItem(title: "Next Tab", detail: "⇧⌘]", symbol: "arrow.right") { m.selectWindow(offset: 1) },
-            PaletteItem(title: "Previous Tab", detail: "⇧⌘[", symbol: "arrow.left") { m.selectWindow(offset: -1) },
+            PaletteItem(title: "Split Right", detail: k("Split Right"), symbol: "rectangle.split.2x1") { [weak self] in self?.split(true) },
+            PaletteItem(title: "Split Down", detail: k("Split Down"), symbol: "rectangle.split.1x2") { [weak self] in self?.split(false) },
+            PaletteItem(title: "Zoom Pane", detail: k("Zoom Pane"), symbol: "arrow.up.left.and.arrow.down.right") { m.toggleZoom() },
+            PaletteItem(title: "Close Pane", detail: k("Close Pane"), symbol: "xmark") { m.closePane() },
+            PaletteItem(title: "Close Tab", detail: k("Close Tab"), symbol: "xmark.square") { m.closeTab() },
+            PaletteItem(title: "Next Tab", detail: k("Next Tab"), symbol: "arrow.right") { m.selectWindow(offset: 1) },
+            PaletteItem(title: "Previous Tab", detail: k("Previous Tab"), symbol: "arrow.left") { m.selectWindow(offset: -1) },
             PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
         ] + Appearance.allCases.map { a in
@@ -320,6 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             windowItems.append(item("Tab \(i)", "\(i)") { m.selectWindow(index: i - 1) })
         }
         menu("Window", windowItems)
+        menu("Help", [item("Keyboard Shortcuts", "/") { [weak self] in self?.toggleShortcuts() }])
         NSApp.mainMenu = main
     }
 }
