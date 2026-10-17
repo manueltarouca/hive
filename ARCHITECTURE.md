@@ -319,6 +319,41 @@ These win over the M2 draft above where they conflict.
 shift+enter, multi-line paste, scroll, copy, resize reflow, splits, and an
 app restart that reattaches with scrollback, with zero `resync` in the log.
 
+## M2 status (2026-10-17)
+
+The app is built: title bar tabs, pane cards, palette, picker, agents
+sidebar, selection and copy, reconnect.
+
+**Fable 5.1 security/maintainability review.** All findings are fixed with
+tests:
+- **S1** origin/content-type guard on every route
+- **S2** unsafe-paste confirmation
+- **S3** validated agent reports
+- **S4** shot.sh hardening
+- **S5** owner-only socket via umask
+- **S6** debug-only hooks
+- **B1** hold-timeout redraw
+- **B2** key buffer retry
+- **B3** reconnect + resync
+- **B4** live-socket server start
+- **B5** move validation
+- **B6** safe JSON ints
+- **B7** callback teardown
+- lesser items: 64-byte graphemes, gesture bounds, parser copies, atlas
+  restart, bidi stripping, deduped titles
+
+**Found while validating the fixes:**
+- Shutdown raced a starting Serve (fixed).
+- Reconnect used to restart a server the user had stopped. The app now
+  starts one only at launch.
+
+**Open:**
+- split AppModel
+- spacing/typography tokens
+- AppModel tests
+- the renderer still rebuilds clean rows (dirtyRows unused)
+- the day-long dogfood exit criterion
+
 ## Building
 
 `make vt` builds libghostty-vt from the pinned Ghostty commit (needs `zig@0.16`).
