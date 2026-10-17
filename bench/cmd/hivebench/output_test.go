@@ -29,3 +29,13 @@ func TestScanStampsAcrossFrames(t *testing.T) {
 		t.Fatalf("byte by byte: %v", got)
 	}
 }
+
+func TestSlopeIsPerHour(t *testing.T) {
+	// 1 MB a minute is 60 MB an hour; flat is 0.
+	if s := slope([]float64{0, 1, 2, 3}, []float64{10, 11, 12, 13}); s < 59.99 || s > 60.01 {
+		t.Fatalf("slope = %v", s)
+	}
+	if s := slope([]float64{0, 1, 2}, []float64{5, 5, 5}); s != 0 {
+		t.Fatalf("flat slope = %v", s)
+	}
+}

@@ -46,6 +46,8 @@ settings, and needs `/tmp/hivebench` (above) as the pane's program.
 | `ptyread` | busy panes (100 KB/s each), no clients, no saves | under 90% of the offered bytes read |
 | `storm` | OSC sequences a second per pane (100 to 100,000), per kind: title, pwd, status, bell, clipboard, notify | API p99 above 50 ms, an events subscriber dropped, under 90% delivered, or the Go heap growing over 64 MB |
 | `resize` | resizes a second (10 to 1,000, one caller), alternating sizes, a pane streaming 1 MB/s to an attach client | resize or output p99 above 50 ms, a resync, or the terminal not at the size last asked for |
+| `clients` | attach clients (1 to 256), each subscribed to 4 panes streaming 256 KB/s | latency p99 above 50 ms, a resync, or a client short of bytes |
+| `soak` | time: steady load (8 busy panes, 2 clients, an events subscriber, agent reports, titles) with churn (a window opened and closed every 10 s, a client reconnecting every 30 s) | Go heap growing over 10 MB an hour, goroutines or open files growing, or an interval's latency p99 above 50 ms |
 | `bench/app-storm.sh` | the real Hive.app (release) on a throwaway server, a pane storming one OSC kind | none: app CPU and memory growth; `SAMPLE=1` samples its stacks |
 | app `feed` | content (plain, SGR colour, unicode, a full-screen TUI) × chunk size | none: µs per KB parsed |
 | app `frame` | grid 80x24 to 500x150, every row or one row changed | frame + encode p99 above 8 ms (half a 60 Hz frame) |
@@ -158,3 +160,14 @@ rows), so every resize here reflows a full history, at ~2 ms. The app: a
 mirror resize is 1.8 ms p99 with 16 MB of history, plus 0.4 ms for the
 frame. Two clients can't fight over a size (only the size owner resizes;
 the rest letterbox), so the probe's `take` resizes are the worst case.
+
+**2026-10-18, clients** (same machine, on battery). No knee up to 256
+clients on 4 busy panes: every client gets all its bytes, latency p99 at
+most 3.8 ms, no resyncs. Cost is linear, ~0.025 cores a client (the bench's
+clients run in the same process). Go heap 145 MB and 1,819 goroutines at
+256.
+
+A note on titles: updating a pane's title in place from the event,
+instead of the coalesced view reload, measured worse in the app (0.22 vs
+0.12 cores at 10 titles a second, A/B under the same load), so the reload
+stays.
