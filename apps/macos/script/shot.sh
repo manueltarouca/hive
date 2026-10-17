@@ -20,7 +20,7 @@ export HIVE_RESUME_CLAUDE='["sh","-c","echo resumed {id}; exec cat"]'
 H="$root/bin/hive"
 
 $H new hive-demo --cwd "$root" >/dev/null
-$H -s hive-demo send 'git log --oneline --graph -14 --color=always'; $H -s hive-demo send-key enter
+$H -s hive-demo send 'git log --oneline --graph --color=always -- apps/macos/Sources/Hive{Core,Render,Kit}'; $H -s hive-demo send-key enter
 # An agent block: reports itself through the hook path and sets a task title.
 agent=$($H -s hive-demo split --split right --ratio 45 --cwd "$root" --keep-open --json -- sh -c '
   printf "\033]2;✳ Refactor attach protocol\007"

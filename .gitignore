@@ -8,3 +8,4 @@ site/.svelte-kit/
 site/build/
 site/node_modules/
 third_party/
+CLAUDE.local.md
