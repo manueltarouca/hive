@@ -4,18 +4,18 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime/pprof"
 	"sync"
 	"time"
 
 	"github.com/manueltarouca/hive/internal/server"
 )
 
-// The flush probe: saves × panes × scrollback. Every second the server
-// snapshots each terminal whose output changed, and agent.report saves at
-// once, so an agent's report waits for every pending snapshot. It ramps
-// the number of busy panes, with empty and with full scrollback, and times
-// agent.report and the saves. Degraded: agent.report p99 above the limit.
+// The flush probe: saves × panes × scrollback. The server snapshots each
+// terminal whose output changed every 30 s (and on server.flush), and
+// agent.report saves state.json at once. It ramps the number of busy panes,
+// with empty and with full scrollback, and times agent.report while
+// snapshot saves run back to back, so a report that has to wait for one
+// shows. Degraded: agent.report p99 above the limit.
 
 type flushStep struct {
 	Panes      int    `json:"panes"`
@@ -23,18 +23,22 @@ type flushStep struct {
 	Report     Dist   `json:"agent_report"`
 	Save       Dist   `json:"save"`
 	SaveWait   Dist   `json:"save_wait"`
-	Snapshots  int    `json:"snapshots_per_save_max"`
-	Memory     Memory `json:"memory"`
-	Degraded   bool   `json:"degraded"`
+	// The reports' own saves (state.json only): waiting for locks, and the
+	// rest (writing and syncing).
+	StateWait Dist   `json:"state_save_wait"`
+	StateIO   Dist   `json:"state_save_io"`
+	Snapshots int    `json:"snapshots_per_save_max"`
+	Memory    Memory `json:"memory"`
+	Degraded  bool   `json:"degraded"`
 }
 
 type flushResult struct {
-	Scenario  string               `json:"scenario"`
-	Meta      Meta                 `json:"meta"`
-	Params    map[string]any       `json:"params"`
-	Steps     []flushStep          `json:"steps"`
-	Knee      map[string]int       `json:"knee_panes"`
-	Note      string               `json:"note"`
+	Scenario string         `json:"scenario"`
+	Meta     Meta           `json:"meta"`
+	Params   map[string]any `json:"params"`
+	Steps    []flushStep    `json:"steps"`
+	Knee     map[string]int `json:"knee_panes"`
+	Note     string         `json:"note"`
 }
 
 func flushProbe(args []string) error {
@@ -43,7 +47,7 @@ func flushProbe(args []string) error {
 	rate := fs.Int("rate", 100<<10, "bytes a second each pane writes")
 	limit := fs.Duration("limit", 50*time.Millisecond, "agent.report p99 above this is degraded")
 	out := fs.String("out", "bench/results", "where results go")
-	only := fs.Int("panes", 0, "run only this many panes (with --profile)")
+	only := fs.Int("panes", 0, "run only this many panes, with empty and full scrollback (with --profile)")
 	profile := fs.String("profile", "", "write cpu and heap profiles of the measured step here (prefix)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -64,23 +68,24 @@ func flushProbe(args []string) error {
 		steps := []int{1, 8, 32, 64, 128, 192, 256}
 		if *only > 0 {
 			steps = []int{*only}
-			if scroll.prefill > 0 {
-				continue
-			}
 		}
 		for _, panes := range steps {
 			if panes > budget {
 				res.Note += fmt.Sprintf("stopped at %d panes: pty budget %d. ", panes, budget)
 				break
 			}
-			st, err := flushStepRun(exe, panes, scroll.prefill, *rate, *secs, *limit, *profile)
+			prof := *profile
+			if prof != "" {
+				prof += map[bool]string{true: "-full", false: "-empty"}[scroll.prefill > 0]
+			}
+			st, err := flushStepRun(exe, panes, scroll.prefill, *rate, *secs, *limit, prof)
 			if err != nil {
 				return err
 			}
 			st.Scrollback = scroll.name
 			res.Steps = append(res.Steps, st)
-			fmt.Printf("%-28s panes %4d  report p50 %6.1f p99 %7.1f max %7.1f ms | save p50 %6.1f p99 %7.1f ms, ≤%d snapshots | rss %5.0f MB (go %4.0f, native %5.0f)%s\n",
-				scroll.name, panes, st.Report.P50, st.Report.P99, st.Report.Max, st.Save.P50, st.Save.P99, st.Snapshots,
+			fmt.Printf("%-28s panes %4d  report p50 %6.1f p99 %7.1f max %7.1f ms | save p50 %6.1f p99 %7.1f ms, ≤%d snapshots | report's save: wait p99 %6.1f, io p99 %6.1f ms | rss %5.0f MB (go %4.0f, native %5.0f)%s\n",
+				scroll.name, panes, st.Report.P50, st.Report.P99, st.Report.Max, st.Save.P50, st.Save.P99, st.Snapshots, st.StateWait.P99, st.StateIO.P99,
 				st.Memory.ResidentMB, st.Memory.GoHeapMB, st.Memory.NativeMB, map[bool]string{true: "  DEGRADED", false: ""}[st.Degraded])
 			if st.Degraded {
 				degradedRun++
@@ -103,7 +108,7 @@ func flushProbe(args []string) error {
 
 func flushStepRun(exe string, panes, prefill, rate, secs int, limit time.Duration, profile string) (flushStep, error) {
 	var mu sync.Mutex
-	var saves, waits []time.Duration
+	var saves, waits, stateWaits, stateIO []time.Duration
 	maxSnaps := 0
 	recording := false
 	ts, err := startServer(server.Config{OnFlush: func(f server.FlushStats) {
@@ -111,6 +116,9 @@ func flushStepRun(exe string, panes, prefill, rate, secs int, limit time.Duratio
 		defer mu.Unlock()
 		if recording {
 			saves, waits = append(saves, f.Took), append(waits, f.Wait)
+			if f.Snapshots == 0 {
+				stateWaits, stateIO = append(stateWaits, f.Wait), append(stateIO, f.Took-f.Wait)
+			}
 			maxSnaps = max(maxSnaps, f.Snapshots)
 		}
 	}})
@@ -138,21 +146,25 @@ func flushStepRun(exe string, panes, prefill, rate, secs int, limit time.Duratio
 	mu.Lock()
 	recording = true
 	mu.Unlock()
-	if profile != "" {
-		f, err := os.Create(profile + ".cpu.pprof")
-		if err != nil {
-			return flushStep{}, err
-		}
-		_ = pprof.StartCPUProfile(f)
-		defer func() {
-			pprof.StopCPUProfile()
-			f.Close()
-			if h, err := os.Create(profile + ".heap.pprof"); err == nil {
-				_ = pprof.WriteHeapProfile(h)
-				h.Close()
+	defer startProfile(profile)()
+	// Snapshot saves, back to back, as the 30 s tick would run them.
+	stopSaves := make(chan struct{})
+	savesDone := make(chan error, 1)
+	go func() {
+		for {
+			select {
+			case <-stopSaves:
+				savesDone <- nil
+				return
+			default:
 			}
-		}()
-	}
+			if err := ts.call("server.flush", map[string]any{}, nil); err != nil {
+				savesDone <- err
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
 	var reports []time.Duration
 	tick := time.NewTicker(20 * time.Millisecond)
 	end := time.Now().Add(time.Duration(secs) * time.Second)
@@ -165,10 +177,14 @@ func flushStepRun(exe string, panes, prefill, rate, secs int, limit time.Duratio
 		reports = append(reports, time.Since(t0))
 	}
 	tick.Stop()
+	close(stopSaves)
+	if err := <-savesDone; err != nil {
+		return flushStep{}, err
+	}
 	mem := memory()
 	mu.Lock()
 	defer mu.Unlock()
-	st := flushStep{Panes: panes, Report: dist(reports), Save: dist(saves), SaveWait: dist(waits), Snapshots: maxSnaps, Memory: mem}
+	st := flushStep{Panes: panes, Report: dist(reports), Save: dist(saves), SaveWait: dist(waits), StateWait: dist(stateWaits), StateIO: dist(stateIO), Snapshots: maxSnaps, Memory: mem}
 	st.Degraded = st.Report.P99 > float64(limit)/float64(time.Millisecond)
 	return st, nil
 }

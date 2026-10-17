@@ -10,11 +10,14 @@ import (
 
 // emit writes coloured lines: first prefill bytes as fast as it can (to fill
 // scrollback), then rate bytes a second, open loop: it keeps its pace
-// whether or not anything downstream keeps up.
+// whether or not anything downstream keeps up. With --stamp, each tick's
+// first line carries the time it was written (see stampPrefix), for
+// end-to-end latency.
 func emit(args []string) error {
 	fs := flag.NewFlagSet("emit", flag.ContinueOnError)
 	rate := fs.Int("rate", 100<<10, "bytes a second after the prefill")
 	prefill := fs.Int("prefill", 0, "bytes written at once first")
+	stamp := fs.Bool("stamp", false, "stamp each tick's first line with the time")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -33,6 +36,9 @@ func emit(args []string) error {
 	perTick := *rate * int(tick) / int(time.Second)
 	next := time.Now()
 	for {
+		if *stamp {
+			fmt.Fprintf(w, "%s%019d;", stampPrefix, time.Now().UnixNano())
+		}
 		for written := 0; written < perTick; {
 			written += line()
 		}
