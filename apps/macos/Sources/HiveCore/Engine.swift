@@ -23,7 +23,7 @@ public final class Engine {
     public private(set) var resyncCount = 0
     public var log: (String) -> Void = { _ in }
 
-    public var theme: Theme = .tomorrowNight {
+    public var theme: Theme = .ghostty {
         didSet {
             guard theme != oldValue else { return }
             for (_, p) in panes {

@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 /// A screen that exercises the renderer.
 func sampleFrame(cols: UInt16 = 60, rows: UInt16 = 12) throws -> PaneFrame {
     let m = try Mirror(cols: cols, rows: rows)
-    m.apply(theme: .tomorrowNight)
+    m.apply(theme: .ghostty)
     let lines = [
         "\u{1b}[1mhive\u{1b}[0m \u{1b}[2m· agents\u{1b}[0m  \u{1b}[32m● working\u{1b}[0m \u{1b}[33m◆ blocked\u{1b}[0m",
         "┌──────────┬─────────┐ ╔═══╗ ▁▂▃▄▅▆▇█ ░▒▓",

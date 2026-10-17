@@ -19,17 +19,19 @@ struct Style: Equatable {
     var claude: NSColor { Style.hex(0xD97857) }
     var terminal: Theme
 
-    /// "Hive Night": warm charcoal, Tomorrow Night terminal colors.
+    /// "Hive Night": Ghostty's default theme for the terminal, with tmux's
+    /// Tomorrow Night surfaces around it. Honey stays the accent and cursor.
     static let dark = Style(
         dark: true,
-        windowTop: hex(0x141317), windowBottom: hex(0x0F0E12),
-        card: hex(0x1B1A1F), cardUnfocused: hex(0x17161A),
-        text: hex(0xECE8E1), secondary: hex(0x8D877E), border: hex(0x2B2930), tabActive: hex(0x26242B),
-        accent: hex(0xF2A93B), blocked: hex(0xE5645B), done: hex(0x7DBE8F), sidebar: hex(0x111014),
-        terminal: Theme(
-            foreground: RGB(0xE3, 0xDF, 0xD8), background: RGB(0x1B, 0x1A, 0x1F), cursor: RGB(0xF2, 0xA9, 0x3B),
-            selection: RGB(0x4D, 0x41, 0x2A),
-            palette: Theme.tomorrowNight.palette))
+        windowTop: hex(0x1F2124), windowBottom: hex(0x1B1D1F),
+        card: hex(0x282C34), cardUnfocused: hex(0x1F2228),
+        text: hex(0xC5C8C6), secondary: hex(0x969896), border: hex(0x373B41), tabActive: hex(0x2E3238),
+        accent: hex(0xF2A93B), blocked: hex(0xCC6666), done: hex(0xB5BD68), sidebar: hex(0x18191B),
+        terminal: {
+            var t = Theme.ghostty
+            t.cursor = RGB(0xF2, 0xA9, 0x3B)
+            return t
+        }())
 
     /// "Hive Day": warm paper with a hint of honey.
     static let light = Style(

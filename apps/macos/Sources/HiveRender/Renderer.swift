@@ -50,7 +50,7 @@ public final class Renderer {
     private var bufferIndex = 0
     private let inflight = DispatchSemaphore(value: 3)
 
-    public init(device: MTLDevice? = nil, fonts: FontSet = FontSet(), theme: Theme = .tomorrowNight,
+    public init(device: MTLDevice? = nil, fonts: FontSet = FontSet(), theme: Theme = .ghostty,
                 pixelFormat: MTLPixelFormat = .bgra8Unorm) throws {
         guard let device = device ?? MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
             throw NSError(domain: "hive.render", code: 1, userInfo: [NSLocalizedDescriptionKey: "no Metal device"])
