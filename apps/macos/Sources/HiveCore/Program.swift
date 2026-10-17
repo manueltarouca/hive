@@ -7,13 +7,29 @@ public struct BrandIcon: Sendable {
     public let hex: UInt32
     public let path: String
 
+    /// Tiles whose app icon is another colour than the logo: Bun's icon is
+    /// cream with a black face, Ollama's white with a black llama.
+    static let fills: [String: UInt32] = ["bun": 0xFBF0DF, "ollama": 0xFFFFFF]
+
+    /// The colour of a logo's tile.
+    public static func fill(_ slug: String) -> UInt32 { fills[slug] ?? all[slug]?.hex ?? 0x3A3B3F }
+
     /// The logo as an SVG document, as Simple Icons ships it.
     public var svg: String {
         #"<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="\#(path)"/></svg>"#
     }
 }
 
-/// How a program is drawn: its logo, or a Mac symbol.
+/// A program's own icon from its vendor's site, as a PNG (base64), and the
+/// colour behind it when it's a transparent mark. Generated into
+/// VendorIcons.generated.swift by script/vendor-icons.sh.
+public struct VendorIcon: Sendable {
+    public let title: String
+    public let background: UInt32?
+    public let png: String
+}
+
+/// How a program is drawn without a vendor icon: its logo, or a Mac symbol.
 public enum ProgramIcon: Equatable, Sendable {
     case brand(String)
     case symbol(String)
@@ -23,37 +39,36 @@ public enum ProgramIcon: Equatable, Sendable {
 public struct Program: Equatable, Sendable {
     public var name: String
     public var icon: ProgramIcon
-    /// Mac apps whose icon stands for the program, by bundle ID, used when
-    /// installed: Claude Code shows Claude's icon.
-    public var apps: [String]
+    /// The program's own icon (VendorIcon.all), drawn in preference to the
+    /// logo or symbol.
+    public var vendor: String?
 
-    public init(_ name: String, _ icon: ProgramIcon, apps: [String] = []) {
-        self.name = name; self.icon = icon; self.apps = apps
+    public init(_ name: String, _ icon: ProgramIcon, vendor: String? = nil) {
+        self.name = name; self.icon = icon; self.vendor = vendor
     }
 }
 
 public enum Programs {
     /// By the name the server reports (see programOf in internal/block).
     public static let table: [String: Program] = [
-        // Claude's coral tile, not Claude.app's dark icon: Claude Code's own look.
-        "claude": Program("Claude Code", .brand("claude")),
-        "codex": Program("Codex", .symbol("hexagon"), apps: ["com.openai.codex"]),
-        "gemini": Program("Gemini", .symbol("sparkles"), apps: ["com.google.GeminiMacOS"]),
-        "grok": Program("Grok", .symbol("bolt")),
-        "opencode": Program("OpenCode", .brand("opencode")),
-        "ollama": Program("Ollama", .brand("ollama")),
+        "claude": Program("Claude Code", .brand("claude"), vendor: "claude"),
+        "codex": Program("Codex", .symbol("hexagon"), vendor: "codex"),
+        "gemini": Program("Gemini", .symbol("sparkles"), vendor: "gemini"),
+        "grok": Program("Grok", .symbol("bolt"), vendor: "grok"),
+        "opencode": Program("OpenCode", .brand("opencode"), vendor: "opencode"),
+        "ollama": Program("Ollama", .brand("ollama"), vendor: "ollama"),
 
         "node": Program("Node", .brand("nodedotjs")),
-        "bun": Program("Bun", .brand("bun")),
+        "bun": Program("Bun", .brand("bun"), vendor: "bun"),
         "deno": Program("Deno", .symbol("hexagon.fill")),
-        "python": Program("Python", .brand("python")),
+        "python": Program("Python", .brand("python"), vendor: "python"),
         "ruby": Program("Ruby", .brand("ruby")),
         "perl": Program("Perl", .brand("perl")),
         "php": Program("PHP", .brand("php")),
         "lua": Program("Lua", .brand("lua")),
-        "go": Program("Go", .brand("go")),
-        "cargo": Program("Cargo", .brand("rust")),
-        "rustc": Program("Rust", .brand("rust")),
+        "go": Program("Go", .brand("go"), vendor: "go"),
+        "cargo": Program("Cargo", .brand("rust"), vendor: "rust"),
+        "rustc": Program("Rust", .brand("rust"), vendor: "rust"),
         "zig": Program("Zig", .brand("zig")),
         "swift": Program("Swift", .brand("swift")),
         "kotlin": Program("Kotlin", .brand("kotlin")),
@@ -71,8 +86,8 @@ public enum Programs {
         "lazygit": Program("Git Changes", .brand("git")),
         "tig": Program("Git History", .brand("git")),
 
-        "docker": Program("Docker", .brand("docker"), apps: ["com.docker.docker", "io.podmandesktop.PodmanDesktop"]),
-        "podman": Program("Podman", .symbol("shippingbox"), apps: ["io.podmandesktop.PodmanDesktop"]),
+        "docker": Program("Docker", .brand("docker"), vendor: "docker"),
+        "podman": Program("Podman", .symbol("shippingbox")),
         "kubectl": Program("Kubernetes", .brand("kubernetes")),
         "k9s": Program("Kubernetes", .brand("kubernetes")),
         "tofu": Program("OpenTofu", .brand("opentofu")),

@@ -22,13 +22,27 @@ import Testing
         #expect(Programs.lookup("codex").name == "Codex")
     }
 
-    /// Programs with a Mac app show that app's icon when it's installed.
-    @Test func macAppsByBundleID() {
-        #expect(Programs.lookup("claude").apps.isEmpty)   // its coral tile, as in the demos
-        #expect(Programs.lookup("gemini").apps == ["com.google.GeminiMacOS"])
-        #expect(Programs.lookup("codex").apps == ["com.openai.codex"])
-        #expect(Programs.lookup("docker").apps.contains("io.podmandesktop.PodmanDesktop"))
-        #expect(Programs.lookup("zsh").apps.isEmpty)
+    /// Programs with a vendor icon show it: Claude Code its docs icon,
+    /// not Claude Desktop's.
+    @Test func vendorIcons() {
+        #expect(Programs.lookup("claude").vendor == "claude")
+        #expect(Programs.lookup("codex").vendor == "codex")
+        #expect(Programs.lookup("python").vendor == "python")
+        #expect(Programs.lookup("zsh").vendor == nil)
+        let used = Set(Programs.table.values.compactMap(\.vendor))
+        #expect(used == Set(VendorIcon.all.keys))
+    }
+
+    /// The vendor icons decode, at most 96 px, and transparent marks have a
+    /// background to sit on.
+    @Test func vendorIconsDecode() throws {
+        for (name, icon) in VendorIcon.all {
+            let data = try #require(Data(base64Encoded: icon.png), "\(name)")
+            let rep = try #require(NSBitmapImageRep(data: data), "\(name)")
+            #expect(rep.pixelsWide <= 96 && rep.pixelsWide >= 48, "\(name)")
+        }
+        #expect(VendorIcon.all["python"]?.background == 0xFFFFFF)
+        #expect(VendorIcon.all["claude"]?.background == nil)
     }
 
     /// Anything else is a terminal, under its own name.
@@ -67,8 +81,17 @@ import Testing
         #expect(Contrast.onFill(0xD97757) == 0xFFFFFF)   // Claude
         #expect(Contrast.onFill(0x000000) == 0xFFFFFF)   // Bun
         #expect(Contrast.onFill(0xFFDA18) == 0x000000)   // OpenTofu
-        for icon in BrandIcon.all.values {
-            #expect(Contrast.ratio(Contrast.onFill(icon.hex), icon.hex) >= 3, "\(icon.title)")
+        for (slug, icon) in BrandIcon.all {
+            let fill = BrandIcon.fill(slug)
+            #expect(Contrast.ratio(Contrast.onFill(fill), fill) >= 3, "\(icon.title)")
         }
+    }
+
+    /// Some tiles use the app icon's colour rather than the logo's: Bun's
+    /// icon is cream, not black.
+    @Test func tileFillsFollowAppIcons() {
+        #expect(BrandIcon.fill("bun") == 0xFBF0DF)
+        #expect(Contrast.onFill(BrandIcon.fill("bun")) == 0x000000)
+        #expect(BrandIcon.fill("python") == 0x3776AB)
     }
 }

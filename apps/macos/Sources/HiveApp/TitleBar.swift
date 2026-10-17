@@ -134,7 +134,7 @@ struct TabPill: View {
         let parts = window.titleParts(model.blocks)
         let status = model.status(of: window)
         HStack(spacing: 7) {
-            ProgramTile(program: model.program(of: window), size: 18)
+            ProgramTile(program: model.program(of: window), size: 18, behind: model.otherPrograms(of: window))
                 .opacity(active ? 1 : 0.85)
             let name = Text(parts.primary).foregroundColor(active ? s.text.swiftUI : s.secondary.swiftUI)
             let font = Font.system(size: 12.5, weight: active ? .medium : .regular)

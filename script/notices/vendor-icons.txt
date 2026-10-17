@@ -1,0 +1,19 @@
+Vendor icons
+============
+
+Hive.app shows these icons only to name the program running in a pane.
+Each is its owner's artwork and trademark, taken from the owner's site
+below, scaled down and otherwise unmodified. They are not covered by
+hive's MIT licence.
+
+Claude Code: https://code.claude.com/docs/_mintlify/favicons/claude-code/pLsy-mRpNksna2sx/_generated/favicon/apple-touch-icon.png
+Codex: https://developers.openai.com/favicon.png
+Gemini CLI: https://geminicli.com/icon.png
+Grok: https://grok.com/images/apple-touch-icon.png
+OpenCode: https://opencode.ai/apple-touch-icon-v3.png
+Ollama: https://ollama.com/public/apple-touch-icon.png
+Python: https://www.python.org/static/apple-touch-icon-144x144-precomposed.png
+Bun: https://bun.sh/icons/apple-touch-icon.png
+Go: https://go.dev/images/favicon-gopher-plain.png
+Rust: https://rust-lang.org/static/images/apple-touch-icon.png
+Docker: https://www.docker.com/app/uploads/2024/02/cropped-docker-logo-favicon-180x180.png

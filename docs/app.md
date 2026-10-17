@@ -38,11 +38,12 @@ shows the keys as your keyboard layout types them: on some layouts ⇧⌘[ and
 
 ## Icons
 
-Tabs and the sidebar show each program as a small app icon: Claude Code's
-coral tile, Node, Python, Vim, Docker and others. Codex, Gemini and docker
-show their Mac app's icon when that app is installed. Any other program
-shows a terminal icon. The logos come from Simple Icons; their licences are
-in the app's third-party notices.
+Tabs and the sidebar show each program as a honeycomb cell: its own icon
+from its vendor (Claude Code, Codex, Gemini CLI, Grok, OpenCode, Ollama,
+Python, Bun, Go, Rust, Docker), else its logo on its brand colour (Node,
+Vim, Ruby and others), else a terminal. A tab with several panes shows the
+other panes' cells peeking out behind. Sources and licences are in the app's
+third-party notices.
 
 ## Sessions
 

@@ -533,6 +533,21 @@ final class AppModel: ObservableObject {
         return w.focused.flatMap { blocks[$0] }?.programInfo ?? Programs.lookup("")
     }
 
+    /// The programs of a tab's other panes, for the tiles stacked behind its
+    /// icon: up to two, nearest first.
+    func otherPrograms(of w: WindowInfo) -> [Program] {
+        let main = program(of: w)
+        var seen: [Program] = []
+        for id in w.layout?.rects().map(\.0) ?? [] {
+            guard let p = blocks[id]?.programInfo, p != main, !seen.contains(p) else { continue }
+            seen.append(p)
+        }
+        // Panes of the same program still show as panes.
+        let panes = (w.layout?.rects().count ?? 1) - 1
+        while seen.count < min(panes, 2) { seen.append(main) }
+        return Array(seen.prefix(2))
+    }
+
     func summary(of w: WindowInfo) -> TabSummary {
         let ids = Set(w.layout?.rects().map(\.0) ?? [])
         let mine = agents.filter { ids.contains($0.blockID) }
