@@ -2,7 +2,7 @@
 // server's: each scenario ramps one dimension against a stated limit and
 // records the knee. Build it in release:
 //
-//	swift run -c release hivebench-app [feed|frame|pipeline|engine|memory|all]
+//	swift run -c release hivebench-app [feed|frame|pipeline|engine|resize|memory|all]
 //
 // Results go to bench/results/<time>-app-<scenario>.json at the repo root.
 import CoreGraphics
@@ -345,6 +345,36 @@ func engineScenario(cols: Int, rows: Int) -> [EngineRow] {
     return out
 }
 
+
+/// resize: the app's mirror reflowing on each resize (a window drag, or the
+/// server's size changing), then a frame, with growing history. Limit:
+/// resize + frame p99 over 8 ms (half a 60 Hz frame).
+struct ResizeRow: Encodable { var historyMB: Int; var resize: Dist; var frame: Dist; var degraded: Bool }
+func resizeScenario() -> [ResizeRow] {
+    var out: [ResizeRow] = []
+    let sizes: [(UInt16, UInt16)] = [(80, 24), (200, 60), (120, 40), (160, 50), (100, 30)]
+    for mb in [0, 4, 16] {
+        let m = try! Mirror(cols: 120, rows: 40)
+        m.apply(theme: .ghostty)
+        if mb > 0 { for p in chunks(sgrLines(mb << 20), 64 << 10) { m.feed(p) } }
+        var rs: [Double] = [], fs: [Double] = []
+        for i in 0..<300 {
+            let (c, r) = sizes[i % sizes.count]
+            let t0 = now()
+            m.resize(cols: c, rows: r, cellWidth: 16, cellHeight: 34)
+            let t1 = now()
+            _ = m.frame()
+            let t2 = now()
+            if i >= 20 { rs.append(ms(t1 - t0)); fs.append(ms(t2 - t1)) }
+        }
+        let row = ResizeRow(historyMB: mb, resize: Dist(rs), frame: Dist(fs), degraded: Dist(rs).p99 + Dist(fs).p99 > 8)
+        out.append(row)
+        print(String(format: "resize history %2d MB | resize p50 %6.2f p99 %6.2f | frame p50 %6.2f p99 %6.2f ms%@", mb,
+                     row.resize.p50, row.resize.p99, row.frame.p50, row.frame.p99, (row.degraded ? "  DEGRADED" : "") as NSString))
+    }
+    return out
+}
+
 // MARK: main
 
 let what = CommandLine.arguments.dropFirst().first ?? "all"
@@ -369,6 +399,10 @@ if what == "pipeline" || what == "all" {
 if what == "engine" || what == "all" {
     struct R: Encodable { var scenario = "app-engine"; var meta = Meta(); var rows: [EngineRow] }
     write("engine", R(rows: engineScenario(cols: 120, rows: 40) + engineScenario(cols: 300, rows: 80)))
+}
+if what == "resize" || what == "all" {
+    struct R: Encodable { var scenario = "app-resize"; var meta = Meta(); var limitMs = 8.0; var rows: [ResizeRow] }
+    write("resize", R(rows: resizeScenario()))
 }
 if what == "memory" || what == "all" {
     struct R: Encodable { var scenario = "app-memory"; var meta = Meta(); var rows: [MemRow] }

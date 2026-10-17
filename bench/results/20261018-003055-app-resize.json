@@ -1,0 +1,64 @@
+{
+  "limit_ms" : 8,
+  "meta" : {
+    "build" : "release",
+    "commit" : "2c711f2+dirty",
+    "cpu" : "Apple M5 Pro",
+    "load_before" : "{ 9.53 9.67 8.39 }",
+    "machine" : "Mac17,8",
+    "os" : "macOS 27.0.1",
+    "power" : "Now drawing from 'Battery Power'",
+    "when" : "2026-10-17T23:30:55Z"
+  },
+  "rows" : [
+    {
+      "degraded" : false,
+      "frame" : {
+        "max" : 0.424375,
+        "n" : 280,
+        "p50" : 0.144291,
+        "p99" : 0.3595
+      },
+      "history_mb" : 0,
+      "resize" : {
+        "max" : 0.108375,
+        "n" : 280,
+        "p50" : 0.017917,
+        "p99" : 0.0905
+      }
+    },
+    {
+      "degraded" : false,
+      "frame" : {
+        "max" : 0.370916,
+        "n" : 280,
+        "p50" : 0.160083,
+        "p99" : 0.369041
+      },
+      "history_mb" : 4,
+      "resize" : {
+        "max" : 3.366167,
+        "n" : 280,
+        "p50" : 1.326167,
+        "p99" : 1.837584
+      }
+    },
+    {
+      "degraded" : false,
+      "frame" : {
+        "max" : 0.405167,
+        "n" : 280,
+        "p50" : 0.157542,
+        "p99" : 0.36775
+      },
+      "history_mb" : 16,
+      "resize" : {
+        "max" : 1.973833,
+        "n" : 280,
+        "p50" : 1.344292,
+        "p99" : 1.797
+      }
+    }
+  ],
+  "scenario" : "app-resize"
+}

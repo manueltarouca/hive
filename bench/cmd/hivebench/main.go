@@ -7,6 +7,7 @@
 //	hivebench output [--panes N] [--secs N]             output rate → latency to a client
 //	hivebench ptyread [--max N] [--rate B]              busy panes → pty read cost, alone
 //	hivebench storm [--kinds K] [--panes N]             OSC sequences a second → events, API latency, memory
+//	hivebench resize [--rate B]                         resizes a second → latency, reflow, final size
 package main
 
 import (
@@ -16,7 +17,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: hivebench emit|flush|output|ptyread|storm [flags]")
+		fmt.Fprintln(os.Stderr, "usage: hivebench emit|flush|output|ptyread|storm|resize [flags]")
 		os.Exit(2)
 	}
 	var err error
@@ -31,6 +32,8 @@ func main() {
 		err = ptyProbe(os.Args[2:])
 	case "storm":
 		err = stormProbe(os.Args[2:])
+	case "resize":
+		err = resizeProbe(os.Args[2:])
 	default:
 		err = fmt.Errorf("unknown scenario %q", os.Args[1])
 	}

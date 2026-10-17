@@ -45,11 +45,13 @@ settings, and needs `/tmp/hivebench` (above) as the pane's program.
 | `flush` | busy panes (100 KB/s each), empty and full scrollback, with snapshot saves running back to back | `agent.report` p99 above 50 ms |
 | `ptyread` | busy panes (100 KB/s each), no clients, no saves | under 90% of the offered bytes read |
 | `storm` | OSC sequences a second per pane (100 to 100,000), per kind: title, pwd, status, bell, clipboard, notify | API p99 above 50 ms, an events subscriber dropped, under 90% delivered, or the Go heap growing over 64 MB |
+| `resize` | resizes a second (10 to 1,000, one caller), alternating sizes, a pane streaming 1 MB/s to an attach client | resize or output p99 above 50 ms, a resync, or the terminal not at the size last asked for |
 | `bench/app-storm.sh` | the real Hive.app (release) on a throwaway server, a pane storming one OSC kind | none: app CPU and memory growth; `SAMPLE=1` samples its stacks |
 | app `feed` | content (plain, SGR colour, unicode, a full-screen TUI) × chunk size | none: µs per KB parsed |
 | app `frame` | grid 80x24 to 500x150, every row or one row changed | frame + encode p99 above 8 ms (half a 60 Hz frame) |
 | app `pipeline` | grid × chunk, a frame after every chunk | under the server's 64 MB/s |
 | app `engine` | output rate, the app's real HiveClient and Engine on a real server | a resync, or the vt queue over 90% of a core |
+| app `resize` | a mirror's history (0, 4, 16 MB), resized back and forth, a frame after each | resize + frame p99 above 8 ms |
 | app `memory` | mirrors with full scrollback | none: MB per mirror |
 | `output` | output rate per pane (64 KB/s to 128 MB/s), stamped by the emitter, read by an attach client as the app does; `--client-cost` makes the client spend time on each frame, as the app does parsing | latency p99 above 50 ms, under 90% of the bytes delivered, or a resync |
 
@@ -146,3 +148,13 @@ The app had three problems under it, all fixed:
 
 Left: a title change still reloads the whole view (~12 ms of CPU each);
 updating it in place would make an agent's title spinner nearly free.
+
+**2026-10-18, resize** (same machine, on battery). No knee on either side.
+The server: resize calls 2–3 ms p99 at any rate, output latency p99 under
+9 ms, no resyncs, and the terminal always ends at the size last asked for.
+One caller gets ~480 resizes a second done, far beyond a window drag
+(60–120). At 1 MB/s even the "empty" case fills its scrollback (~26,500
+rows), so every resize here reflows a full history, at ~2 ms. The app: a
+mirror resize is 1.8 ms p99 with 16 MB of history, plus 0.4 ms for the
+frame. Two clients can't fight over a size (only the size owner resizes;
+the rest letterbox), so the probe's `take` resizes are the worst case.
