@@ -107,7 +107,6 @@ struct TabRow: View {
                     Text(sum.title).font(.system(size: 12.5, weight: active ? .semibold : .medium))
                         .foregroundStyle(s.text.swiftUI.opacity(active ? 1 : 0.86)).lineLimit(1)
                     Spacer(minLength: 4)
-                    if model.rangUnseen(window) { BellMark(style: s) }
                     if blocked {
                         StatusBadge(state: "blocked", style: s)
                     } else if let st = sum.state {

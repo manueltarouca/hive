@@ -10,13 +10,13 @@ import Testing
     @Test func settingDecidesTheEffects() {
         var p = BellPolicy()
         let r1 = p.ring(block: "a", setting: "flash", appActive: true, now: t0)
-        #expect(r1 == [.flash, .mark])
+        #expect(r1 == [.flash])
         p = BellPolicy()
         let r2 = p.ring(block: "a", setting: "sound", appActive: true, now: t0)
-        #expect(r2 == [.sound, .mark])
+        #expect(r2 == [.sound])
         p = BellPolicy()
         let r3 = p.ring(block: "a", setting: "flash+sound", appActive: true, now: t0)
-        #expect(r3 == [.flash, .sound, .mark])
+        #expect(r3 == [.flash, .sound])
         p = BellPolicy()
         let r4 = p.ring(block: "a", setting: "none", appActive: false, now: t0)
         #expect(r4 == [])
@@ -55,44 +55,5 @@ import Testing
         _ = p.ring(block: "b", setting: "flash", appActive: true, now: Date(timeIntervalSince1970: 1))
         p.prune(keeping: ["b"])
         #expect(p.remembered == ["b"])
-    }
-}
-
-/// Like Ghostty's bell `title` feature: a pane that rang shows a bell until
-/// it's focused again or typed into.
-@Suite struct BellMarkTests {
-    @Test func aRingMarksEvenTheFocusedPane() {
-        var m = BellMarks()
-        m.rang("a")
-        #expect(m.contains("a"))
-    }
-
-    @Test func typingIntoThePaneClearsIt() {
-        var m = BellMarks()
-        m.rang("a"); m.rang("b")
-        m.typed(into: "a")
-        #expect(!m.contains("a") && m.contains("b"))
-    }
-
-    @Test func focusingThePaneClearsIt() {
-        var m = BellMarks()
-        m.rang("a"); m.rang("b")
-        m.focused("b")
-        #expect(m.contains("a") && !m.contains("b"))
-    }
-
-    /// Coming back to hive is re-focusing its focused pane.
-    @Test func comingBackClearsTheFocusedPane() {
-        var m = BellMarks()
-        m.rang("a"); m.rang("b")
-        m.appActivated(focused: "a")
-        #expect(!m.contains("a") && m.contains("b"))
-    }
-
-    @Test func closedPanesAreForgotten() {
-        var m = BellMarks()
-        m.rang("a"); m.rang("b")
-        m.prune(keeping: ["b"])
-        #expect(m.blocks == ["b"])
     }
 }

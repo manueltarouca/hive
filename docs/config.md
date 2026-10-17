@@ -42,7 +42,7 @@ comment.
 | `theme` | `system` | `system`, `day` (Hive Day) or `night` (Hive Night) |
 | `font-family` | empty | A monospaced font installed on this Mac; empty is the bundled JetBrains Mono. A font that isn't installed or isn't monospaced falls back to JetBrains Mono, and the title bar says why. Nerd Font icons draw either way |
 | `font-size` | `13` | Points, 8 to 32 |
-| `bell` | `flash` | When a program rings the bell, or an agent finishes its turn: `flash`, `sound`, `flash+sound` or `none`. Like Ghostty, the pane and its tab also show a bell until you focus that pane or type into it, and the Dock bounces once if hive is in the background; `none` turns all of that off |
+| `bell` | `flash` | When a program rings the bell: `flash`, `sound`, `flash+sound` or `none`. The Dock bounces once if hive is in the background; `none` turns both off |
 | `notify` | `background` | Agent notifications: `background` (when hive isn't in front), `always` or `never` |
 | `confirm-paste` | `true` | Ask before pasting lines into a program that would run each one |
 | `cursor-style-blink` | empty | Whether the cursor blinks, with Ghostty's name: empty or `true` blinks (Ghostty's default), `false` keeps it steady. It blinks only in the focused pane, and typing or output shows it again at once. Programs can still choose with `CSI Ps SP q` or DEC mode 12 |

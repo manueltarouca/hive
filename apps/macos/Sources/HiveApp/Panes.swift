@@ -350,9 +350,6 @@ struct PaneHeader: View {
         HStack(spacing: 7) {
             ProgramGlyph(program: info?.programInfo ?? Programs.lookup(""), color: s.text.swiftUI.opacity(0.9), size: 13)
                 .accessibilityHidden(true)  // the title beside it names the pane
-            // Like Ghostty's 🔔 before the title: the pane rang, until it's
-            // focused again or typed into.
-            if model.bellMarks.contains(blockID) { BellMark(style: s) }
             (Text(parts.primary).foregroundColor(s.text.swiftUI)
                 + Text(parts.secondary.isEmpty ? "" : "  " + parts.secondary).foregroundColor(s.secondary.swiftUI).fontWeight(.regular))
                 .font(.system(size: 12.5, weight: .semibold))

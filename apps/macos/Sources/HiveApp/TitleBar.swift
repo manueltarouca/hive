@@ -153,7 +153,6 @@ struct TabPill: View {
                     .mask(FadeMask())
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if model.rangUnseen(window) { BellMark(style: s) }
             if let status { StatusBadge(state: status == "blocked" ? "blocked-dot" : status, style: s) }
         }
         .padding(.leading, 6).padding(.trailing, 10)
@@ -254,14 +253,4 @@ struct HiveContextMenu: View {
     }
 }
 
-/// A tab's pane rang the bell and nobody has looked yet.
-struct BellMark: View {
-    let style: Style
-    var body: some View {
-        Image(systemName: "bell.fill").font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(style.accent.swiftUI)
-            .help("A program here rang the bell")
-            .accessibilityLabel("Bell")
-    }
-}
 

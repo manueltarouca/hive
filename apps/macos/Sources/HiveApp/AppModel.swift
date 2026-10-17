@@ -393,12 +393,6 @@ final class AppModel: ObservableObject {
 
     private func notifyChanges(_ list: [AgentInfo]) {
         defer { lastAgentStates = Dictionary(uniqueKeysWithValues: list.map { ($0.blockID, $0.state) }) }
-        // An agent that finished its turn rings hive's bell for its pane, as
-        // Claude Code rings the terminal bell in Ghostty (in hive, a terminal
-        // it doesn't know, it rings nothing). The bell setting applies.
-        for a in list where AgentStatus.turnEnded(from: lastAgentStates[a.blockID], to: a.state) {
-            bell(block: a.blockID)
-        }
         switch settings.notify {
         case "never": return
         case "always": break
@@ -448,14 +442,8 @@ final class AppModel: ObservableObject {
                                       agentState: agentState, exited: b["exited"].bool ?? false, exitCode: b["exit_code"].int ?? 0)
             }
             blocks = info
-            // Closed panes leave no bell behind.
+            // Closed panes leave nothing behind in the bell's rate limit.
             let live = Set(info.keys)
-            if !bellMarks.blocks.isSubset(of: live) { bellMarks.prune(keeping: live) }
-            // A pane coming into focus has been looked at (Ghostty's re-focus).
-            if focusedBlock != lastFocused {
-                lastFocused = focusedBlock
-                if let f = focusedBlock, bellMarks.contains(f) { bellMarks.focused(f) }
-            }
             bellPolicy.prune(keeping: live)
             attachVisible()
             markSeen()
@@ -607,38 +595,25 @@ final class AppModel: ObservableObject {
     // MARK: bell
 
     private var bellPolicy = BellPolicy()
-    /// Panes showing a bell (BellMarks): until focused again or typed into.
-    @Published private(set) var bellMarks = BellMarks()
-    private var lastFocused: String?
-
-    /// Coming back to hive re-focuses its focused pane.
-    func appActivated() { if let f = focusedBlock, bellMarks.contains(f) { bellMarks.appActivated(focused: f) } }
-
-    /// Typing into a pane answers its bell.
-    private func typed(into block: String) { if bellMarks.contains(block) { bellMarks.typed(into: block) } }
     /// Flashes a pane (set by the app).
     var onFlash: ((String) -> Void)?
 
     /// A program rang the terminal bell (BEL). What happens is the `bell`
     /// setting's, rate-limited by BellPolicy. Only the open session's panes
-    /// have a tab to mark; bells elsewhere are dropped.
+    /// can flash; bells elsewhere are dropped. Finished agents show on their
+    /// tab already, by their status.
     func bell(block: String) {
         guard blocks[block] != nil else { return }
         for effect in bellPolicy.ring(block: block, setting: settings.bell, appActive: NSApp.isActive) {
             switch effect {
             case .flash: onFlash?(block)
             case .sound: NSSound.beep()
-            case .mark:
-                bellMarks.rang(block)
             case .bounce: NSApp.requestUserAttention(.informationalRequest)
             }
         }
     }
 
     func isIn(_ block: String, _ w: WindowInfo) -> Bool { w.layout?.rects().contains { $0.0 == block } ?? false }
-
-    /// Whether a tab has a pane showing a bell.
-    func rangUnseen(_ w: WindowInfo) -> Bool { bellMarks.blocks.contains { isIn($0, w) } }
 
     func markSeen() {
         guard NSApp.isActive, let w = active else { return }
@@ -786,21 +761,18 @@ final class AppModel: ObservableObject {
 
     func key(_ k: KeyInput) {
         guard let b = focusedBlock else { return }
-        typed(into: b)
         let engine = engine
         vt.async { engine.key(block: b, k) }
     }
 
     func text(_ s: String) {
         guard let b = focusedBlock else { return }
-        typed(into: b)
         let engine = engine
         vt.async { engine.text(block: b, s) }
     }
 
     func paste(_ s: String) {
         guard let b = focusedBlock else { return }
-        typed(into: b)
         let engine = engine
         vt.async { engine.paste(block: b, s) }
     }
