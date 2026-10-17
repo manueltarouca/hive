@@ -197,6 +197,74 @@ These amendments win over the M1 detail above where they conflict.
   - Tests for: shutdown with a WebSocket attached; a child ignoring SIGHUP
     with a grandchild holding the pty.
 
+## Milestone 2 plan: the Mac app (draft, under review)
+
+A native app that attaches to the local hive server over `/v1/attach`.
+Each pane mirrors its block in a client-side libghostty-vt terminal and is
+drawn with Metal.
+
+**Layout:** `apps/macos/`, a SwiftPM package, so it builds with the Command
+Line Tools.
+- `script/bundle.sh` assembles `Hive.app` (Info.plist, icon, ad-hoc codesign).
+- An Xcode project only for signing and notarization when publishing.
+
+| Module | Responsibility |
+|---|---|
+| `CGhosttyVT` | system-library/C target over `third_party/ghostty-vt` (headers + the shipped `module.modulemap`, static `libghostty-vt.a`) |
+| `HiveKit` | the protocol client: a hand-rolled RFC 6455 client (masking, fragmentation, ping/pong) over a raw `NWConnection` to `NWEndpoint.unix`. Binary frame parser; `call` with ids; event stream with `seq`; reconnect with `since`. Remote hosts (M4) can use `URLSessionWebSocketTask` over TCP |
+| `Mirror` | per block: a libghostty terminal restored from the snapshot, fed seq-checked frames. Its write-back replies are discarded (the server already answered). `resync` → re-subscribe |
+| `Render` | one `MTKView` per window drawing every pane. A CoreText glyph atlas (JetBrains Mono embedded, then the system monospace font); instanced quads: background, glyph, decoration, cursor and selection passes. Driven by libghostty `RenderState` dirty rows; shaders compiled at runtime from source (CLT has no `metal` compiler) |
+| `Input` | `NSTextInputClient` for IME. Keys are encoded **client-side** by the libghostty key encoder with options taken from the mirror (kitty keyboard, cursor-key modes), then sent as `input` bytes. Mouse via the mouse encoder; paste via `paste.h` (bracketed) |
+| `UI` | window = session, tab bar = windows, split panes with draggable dividers (`session.resize_pane`), sidebar with sessions + agents (blocked first, from `agent.list` + `agent_changed`), command palette (⇧⌘P), the reference app-like default keys (⌘T, ⌘D/⇧⌘D, ⌘W, ⌥⌘arrows, ⇧⌘↩ zoom) |
+| `Notify` | UserNotifications when an agent turns blocked/done while the app is in the background (rate-limited, names the session) |
+
+**Size authority:**
+- On focus or visibility, the app computes cols/rows from the pane's pixel
+  rect and the cell size, and sends `resize` with `take` for visible blocks.
+- Blocks it doesn't show are left alone.
+- On `size_changed` from another owner it letterboxes until the user
+  interacts with the pane.
+
+**Attach order** (documented in attach.go):
+1. `events` first, noting `seq`.
+2. `session.view`.
+3. Subscribe the visible blocks.
+
+**Server additions expected:**
+- `session.view` already returns blocks' cols/rows.
+- Possibly a `client.set_focus` hint, so the agent list knows which pane
+  the user is looking at. Deferred unless needed.
+
+**Testing:**
+- `HiveKit`/`Mirror` unit tests (`swift test`) against a real `hive server
+  run` in a temp dir: attach, snapshot restore, seq continuity, resync,
+  resize conflict.
+- Renderer tests compare the *cell model* (text/style per cell from
+  RenderState) rather than pixels.
+- One visual smoke loop: launch the app against a temp server, screenshot
+  with `screencapture`, downscale to webp, inspect.
+
+**Cut from M2:**
+- Kitty graphics
+- ligatures beyond CoreText's default shaping
+- settings UI (config is M3's `init.lua`)
+- remote hosts (M4)
+- iOS
+
+**Spikes (2026-10-17, /tmp/hive-spike):**
+- SwiftPM + CLT links the static `libghostty-vt.a` through a C target
+  (`-I…/include -DGHOSTTY_STATIC`, the archive passed to the linker), and
+  `ghostty_terminal_new`/`vt_write` run.
+- `NWProtocolWebSocket` over `NWEndpoint.unix` **does not work**: it
+  connects and aborts without sending a handshake (POSIX 53).
+- A hand-written upgrade over a raw unix `NWConnection` **works**: 101,
+  then hive's `welcome`.
+
+**Risks:**
+1. Glyph rendering quality and performance vs Ghostty's own renderer.
+2. IME and dead keys.
+3. Notarization later needs Xcode (installing) and a Developer ID.
+
 ## Building
 
 `make vt` builds libghostty-vt from the pinned Ghostty commit (needs `zig@0.16`).
