@@ -339,6 +339,14 @@ final class AppModel: ObservableObject {
             }
             let order = ["blocked": 0, "done": 1, "working": 2, "idle": 3]
             agents = list.sorted { (order[$0.state] ?? 9) < (order[$1.state] ?? 9) }
+            // A pane's agent can report after the layout loaded (a new Claude
+            // says SessionStart once it's up): carry it into the pane, so its
+            // icon and name follow without waiting for another reload.
+            for a in list where blocks[a.blockID] != nil {
+                let harness = a.state == "ended" || a.harness.isEmpty ? nil : a.harness
+                if blocks[a.blockID]?.harness != harness { blocks[a.blockID]?.harness = harness }
+                if blocks[a.blockID]?.agentState != a.state { blocks[a.blockID]?.agentState = a.state }
+            }
             let live = Set(list.map(\.blockID))
             if seenDone.keys.contains(where: { !live.contains($0) }) { seenDone = seenDone.filter { live.contains($0.key) } }
             markSeen()
