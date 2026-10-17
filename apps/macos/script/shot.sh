@@ -22,23 +22,26 @@ H="$root/bin/hive"
 $H new hive-demo --cwd "$root" >/dev/null
 $H -s hive-demo send 'git log --oneline --graph --color=always -- apps/macos/Sources/Hive{Core,Render,Kit}'; $H -s hive-demo send-key enter
 # An agent block: reports itself through the hook path and sets a task title.
+# Hooks run inside the pane, as an agent runs them: hive ignores reports from
+# another agent's process tree (this script may run under one).
 agent=$($H -s hive-demo split --split right --ratio 45 --cwd "$root" --keep-open --json -- sh -c '
+  printf "{\"session_id\":\"7f3c2a10-demo\",\"cwd\":\"%s\",\"hook_event_name\":\"UserPromptSubmit\"}" "$2" | "$1" agent hook claude
   printf "\033]2;✳ Refactor attach protocol\007"
   printf "\033[38;2;217;119;87m ▐▛███▜▌\033[0m   \033[1mClaude Code\033[0m v2.1.302\r\n"
   printf "\033[38;2;217;119;87m▝▜█████▛▘\033[0m  Opus 5.5 · ~/code/projects/hive\r\n\r\n"
   printf "\033[2m>\033[0m refactor the attach protocol so resizes are sequenced\r\n\r\n"
   printf "\033[38;2;217;119;87m●\033[0m Reading internal/server/attach.go\r\n"
   printf "\033[38;2;217;119;87m●\033[0m Update(internal/block/block.go)\r\n  \033[32m+ f := Frame{Resize: true, Cols: cols}\033[0m\r\n"
-  exec cat' | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["block_ids"][0])')
-printf '{"session_id":"7f3c2a10-demo","cwd":"%s","hook_event_name":"UserPromptSubmit"}' "$root" | HIVE_BLOCK=$agent $H agent hook claude
+  exec cat' sh "$H" "$root" | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["block_ids"][0])')
 $H -s hive-demo split -b "$agent" --split below --ratio 40 --label tests --cwd "$root" -- sh -c 'cd internal/session && go test -v -run "Split|Resolve" . 2>&1 | tail -12; exec cat' >/dev/null
 $H -s hive-demo run --label logs --focus=false --cwd "$root" -- sh -c 'echo serving on :8080; exec cat' >/dev/null
 # A second session with a blocked agent and a finished one.
-$H new api-gateway --cwd "$root" -- sh -c 'printf "\033]2;✳ Migrate rate limiter to Redis\007"; exec cat' >/dev/null
-blocked=$($H -s api-gateway block inspect --json | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["block_id"])')
-printf '{"session_id":"a1","cwd":"%s","hook_event_name":"Notification","notification_type":"permission_prompt","message":"Claude needs your permission to use Bash"}' "$root" | HIVE_BLOCK=$blocked $H agent hook claude
-done_b=$($H -s api-gateway split --json --cwd "$root" -- sh -c 'printf "\033]2;✳ Write changelog\007"; exec cat' | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["block_ids"][0])')
-printf '{"session_id":"a2","cwd":"%s","hook_event_name":"Stop"}' "$root" | HIVE_BLOCK=$done_b $H agent hook claude
+$H new api-gateway --cwd "$root" -- sh -c '
+  printf "{\"session_id\":\"a1\",\"cwd\":\"%s\",\"hook_event_name\":\"Notification\",\"notification_type\":\"permission_prompt\",\"message\":\"Claude needs your permission to use Bash\"}" "$2" | "$1" agent hook claude
+  printf "\033]2;✳ Migrate rate limiter to Redis\007"; exec cat' sh "$H" "$root" >/dev/null
+$H -s api-gateway split --json --cwd "$root" -- sh -c '
+  printf "{\"session_id\":\"a2\",\"cwd\":\"%s\",\"hook_event_name\":\"Stop\"}" "$2" | "$1" agent hook claude
+  printf "\033]2;✳ Write changelog\007"; exec cat' sh "$H" "$root" >/dev/null
 sleep 2
 
 # EXTRA_TABS=n adds plain tabs, to check the title bar with many tabs.

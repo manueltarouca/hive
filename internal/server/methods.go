@@ -1005,6 +1005,20 @@ func (s *Server) registerTerminalMethods() {
 
 // ---- agents ----
 
+// nestedAgent reports whether a hook's agent process is a different agent
+// than the one holding the pane: another agent program, or the same one
+// without the pane's terminal (an agent's tools run without it, so this is
+// claude -p run by Claude). Anything that isn't an agent (a script, a test,
+// a daemon) isn't nested, and neither is the agent's own child on the
+// pane's terminal (Gemini relaunches itself).
+func nestedAgent(pid int, fg block.Process) bool {
+	p, err := block.Describe(pid)
+	if err != nil || !agents.Names[p.Program] {
+		return false
+	}
+	return p.Program != fg.Program || block.TTY(pid) != block.TTY(fg.PID)
+}
+
 func (s *Server) registerAgentMethods() {
 	type reportIn struct {
 		BlockID        string `json:"block_id" required:"true"`
@@ -1015,6 +1029,7 @@ func (s *Server) registerAgentMethods() {
 		Cwd            string `json:"cwd,omitempty"`
 		TranscriptPath string `json:"transcript_path,omitempty"`
 		Message        string `json:"message,omitempty"`
+		AgentPID       int    `json:"agent_pid,omitempty" desc:"The agent process the hook runs for (its nearest ancestor that isn't a shell). Reports from an agent that doesn't hold the pane, such as one another agent runs as a tool, are ignored."`
 	}
 	api.Register(s.reg, "agent.report", "Report an agent's identity and state from its hooks. Saved to disk at once.",
 		func(ctx context.Context, in reportIn) (*persist.Agent, error) {
@@ -1037,13 +1052,27 @@ func (s *Server) registerAgentMethods() {
 			}
 			// Agents borrow each other's hooks (grok runs Claude Code's):
 			// the agent running in the pane is the one reporting.
+			endedByShell := false
 			if fg, err := rr.b.Foreground(); err == nil {
+				// Only the agent holding the pane, or another process of its
+				// program, speaks for the pane: an agent another agent runs
+				// as a tool inherits HIVE_BLOCK, and an orphaned late hook
+				// has no agent at all.
+				if in.AgentPID > 0 && fg.PID > 0 && in.AgentPID != fg.PID && nestedAgent(in.AgentPID, fg) {
+					var cur *persist.Agent
+					if rr.st.Agent != nil {
+						c := *rr.st.Agent
+						cur = &c
+					}
+					s.mu.Unlock()
+					return cur, nil
+				}
 				in.Harness = agents.Harness(in.Harness, fg.Program)
 				// Hooks run inside the agent, which holds the terminal. With
 				// the shell in front, this is a hook finishing after the
 				// agent exited: it stays ended.
-				if fg.AtShell() {
-					in.State = "ended"
+				if fg.AtShell() && in.State != "ended" {
+					endedByShell = true
 				}
 			}
 			a := rr.st.Agent
@@ -1060,6 +1089,10 @@ func (s *Server) registerAgentMethods() {
 				a.TranscriptPath = in.TranscriptPath
 			}
 			a.State, a.Message, a.UpdatedAt = in.State, in.Message, time.Now().UTC()
+			a.EndedBy, a.Before = "", ""
+			if endedByShell {
+				a.EndedBy, a.Before, a.State = "shell", in.State, "ended"
+			}
 			rr.st.Agent = a
 			copyA := *a
 			s.bus.Block(rr.st.SessionID, in.BlockID, "agent_changed", map[string]any{

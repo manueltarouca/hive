@@ -5,6 +5,18 @@ package block
 #include <sys/proc_info.h>
 #include <string.h>
 
+static int hive_proc_ppid(int pid) {
+	struct proc_bsdinfo bi;
+	if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bi, sizeof(bi)) != sizeof(bi)) return -1;
+	return (int)bi.pbi_ppid;
+}
+
+static long long hive_proc_tty(int pid) {
+	struct proc_bsdinfo bi;
+	if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bi, sizeof(bi)) != sizeof(bi)) return -1;
+	return (long long)bi.e_tdev;
+}
+
 static int hive_proc_cwd(int pid, char *out, int len) {
 	struct proc_vnodepathinfo vpi;
 	int n = proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &vpi, sizeof(vpi));
@@ -50,6 +62,19 @@ func procArgs(pid int) []string {
 	}
 	return argv
 }
+
+// TTY returns the device of a process's controlling terminal: -1 if it has
+// none or can't be read.
+func TTY(pid int) int64 {
+	t := int64(C.hive_proc_tty(C.int(pid)))
+	if t == 0 || uint32(t) == 0xFFFFFFFF { // NODEV
+		return -1
+	}
+	return t
+}
+
+// Parent returns a process's parent, or -1.
+func Parent(pid int) int { return int(C.hive_proc_ppid(C.int(pid))) }
 
 func describe(pid int) (Process, error) {
 	var name [256]C.char

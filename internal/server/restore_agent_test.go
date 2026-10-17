@@ -33,3 +33,37 @@ func TestRestoreResumesOnlyRunningAgents(t *testing.T) {
 		}
 	}
 }
+
+// State saved by an older server can hold an agent still "idle" in a pane
+// that was back at its shell (it was killed). It isn't resumed, and it
+// comes back ended, not idle.
+func TestRestoreEndsAgentsItDoesNotResume(t *testing.T) {
+	state := t.TempDir()
+	resume := func(h, id string) []string {
+		return []string{"sh", "-c", "echo resumed " + h + " " + id + "; exec cat"}
+	}
+	h := start(t, state, resume)
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	sid := created["session_id"].(string)
+	bid := strs(created["block_ids"])[0]
+	h.stop()
+
+	store := persist.New(state)
+	saved, err := store.LoadState()
+	if err != nil || saved == nil {
+		t.Fatalf("state: %v %v", saved, err)
+	}
+	saved.Blocks[bid].Agent = &persist.Agent{Harness: "claude", SessionID: "old-1", State: "idle"}
+	saved.Blocks[bid].Foreground = &block.Process{PID: 1, Name: "zsh"} // as an older server saved it
+	if err := store.SaveState(saved); err != nil {
+		t.Fatal(err)
+	}
+
+	h2 := start(t, state, resume)
+	defer h2.stop()
+	view := h2.call("session.view", map[string]any{"session_id": sid})
+	b := view["blocks"].(map[string]any)[bid].(map[string]any)
+	if a, _ := b["agent"].(map[string]any); a["state"] != "ended" {
+		t.Fatalf("agent after restore = %v, want ended", a)
+	}
+}

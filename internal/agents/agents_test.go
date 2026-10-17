@@ -191,9 +191,9 @@ func TestParseGrokHooks(t *testing.T) {
 	if r, err := ParseHook("grok", []byte(`{"hook_event_name":"Stop","session_id":"s1"}`)); err != nil || r.State != "done" {
 		t.Fatalf("grok Stop = %+v, %v", r, err)
 	}
-	// A subagent's session starting or ending says nothing about the agent
-	// in the pane, and its ID isn't the one to resume.
-	for _, ev := range []string{"SessionStart", "SessionEnd"} {
+	// A subagent's session starting, ending or stopping says nothing about
+	// the agent in the pane, and its ID isn't the one to resume.
+	for _, ev := range []string{"SessionStart", "SessionEnd", "Stop"} {
 		_, err := ParseHook("grok", []byte(`{"hook_event_name":"`+ev+`","sessionId":"child-1","subagentType":"explore"}`))
 		if !errors.Is(err, ErrNoChange) {
 			t.Errorf("subagent %s: err = %v, want ErrNoChange", ev, err)
@@ -224,5 +224,18 @@ func TestStateFromProgramStatus(t *testing.T) {
 		if got != c.want || ok != c.ok {
 			t.Errorf("StateFromStatus(%q, %q, %q) = %q, %v; want %q, %v", c.harness, c.app, c.state, got, ok, c.want, c.ok)
 		}
+	}
+}
+
+// A subagent waiting for permission or using tools is the agent's work:
+// it shows, without the subagent's session ID.
+func TestSubagentWorkStillShows(t *testing.T) {
+	r, err := ParseHook("grok", []byte(`{"hook_event_name":"Notification","notification_type":"permission_prompt","sessionId":"child-1","subagentType":"explore","message":"Grok needs permission","transcript_path":"/x/child.jsonl"}`))
+	if err != nil || r.State != "blocked" || r.SessionID != "" || r.TranscriptPath != "" || r.Message != "Grok needs permission" {
+		t.Fatalf("subagent permission prompt = %+v, %v", r, err)
+	}
+	r, err = ParseHook("grok", []byte(`{"hook_event_name":"PostToolUse","sessionId":"child-1","subagentType":"explore"}`))
+	if err != nil || r.State != "working" || r.SessionID != "" {
+		t.Fatalf("subagent tool use = %+v, %v", r, err)
 	}
 }

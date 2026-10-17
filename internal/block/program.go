@@ -23,7 +23,7 @@ var versionName = regexp.MustCompile(`^\d+\.\d+\.\d+`)
 
 // Agents whose release binaries carry their version and platform:
 // grok-1.0.62-macos-aarch64.
-var versionedAgent = regexp.MustCompile(`^(claude|codex|gemini|grok|opencode)-\d`)
+var versionedAgent = regexp.MustCompile(`^(claude|codex|gemini|grok|opencode)-\d+\.\d+\.\d+`)
 
 // programOf names the program a process runs, the way a person would. name
 // is the kernel's short name, exe the executable's path and argv the
@@ -84,26 +84,43 @@ func programOf(name, exe string, argv []string) string {
 }
 
 // shellRuns names what a non-interactive shell runs: the script it was
-// given, or the first command of its -c string. "" for an interactive shell.
+// given, or the main command of its -c string. "" for an interactive shell.
 func shellRuns(argv []string) string {
 	for i := 1; i < len(argv); i++ {
 		a := argv[i]
-		if a == "-c" {
-			if i+1 >= len(argv) {
-				return ""
-			}
-			for _, w := range strings.Fields(argv[i+1]) {
-				if w == "exec" || strings.Contains(w, "=") {
-					continue // the command after env assignments and exec
-				}
-				return filepath.Base(w)
+		switch {
+		case a == "-o" || a == "+o" || a == "--rcfile" || a == "--init-file":
+			i++ // the option's value, not a script
+		case strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.Contains(a, "c"):
+			// -c, -lc, -ic: the next argument is a command string.
+			if i+1 < len(argv) {
+				return commandIn(argv[i+1])
 			}
 			return ""
+		case strings.HasPrefix(a, "-") || strings.HasPrefix(a, "+"):
+		default:
+			return strings.TrimSuffix(filepath.Base(a), filepath.Ext(a))
 		}
-		if strings.HasPrefix(a, "-") {
-			continue
+	}
+	return ""
+}
+
+var segment = regexp.MustCompile(`;|&&|\|\||\n`)
+
+// commandIn names the main command of a shell command string: the first
+// command of its last ; && || segment (cd /x && claude is claude), past
+// env assignments and exec, without quotes.
+func commandIn(script string) string {
+	segs := segment.Split(script, -1)
+	for i := len(segs) - 1; i >= 0; i-- {
+		first := strings.SplitN(segs[i], "|", 2)[0]
+		for _, w := range strings.Fields(first) {
+			w = strings.Trim(w, `"'`)
+			if w == "" || w == "exec" || strings.Contains(w, "=") {
+				continue
+			}
+			return filepath.Base(w)
 		}
-		return strings.TrimSuffix(filepath.Base(a), filepath.Ext(a))
 	}
 	return ""
 }
@@ -130,4 +147,31 @@ func (p Process) AtShell() bool {
 		n = normalize(p.Name) // saved by a server that didn't name programs
 	}
 	return shells[n]
+}
+
+// Describe returns what a process is, as the foreground is described.
+func Describe(pid int) (Process, error) { return describe(pid) }
+
+// ShellName reports whether a kernel process name is a shell, or env, the
+// launchers between an agent and the hooks it runs.
+func ShellName(name string) bool {
+	n := normalize(name)
+	return shells[n] || n == "env"
+}
+
+// AgentProcess is the process a hook runs for: its nearest ancestor that
+// isn't a shell or env. 0 if it can't be told.
+func AgentProcess(from int) int {
+	pid := from
+	for i := 0; i < 8 && pid > 1; i++ {
+		p, err := describe(pid)
+		if err != nil {
+			return 0
+		}
+		if !ShellName(p.Name) {
+			return pid
+		}
+		pid = Parent(pid)
+	}
+	return 0
 }

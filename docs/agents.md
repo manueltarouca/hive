@@ -42,8 +42,16 @@ inside hive to use them. Outside hive, the hooks exit at once.
 | You're back at the shell prompt | ended |
 
 The last row covers an agent that was killed before it could say it ended:
-when the pane's shell is back in front, the agent has exited. A report from
-it later, once it's running again, brings it back.
+when the pane's shell is back in front, the agent has exited. If the same
+agent comes back in front (a tool ran an interactive shell for a while, or
+you suspended it with ctrl-z and typed `fg`), it's back as it was.
+
+Interrupting Claude Code runs no hook. Claude also reports its own state to
+the terminal, so hive sees it go idle.
+
+An agent that another agent runs as a tool, such as `grok -p` inside Claude
+Code, runs in the same pane and its hooks report too. hive ignores those:
+only the agent holding the pane speaks for it.
 
 The agent's task comes from the terminal title Claude Code sets, such as
 "Migrate rate limiter to Redis".

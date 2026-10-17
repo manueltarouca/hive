@@ -155,9 +155,14 @@ func ParseHook(harness string, data []byte) (Report, error) {
 		return r, fmt.Errorf("unknown hook event %q", in.Event)
 	}
 	if in.Subagent != "" {
-		// A subagent's session starting or ending isn't the pane's agent,
-		// and its ID isn't the one to resume.
-		return r, ErrNoChange
+		// A subagent's session starting, ending or stopping isn't the pane's
+		// agent; its waiting for permission or using tools is the agent's
+		// work. Its session isn't the one to resume.
+		switch in.Event {
+		case "SessionStart", "SessionEnd", "Stop":
+			return r, ErrNoChange
+		}
+		r.SessionID, r.Cwd, r.TranscriptPath = "", "", ""
 	}
 	if in.Event == "Notification" {
 		switch in.NotifType {

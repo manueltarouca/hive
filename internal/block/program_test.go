@@ -36,9 +36,20 @@ func TestProgramOf(t *testing.T) {
 		{"bash", "/bin/bash", []string{"/bin/bash", "/Users/x/bin/run-agent.sh", "--fast"}, "run-agent"},
 		{"zsh", "/bin/zsh", []string{"zsh", "-c", "claude --resume abc"}, "claude"},
 		{"sh", "/bin/sh", []string{"sh", "-c", "FOO=1 exec cat"}, "cat"},
+		// Options that take a value aren't scripts; flags can be combined.
+		{"zsh", "/bin/zsh", []string{"zsh", "-o", "sharehistory"}, "zsh"},
+		{"bash", "/bin/bash", []string{"bash", "--rcfile", "/x/rc"}, "bash"},
+		{"bash", "/bin/bash", []string{"bash", "--init-file", "/x/rc", "-i"}, "bash"},
+		{"zsh", "/bin/zsh", []string{"zsh", "+o", "nomatch"}, "zsh"},
+		{"bash", "/bin/bash", []string{"bash", "-o", "pipefail", "-c", "claude"}, "claude"},
+		{"zsh", "/bin/zsh", []string{"zsh", "-lc", "cd /x && claude --resume y"}, "claude"},
+		{"sh", "/bin/sh", []string{"sh", "-c", `"$HOME/bin/claude" --fast`}, "claude"},
+		{"sh", "/bin/sh", []string{"sh", "-c", "cd /x; claude | tee log"}, "claude"},
 		// Release builds named with their version and platform.
 		{"grok-1.0.41-macos-aarch64", "/Users/x/.grok/bin/grok-1.0.41-macos-aarch64", []string{"grok"}, "grok"},
 		{"node-22", "", nil, "node-22"},
+		{"codex-2fa-helper", "", nil, "codex-2fa-helper"},
+		{"grok-2", "", nil, "grok-2"},
 		{"", "", nil, ""},
 	}
 	for _, c := range cases {

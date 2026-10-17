@@ -356,9 +356,20 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 			// (they run without one), so this means it's gone. A report from
 			// it later brings it back.
 			if a := r.st.Agent; a != nil && a.State != "ended" && p.AtShell() {
+				a.Before, a.EndedBy = a.State, "shell"
 				a.State, a.Message, a.UpdatedAt = "ended", "", time.Now().UTC()
 				s.bus.Block(r.st.SessionID, e.BlockID, "agent_changed", map[string]any{
 					"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": "", "event": "shell_returned",
+				})
+			} else if a != nil && a.EndedBy == "shell" && p.Program == a.Harness {
+				// The same agent is in front again: a tool's interactive shell
+				// had the terminal, or the agent was suspended and resumed.
+				a.State, a.EndedBy, a.UpdatedAt = a.Before, "", time.Now().UTC()
+				if a.State == "" {
+					a.State = "idle"
+				}
+				s.bus.Block(r.st.SessionID, e.BlockID, "agent_changed", map[string]any{
+					"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": a.Message, "event": "agent_returned",
 				})
 			}
 		}
@@ -726,7 +737,11 @@ func (s *Server) restore() error {
 				st.Command, st.Exited, st.ExitCode = argv, false, 0
 				st.Status = nil
 				if st.Agent != nil && st.Agent.State != "ended" {
-					st.Agent.State = "idle"
+					if argv == nil {
+						st.Agent.State = "ended" // not resumed: it had exited
+					} else {
+						st.Agent.State = "idle"
+					}
 				}
 				if _, err := s.startBlock(ss.ID, bid, st, opts); err != nil {
 					s.log.Warn("could not restore block", "block", bid, "err", err)

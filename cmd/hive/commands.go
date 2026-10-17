@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/manueltarouca/hive/internal/agents"
+	"github.com/manueltarouca/hive/internal/block"
 	"github.com/manueltarouca/hive/internal/client"
 	"github.com/manueltarouca/hive/internal/paths"
 	"github.com/manueltarouca/hive/internal/server"
@@ -1235,6 +1236,19 @@ func claudeDir() string {
 
 // agentHook is run by an agent's hook with the hook's JSON on stdin. It never
 // fails the agent: errors go to stderr and it exits 0.
+// sendReport sends an agent report. Servers from before agent_pid reject
+// the field, so the report goes again without it: hooks keep working with a
+// server that hasn't been restarted since hive was updated.
+func sendReport(call func(map[string]any) error, params map[string]any) error {
+	err := call(params)
+	var e *client.Error
+	if err != nil && errors.As(err, &e) && e.Code == "bad_request" && strings.Contains(e.Message, `"agent_pid"`) {
+		delete(params, "agent_pid")
+		return call(params)
+	}
+	return err
+}
+
 func agentHook(g globals, harness string) error {
 	bid := os.Getenv("HIVE_BLOCK")
 	if bid == "" {
@@ -1254,10 +1268,13 @@ func agentHook(g globals, harness string) error {
 	c := client.New(socketFor(g))
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	err = c.Call(ctx, "agent.report", map[string]any{
+	err = sendReport(func(params map[string]any) error { return c.Call(ctx, "agent.report", params, nil) }, map[string]any{
 		"block_id": bid, "harness": r.Harness, "event": r.Event, "state": r.State,
 		"session_id": r.SessionID, "cwd": r.Cwd, "transcript_path": r.TranscriptPath, "message": r.Message,
-	}, nil)
+		// The agent this hook runs for, so the server can tell the pane's
+		// agent from one it runs as a tool.
+		"agent_pid": block.AgentProcess(os.Getppid()),
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "hive:", err)
 	}

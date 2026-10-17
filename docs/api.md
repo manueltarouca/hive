@@ -92,3 +92,17 @@ Session events include `window_created`, `window_closed`, `block_created`,
 events include `child_exited`, `title_changed`, `pwd_changed`, `bell`,
 `process_changed`, `size_changed`, `desktop_notification`,
 `program_status_changed` and `agent_changed`.
+
+`agent_changed` carries `harness`, `session_id`, `state`, `message` and
+`event`: what changed it. That is a hook's event name (`SessionStart`,
+`Stop`…), or one of the server's own:
+
+| `event` | Why |
+| --- | --- |
+| `program_status` | The agent reported its own state (OSC 7501), such as idle after an interrupt, which runs no hook |
+| `shell_returned` | The pane's interactive shell came back in front: the agent exited |
+| `agent_returned` | The same agent is in front again after `shell_returned` |
+
+`agent.report` takes an optional `agent_pid`, the process the hook runs
+for. A report from a different agent than the one holding the pane (one
+another agent runs as a tool) is ignored. `hive agent hook` sends it.

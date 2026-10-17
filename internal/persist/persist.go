@@ -59,6 +59,11 @@ type Agent struct {
 	State          string    `json:"state,omitempty"` // idle, working, blocked, done, ended
 	Message        string    `json:"message,omitempty"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	// EndedBy "shell": ended because the pane's shell came back in front,
+	// not by the agent's word. It comes back, in its Before state, if the
+	// same agent is in front again (a tool's shell had the terminal).
+	EndedBy string `json:"ended_by,omitempty"`
+	Before  string `json:"before,omitempty"`
 }
 
 // Store reads and writes a state directory.
