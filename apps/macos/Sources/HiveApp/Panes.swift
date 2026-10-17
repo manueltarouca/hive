@@ -45,7 +45,7 @@ final class PaneView: MTKView, NSTextInputClient {
         preedit.background = color(t.background)
         preedit.baseline = (CGFloat(renderer.fonts.cellHeight) - renderer.fonts.baseline) / scale
         let width = max(cellSize.width, ceil(preedit.text.size().width))
-        preedit.frame = NSRect(x: CGFloat(c.x) * cellSize.width, y: CGFloat(c.y) * cellSize.height, width: width, height: cellSize.height)
+        preedit.frame = NSRect(x: CGFloat(c.x) * cellSize.width, y: CGFloat(c.y - rowOffset) * cellSize.height, width: width, height: cellSize.height)
         preedit.isHidden = false
         preedit.needsDisplay = true
     }
@@ -57,6 +57,26 @@ final class PaneView: MTKView, NSTextInputClient {
 
     var scale: CGFloat { window?.backingScaleFactor ?? 2 }
     var cellSize: CGSize { CGSize(width: CGFloat(renderer.fonts.cellWidth) / scale, height: CGFloat(renderer.fonts.cellHeight) / scale) }
+
+    /// Rows of the grid hidden above the pane, when another window owns a
+    /// taller size: the cursor's row stays in view (see Viewport).
+    var rowOffset: Int {
+        guard let f = model.frames[blockID] else { return 0 }
+        return Viewport.rowOffset(rows: f.rowsCount, visible: Int(bounds.height / cellSize.height), cursorRow: f.cursor.y)
+    }
+
+    /// Pointer geometry over the whole grid, which can be taller than the pane.
+    private var pointerGeometry: PointerGeometry {
+        let gridHeight = (model.frames[blockID]?.rowsCount ?? 0) * renderer.fonts.cellHeight
+        return PointerGeometry(cellWidth: renderer.fonts.cellWidth, cellHeight: renderer.fonts.cellHeight,
+                               paneWidth: Int(drawableSize.width), paneHeight: max(Int(drawableSize.height), gridHeight))
+    }
+
+    /// A point in the pane, in the grid's points (below any hidden rows).
+    private func gridPoint(_ event: NSEvent) -> NSPoint {
+        let p = convert(event.locationInWindow, from: nil)
+        return NSPoint(x: p.x, y: p.y + CGFloat(rowOffset) * cellSize.height)
+    }
 
     /// The grid that fits.
     var grid: (cols: Int, rows: Int) {
@@ -77,6 +97,7 @@ final class PaneView: MTKView, NSTextInputClient {
         if let frame = model.frames[blockID] {
             var d = PaneDraw(frame: frame, origin: .zero, size: SIMD2(Float(drawableSize.width), Float(drawableSize.height)),
                              focused: focused && (window?.isKeyWindow ?? false))
+            d.scrollY = Float(rowOffset * renderer.fonts.cellHeight)
             if !focused {
                 let c = style.cardUnfocused.usingColorSpace(.sRGB) ?? style.cardUnfocused
                 let a = Float(style.unfocusedTint)
@@ -119,14 +140,13 @@ final class PaneView: MTKView, NSTextInputClient {
     /// selection in the mirror through libghostty's gestures: drag,
     /// double-click for a word, triple-click for a line. Shift always selects.
     private func pointer(_ action: Mirror.PointerAction, _ button: Mirror.PointerButton?, _ event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
+        let p = gridPoint(event)
         var mods = KeyMods()
         let f = event.modifierFlags
         if f.contains(.shift) { mods.insert(.shift) }
         if f.contains(.control) { mods.insert(.ctrl) }
         if f.contains(.option) { mods.insert(.alt) }
-        let geometry = PointerGeometry(cellWidth: renderer.fonts.cellWidth, cellHeight: renderer.fonts.cellHeight,
-                                       paneWidth: Int(drawableSize.width), paneHeight: Int(drawableSize.height))
+        let geometry = pointerGeometry
         model.pointer(block: blockID, action, button: button, mods: mods, x: Double(p.x * scale), y: Double(p.y * scale),
                       geometry: geometry, col: Int(p.x / cellSize.width), row: Int(p.y / cellSize.height),
                       repeatInterval: NSEvent.doubleClickInterval, repeatDistance: Double(4 * scale))
@@ -144,9 +164,8 @@ final class PaneView: MTKView, NSTextInputClient {
         let lines = Int(wheelRemainder.rounded(.towardZero))
         guard lines != 0 else { return }
         wheelRemainder -= CGFloat(lines)
-        let p = convert(event.locationInWindow, from: nil)
-        let geometry = PointerGeometry(cellWidth: renderer.fonts.cellWidth, cellHeight: renderer.fonts.cellHeight,
-                                       paneWidth: Int(drawableSize.width), paneHeight: Int(drawableSize.height))
+        let p = gridPoint(event)
+        let geometry = pointerGeometry
         // Wheel up (positive delta) scrolls back: negative rows.
         model.wheel(block: blockID, rows: -lines, shift: event.modifierFlags.contains(.shift),
                     x: Double(p.x * scale), y: Double(p.y * scale), geometry: geometry)
@@ -239,7 +258,7 @@ final class PaneView: MTKView, NSTextInputClient {
     func characterIndex(for point: NSPoint) -> Int { NSNotFound }
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
         let c = model.frames[blockID]?.cursor
-        let r = NSRect(x: CGFloat(c?.x ?? 0) * cellSize.width, y: CGFloat((c?.y ?? 0) + 1) * cellSize.height, width: cellSize.width, height: cellSize.height)
+        let r = NSRect(x: CGFloat(c?.x ?? 0) * cellSize.width, y: CGFloat((c?.y ?? 0) - rowOffset + 1) * cellSize.height, width: cellSize.width, height: cellSize.height)
         return window?.convertToScreen(convert(r, to: nil)) ?? r
     }
 }

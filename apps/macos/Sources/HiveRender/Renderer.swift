@@ -15,6 +15,10 @@ public struct PaneDraw {
     /// Pixels of the pane area beyond the grid (letterbox), filled with the
     /// background.
     public var size: SIMD2<Float>
+    /// Pixels of the grid scrolled up out of the pane, when the grid is
+    /// taller than the pane (see Viewport): cells and cursor move, the
+    /// background and tint don't.
+    public var scrollY: Float = 0
     public init(frame: PaneFrame, origin: SIMD2<Float>, size: SIMD2<Float>, focused: Bool) {
         self.frame = frame; self.origin = origin; self.size = size; self.focused = focused
     }
@@ -96,7 +100,7 @@ public final class Renderer {
             for (y, row) in f.cells.enumerated() {
                 for (x, cell) in row.enumerated() {
                     if cell.wide == .spacerTail || cell.wide == .spacerHead { continue }
-                    let pos = p.origin + SIMD2(Float(x) * cw, Float(y) * ch)
+                    let pos = p.origin + SIMD2(Float(x) * cw, Float(y) * ch - p.scrollY)
                     let width: Float = cell.wide == .wide ? 2 : 1
                     var fgc = cell.fg ?? defaultFG, bgc = cell.bg
                     if cell.inverse { (fgc, bgc) = (bgc ?? defaultBG, fgc) }
@@ -125,7 +129,7 @@ public final class Renderer {
             }
             // Non-block cursors, and a hollow block for unfocused panes.
             if f.cursor.visible, f.cursor.y < f.rows {
-                let pos = p.origin + SIMD2(Float(f.cursor.x) * cw, Float(f.cursor.y) * ch)
+                let pos = p.origin + SIMD2(Float(f.cursor.x) * cw, Float(f.cursor.y) * ch - p.scrollY)
                 let c = color(theme.cursor)
                 let t = max(1, Float(fonts.scale).rounded())
                 switch (p.focused, f.cursor.style) {
