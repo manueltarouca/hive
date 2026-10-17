@@ -69,4 +69,8 @@ ffmpeg -v error -y -i "$out/$style.png" -vf "crop=1400:110:0:0" "$out/$style-tit
 ffmpeg -v error -y -i "$out/$style.png" -vf "crop=1200:180:1340:80" "$out/$style-header.png"
 for f in titlebar header; do cwebp -quiet -q 85 "$out/$style-$f.png" -o "$out/$style-$f.webp"; done
 echo "$D" > "$out/fixture"
+# Follow-up commands source this: both variables, or a stray server uses
+# your real state directory.
+{ printf 'export HIVE_SERVER=%s HIVE_STATE_DIR=%s\n' "$HIVE_SERVER" "$HIVE_STATE_DIR"
+  printf "export HIVE_RESUME_CLAUDE='%s'\n" "$HIVE_RESUME_CLAUDE"; } > "$out/fixture.env"
 echo "$out/$style.webp"

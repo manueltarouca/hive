@@ -227,13 +227,15 @@ final class AppModel: ObservableObject {
 
     func start() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        // Only at launch: if the server stops later, it was asked to.
+        // Reconnecting must not undo `hive server stop`.
+        ensureServer()
         connect()
     }
 
     /// Connects, or reconnects with a fresh client and engine. Panes are
     /// attached again and state is re-read, so nothing is stale afterwards.
     private func connect() {
-        ensureServer()
         let theme = engine.theme
         client = HiveClient(socketPath: socket, queue: vt)
         engine = Engine(client: client)
