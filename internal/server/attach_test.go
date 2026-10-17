@@ -1,0 +1,198 @@
+package server
+
+import (
+	"context"
+	"encoding/json"
+	"net"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/coder/websocket"
+
+	"github.com/manueltarouca/hive/internal/vt"
+)
+
+type wsClient struct {
+	t  *testing.T
+	ws *websocket.Conn
+	id string
+}
+
+func dial(t *testing.T, h *harness, name string) *wsClient {
+	t.Helper()
+	hc := &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, "unix", h.sock)
+	}}}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ws, _, err := websocket.Dial(ctx, "ws://hive/v1/attach", &websocket.DialOptions{HTTPClient: hc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws.SetReadLimit(64 << 20)
+	c := &wsClient{t: t, ws: ws}
+	c.send(map[string]any{"type": "hello", "name": name, "kind": "test"})
+	m := c.nextJSON()
+	if m["type"] != "welcome" {
+		t.Fatalf("welcome = %v", m)
+	}
+	c.id = m["client_id"].(string)
+	return c
+}
+
+func (c *wsClient) send(v any) {
+	b, _ := json.Marshal(v)
+	if err := c.ws.Write(context.Background(), websocket.MessageText, b); err != nil {
+		c.t.Fatal(err)
+	}
+}
+
+func (c *wsClient) next() (websocket.MessageType, []byte) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	typ, b, err := c.ws.Read(ctx)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	return typ, b
+}
+
+func (c *wsClient) nextJSON() map[string]any {
+	for {
+		typ, b := c.next()
+		if typ == websocket.MessageText {
+			var m map[string]any
+			json.Unmarshal(b, &m)
+			return m
+		}
+	}
+}
+
+func TestAttachMirrorsTerminal(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}, "cols": 80, "rows": 24})
+	sid, bid := created["session_id"].(string), strs(created["block_ids"])[0]
+	h.call("hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{"data": "early\r"}})
+	h.waitScreen(sid, bid, "early")
+
+	c := dial(t, h, "app")
+	defer c.ws.CloseNow()
+	c.send(map[string]any{"type": "subscribe", "block_id": bid})
+	sub := c.nextJSON()
+	if sub["type"] != "subscribed" {
+		t.Fatalf("subscribed = %v", sub)
+	}
+	seq := uint64(sub["seq"].(float64))
+
+	typ, b := c.next()
+	kind, fb, fseq, snap, err := ParseFrame(b)
+	if typ != websocket.MessageBinary || err != nil || kind != frameSnapshot || fb != bid || fseq != seq {
+		t.Fatalf("snapshot frame: %v %v %v %v", kind, fb, fseq, err)
+	}
+	mirror, err := vt.Restore(snap, vt.Hooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mirror.Close()
+
+	// Input over the socket; output frames continue exactly at seq.
+	c.send(map[string]any{"type": "input", "block_id": bid, "data": "late"})
+	c.send(map[string]any{"type": "key", "block_id": bid, "key": "enter"})
+	next := seq
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		typ, b := c.next()
+		if typ != websocket.MessageBinary {
+			continue
+		}
+		kind, _, fseq, data, _ := ParseFrame(b)
+		if kind != frameOutput {
+			continue
+		}
+		if fseq != next {
+			t.Fatalf("gap: %d != %d", fseq, next)
+		}
+		next += uint64(len(data))
+		mirror.Feed(data)
+		got, _ := mirror.Format(vt.FormatOpts{Trim: true})
+		if strings.Count(got, "late") >= 2 {
+			want := h.screen(sid, bid)
+			if got != want {
+				t.Fatalf("mirror differs:\n%q\nserver:\n%q", got, want)
+			}
+			return
+		}
+	}
+	t.Fatal("never saw the echo")
+}
+
+func TestAttachSizeAuthorityAndCalls(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	bid := strs(created["block_ids"])[0]
+
+	a, b := dial(t, h, "mac"), dial(t, h, "phone")
+	defer a.ws.CloseNow()
+	defer b.ws.CloseNow()
+	list := h.call("client.list", nil)["clients"].([]any)
+	if len(list) != 2 {
+		t.Fatalf("clients = %v", list)
+	}
+
+	a.send(map[string]any{"type": "resize", "block_id": bid, "cols": 100, "rows": 30})
+	// Wait for the mac's resize to land: each connection is handled in order.
+	a.send(map[string]any{"type": "call", "id": 1, "method": "server.version"})
+	a.nextJSON()
+	b.send(map[string]any{"type": "resize", "block_id": bid, "cols": 50, "rows": 20})
+	if m := b.nextJSON(); m["type"] != "error" || !strings.Contains(m["error"].(map[string]any)["code"].(string), "conflict") {
+		t.Fatalf("phone resize = %v", m)
+	}
+	size := h.call("hive.terminal.size", map[string]any{"block_id": bid})
+	if size["cols"].(float64) != 100 || size["size_owner"] != a.id {
+		t.Fatalf("size = %v", size)
+	}
+	b.send(map[string]any{"type": "resize", "block_id": bid, "cols": 50, "rows": 20, "take": true})
+	b.send(map[string]any{"type": "call", "id": 9, "method": "hive.terminal.size", "params": map[string]any{"block_id": bid}})
+	res := b.nextJSON()
+	if res["type"] != "result" || res["id"].(float64) != 9 || res["result"].(map[string]any)["cols"].(float64) != 50 {
+		t.Fatalf("call = %v", res)
+	}
+
+	// When the owner leaves, authority is released.
+	b.ws.Close(websocket.StatusNormalClosure, "")
+	time.Sleep(200 * time.Millisecond)
+	a.send(map[string]any{"type": "resize", "block_id": bid, "cols": 90, "rows": 30})
+	a.send(map[string]any{"type": "call", "id": 1, "method": "hive.terminal.size", "params": map[string]any{"block_id": bid}})
+	if res := a.nextJSON(); res["result"].(map[string]any)["cols"].(float64) != 90 {
+		t.Fatalf("after owner left = %v", res)
+	}
+}
+
+func TestAttachSlowClientGetsResync(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	bid := strs(created["block_ids"])[0]
+	c := dial(t, h, "slow")
+	defer c.ws.CloseNow()
+	c.send(map[string]any{"type": "subscribe", "block_id": bid})
+	c.nextJSON()
+	// Flood output without reading the socket.
+	big := strings.Repeat("x", 4000) + "\r"
+	for i := 0; i < 3000; i++ {
+		h.call("hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{"data": big}})
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		typ, b := c.next()
+		if typ == websocket.MessageText && strings.Contains(string(b), `"resync"`) {
+			return
+		}
+	}
+	t.Fatal("no resync for a client that fell behind")
+}
