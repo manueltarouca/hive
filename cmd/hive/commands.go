@@ -205,6 +205,9 @@ func (x *cx) view(sid string) (*view, error) {
 }
 
 // windowID finds the window a command acts on: -w, or the active one.
+// windowID is the window a --window switch acts on: the one named with -w,
+// else the targeted block's (-b, or the terminal the command runs in), and
+// only without either the session's active window.
 func (x *cx) windowID(sid string) (string, error) {
 	if x.g.window != "" {
 		id, _, err := x.resolve("window", x.g.window, sid, "")
@@ -213,6 +216,23 @@ func (x *cx) windowID(sid string) (string, error) {
 	v, err := x.view(sid)
 	if err != nil {
 		return "", err
+	}
+	bid := ""
+	if x.g.block != "" {
+		if _, bid, err = x.blockID(); err != nil {
+			return "", err
+		}
+	} else if x.g.session == "" && os.Getenv("HIVE_SESSION") == sid {
+		bid = os.Getenv("HIVE_BLOCK")
+	}
+	if bid != "" {
+		var b struct {
+			WindowID string `json:"window_id"`
+		}
+		if raw, ok := v.Blocks[bid]; ok && json.Unmarshal(raw, &b) == nil && b.WindowID != "" {
+			return b.WindowID, nil
+		}
+		return "", usagef("block %s is not in session %s", short(bid), short(sid))
 	}
 	return v.Active, nil
 }
