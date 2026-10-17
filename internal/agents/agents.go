@@ -97,6 +97,30 @@ func Harness(reported, running string) string {
 	return reported
 }
 
+// statusApps names the app each agent reports in its program status
+// (OSC 7501). Agents not listed report under their own name.
+var statusApps = map[string]string{"claude": "claude-code"}
+
+var statusStates = map[string]string{
+	"idle": "idle", "working": "working", "waiting": "blocked", "done": "done", "failed": "done",
+}
+
+// StateFromStatus maps an agent's own status report (OSC 7501) to hive's
+// agent states. Claude Code sends one at every change, also after an
+// interrupt, when no hook runs. ok is false for another program's report
+// or one that says nothing (a cleared record).
+func StateFromStatus(harness, app, state string) (string, bool) {
+	want := statusApps[harness]
+	if want == "" {
+		want = harness
+	}
+	if app != want {
+		return "", false
+	}
+	s, ok := statusStates[state]
+	return s, ok
+}
+
 // ErrNoChange means the hook carries nothing to report.
 var ErrNoChange = errors.New("no state change")
 

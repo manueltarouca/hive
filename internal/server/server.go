@@ -377,6 +377,16 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 			} else {
 				r.st.Status[key] = rec
 			}
+			// The agent's own report of its state wins over the last hook:
+			// an interrupt runs no hook, but Claude Code reports going idle.
+			if a := r.st.Agent; a != nil && a.State != "ended" {
+				if st, ok := agents.StateFromStatus(a.Harness, rec.App, rec.State); ok && st != a.State {
+					a.State, a.Message, a.UpdatedAt = st, rec.Message, time.Now().UTC()
+					s.bus.Block(r.st.SessionID, e.BlockID, "agent_changed", map[string]any{
+						"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": a.Message, "event": "program_status",
+					})
+				}
+			}
 		}
 	case "prompt":
 		// A new prompt ends working and blocked records (OSC 7501 lifetime).

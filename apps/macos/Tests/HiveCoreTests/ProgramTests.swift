@@ -139,3 +139,24 @@ import Testing
         #expect(Programs.shown(harness: "claude", foreground: nil).name == "Claude Code")
     }
 }
+
+/// Claude Code reports its own state (OSC 7501) at every change, also after
+/// an interrupt, when no hook runs; it decides the state shown.
+@Suite struct AgentStatusTests {
+    @Test func statusMapsOntoAgentStates() {
+        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "idle") == "idle")
+        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "waiting") == "blocked")
+        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "failed") == "done")
+        #expect(AgentStatus.state(harness: "grok", app: "grok", status: "working") == "working")
+        #expect(AgentStatus.state(harness: "claude", app: "cargo", status: "working") == nil)
+        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "clear") == nil)
+    }
+
+    /// The interrupted pane: hooks said working, Claude says idle.
+    @Test func ownStatusWinsOverTheLastHook() {
+        let records = [(app: "cargo", status: "working"), (app: "claude-code", status: "idle")]
+        #expect(AgentStatus.effective(hook: "working", harness: "claude", records: records) == "idle")
+        #expect(AgentStatus.effective(hook: "blocked", harness: "claude", records: []) == "blocked")
+        #expect(AgentStatus.effective(hook: "ended", harness: "claude", records: records) == "ended")
+    }
+}

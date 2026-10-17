@@ -123,3 +123,32 @@ func TestAgentEndsWhenTheShellReturns(t *testing.T) {
 		t.Fatalf("after a new report, state = %q, want idle", s)
 	}
 }
+
+// Interrupting Claude Code runs no hook, so the agent stayed "working".
+// Claude reports its own state (OSC 7501) at every change, interrupts too:
+// the server follows it.
+func TestAgentFollowsItsOwnStatus(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
+		`sleep 0.6; printf '\033]7501;state=working:app=claude-code\033\\'; sleep 0.6; printf '\033]7501;state=idle:app=claude-code\033\\'; exec cat`}})
+	bid := strs(created["block_ids"])[0]
+	sid, _ := created["session_id"].(string)
+	h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working", "session_id": "s-osc"})
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		out := h.call("session.view", map[string]any{"session_id": sid})
+		b, _ := out["blocks"].(map[string]any)[bid].(map[string]any)
+		a, _ := b["agent"].(map[string]any)
+		if a["state"] == "idle" {
+			if a["session_id"] != "s-osc" {
+				t.Fatalf("session id lost: %v", a)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("agent never followed its status to idle: %v", a)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}

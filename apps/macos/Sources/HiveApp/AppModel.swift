@@ -331,10 +331,17 @@ final class AppModel: ObservableObject {
     func reloadAgents() {
         call("agent.list") { [weak self] j in
             guard let self else { return }
-            let list = j["agents"].array.map { a in
-                AgentInfo(blockID: a["block_id"].string ?? "", sessionID: a["session_id"].string ?? "",
-                          sessionLabel: a["session_label"].string ?? "", harness: a["agent"]["harness"].string ?? "",
-                          state: a["agent"]["state"].string ?? "", message: a["agent"]["message"].string ?? "",
+            let list = j["agents"].array.compactMap { a -> AgentInfo? in
+                let harness = a["agent"]["harness"].string ?? ""
+                // The agent's own status wins over the last hook (an interrupt
+                // runs no hook), and a pane back at its shell has no agent.
+                // Servers from 0.1 do both themselves; this covers older ones.
+                let records = a["program_status"].array.map { (app: $0["app"].string ?? "", status: $0["state"].string ?? "") }
+                let state = AgentStatus.effective(hook: a["agent"]["state"].string, harness: harness, records: records) ?? ""
+                if Programs.atShell(a["foreground"]["program"].string ?? a["foreground"]["name"].string) { return nil }
+                return AgentInfo(blockID: a["block_id"].string ?? "", sessionID: a["session_id"].string ?? "",
+                          sessionLabel: a["session_label"].string ?? "", harness: harness,
+                          state: state, message: a["agent"]["message"].string ?? "",
                           cwd: a["agent"]["cwd"].string ?? "", title: a["title"].string ?? "",
                           updatedAt: a["agent"]["updated_at"].string.flatMap { ISO8601DateFormatter.hive.date(from: $0) })
             }
@@ -348,6 +355,12 @@ final class AppModel: ObservableObject {
                 let harness = gone ? nil : a.harness, state = gone ? "ended" : a.state
                 if blocks[a.blockID]?.harness != harness { blocks[a.blockID]?.harness = harness }
                 if blocks[a.blockID]?.agentState != state { blocks[a.blockID]?.agentState = state }
+            }
+            // A pane whose agent left the list ended (or its shell came back).
+            let listed = Set(list.map(\.blockID))
+            for (id, b) in blocks where b.harness != nil && !listed.contains(id) {
+                blocks[id]?.harness = nil
+                blocks[id]?.agentState = "ended"
             }
             let live = Set(list.map(\.blockID))
             if seenDone.keys.contains(where: { !live.contains($0) }) { seenDone = seenDone.filter { live.contains($0.key) } }
@@ -393,7 +406,9 @@ final class AppModel: ObservableObject {
                 // (killed before it could report; servers before 0.1 don't
                 // notice that themselves).
                 let gone = b["agent"]["state"].string == "ended" || Programs.atShell(foreground)
-                let agentState = gone && b["agent"]["state"].string != nil ? "ended" : b["agent"]["state"].string
+                let records = b["program_status"].array.map { (app: $0["app"].string ?? "", status: $0["state"].string ?? "") }
+                let ownState = AgentStatus.effective(hook: b["agent"]["state"].string, harness: b["agent"]["harness"].string, records: records)
+                let agentState = gone && b["agent"]["state"].string != nil ? "ended" : ownState
                 info[bid] = BlockInfo(title: b["title"].string ?? "", label: b["label"].string ?? "",
                                       cols: b["cols"].int ?? 0, rows: b["rows"].int ?? 0, sizeOwner: b["size_owner"].string,
                                       foreground: foreground, cwd: cwd,
@@ -474,6 +489,10 @@ final class AppModel: ObservableObject {
             if type == "block_event" {
                 let name = inner["payload"]["name"].string
                 if name == "agent_changed" { reloadAgents() }
+                if name == "program_status_changed" {
+                    scheduleAgentReload()
+                    if sid == currentSession { scheduleReload() }
+                }
                 if name == "clipboard_written" {
                     programCopied(block: inner["payload"]["block_id"].string ?? "", text: inner["payload"]["payload"]["text"].string ?? "")
                 }
@@ -483,6 +502,17 @@ final class AppModel: ObservableObject {
             }
             if type == "block_closed" || type == "block_created" { reloadSessions() }
         default: break
+        }
+    }
+
+    /// Coalesces bursts of status reports (progress updates) into one reload.
+    private var agentReloadPending = false
+    private func scheduleAgentReload() {
+        guard !agentReloadPending else { return }
+        agentReloadPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.agentReloadPending = false
+            self?.reloadAgents()
         }
     }
 

@@ -200,3 +200,29 @@ func TestParseGrokHooks(t *testing.T) {
 		}
 	}
 }
+
+// Claude Code also reports its state itself (OSC 7501), including after an
+// interrupt, when no hook runs. That status maps onto hive's states.
+func TestStateFromProgramStatus(t *testing.T) {
+	cases := []struct {
+		harness, app, state string
+		want                string
+		ok                  bool
+	}{
+		{"claude", "claude-code", "idle", "idle", true},
+		{"claude", "claude-code", "working", "working", true},
+		{"claude", "claude-code", "waiting", "blocked", true},
+		{"claude", "claude-code", "done", "done", true},
+		{"claude", "claude-code", "failed", "done", true},
+		{"grok", "grok", "working", "working", true},
+		{"claude", "claude-code", "clear", "", false}, // a record removed says nothing
+		{"claude", "cargo", "working", "", false},     // another program in the pane
+		{"codex", "claude-code", "idle", "", false},
+	}
+	for _, c := range cases {
+		got, ok := StateFromStatus(c.harness, c.app, c.state)
+		if got != c.want || ok != c.ok {
+			t.Errorf("StateFromStatus(%q, %q, %q) = %q, %v; want %q, %v", c.harness, c.app, c.state, got, ok, c.want, c.ok)
+		}
+	}
+}
