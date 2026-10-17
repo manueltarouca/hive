@@ -82,6 +82,11 @@ Codex, OpenCode, Gemini and Grok have their own resume commands
 `grok --resume ID`). Find their IDs the same way: from the command line
 first, then their own session files. Ask when in doubt.
 
+**Start the hive server outside the agent's environment if you can.** hive
+drops Claude's own session variables from terminals (since cadd056), but an
+older hive passes `CLAUDECODE` to every pane, and a `claude` started there
+thinks it is nested.
+
 ## 3. Build the hive side
 
 One hive session per tmux session. Create it once, in the first window's
@@ -120,12 +125,21 @@ hive -b BLOCK send-key enter
 
 For each agent pane, in order:
 
-1. **Confirm with the user.** Make sure the agent is idle, not in the middle
-   of a turn: look at `tmux capture-pane -p -t PANE | tail -20`. A busy agent
-   loses its turn when it exits.
+1. **Confirm the agent is idle:** look at
+   `tmux capture-pane -p -t PANE | tail -20`. It is **not** idle if it is
+   mid-turn ("esc to interrupt") or shows any dialog: a permission prompt
+   ("Do you want to proceed?", numbered options), a question, or a picker.
+   Never send keys to a pane with a dialog open. Enter answers it, and an
+   approval is the user's to give. Leave that window and tell the user.
 2. **Exit it in tmux:**
    `tmux send-keys -t PANE '/exit' Enter`
-   Wait until the pane shows a shell again.
+   Wait until the pane shows a shell again. On exit, Claude prints
+   `claude --resume <id-or-name>`. That line is the most reliable source of
+   the session to resume.
+   - If it shows a name rather than a UUID, resolve the name first: several
+     conversations can share one name, and resuming by name then opens a
+     picker. Pick the newest transcript in the folder with
+     `"customTitle":"<name>"`, and use its file name, which is the UUID.
 3. **Resume it in hive** with its exact original flags, as in step 3.
 4. **Check it** before the next one. After a few seconds,
    `hive -b BLOCK capture --trim | tail -30` should show the old conversation
