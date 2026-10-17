@@ -40,6 +40,8 @@ type outputStep struct {
 	DeliveredMBps float64 `json:"delivered_mb_per_s"`
 	Delivered     float64 `json:"delivered_ratio"`
 	Resyncs       int     `json:"resyncs"`
+	BytesPerFrame float64 `json:"bytes_per_frame"`
+	CPUCores      float64 `json:"cpu_cores"` // the process's own (getrusage): server and client
 	Memory        Memory  `json:"memory"`
 	Degraded      bool    `json:"degraded"`
 	Why           string  `json:"why,omitempty"`
@@ -62,6 +64,7 @@ func outputProbe(args []string) error {
 	out := fs.String("out", "bench/results", "where results go")
 	only := fs.Int("rate", 0, "run only this rate per pane (with --profile)")
 	profile := fs.String("profile", "", "write cpu and heap profiles of the measured step here (prefix)")
+	cost := fs.Duration("client-cost", 0, "time the client spends on each frame, as a slower client (the app parsing) would")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -81,14 +84,14 @@ func outputProbe(args []string) error {
 	}
 	degradedRun := 0
 	for _, rate := range rates {
-		st, err := outputStepRun(exe, *panes, rate, *secs, *limit, *profile)
+		st, err := outputStepRun(exe, *panes, rate, *secs, *limit, *profile, *cost)
 		if err != nil {
 			return err
 		}
 		res.Steps = append(res.Steps, st)
-		fmt.Printf("panes %3d  rate %6.2f MB/s each | latency p50 %6.1f p99 %7.1f max %7.1f ms | delivered %7.2f of %7.2f MB/s (%3.0f%%) | resyncs %d | rss %5.0f MB (go %4.0f)%s\n",
+		fmt.Printf("panes %3d  rate %6.2f MB/s each | latency p50 %6.1f p99 %7.1f max %7.1f ms | delivered %7.2f of %7.2f MB/s (%3.0f%%) | resyncs %d | %6.0f B/frame | cpu %4.2f cores | rss %5.0f MB (go %4.0f)%s\n",
 			*panes, float64(rate)/(1<<20), st.Latency.P50, st.Latency.P99, st.Latency.Max, st.DeliveredMBps, st.OfferedMBps,
-			st.Delivered*100, st.Resyncs, st.Memory.ResidentMB, st.Memory.GoHeapMB, map[bool]string{true: "  DEGRADED: " + st.Why, false: ""}[st.Degraded])
+			st.Delivered*100, st.Resyncs, st.BytesPerFrame, st.CPUCores, st.Memory.ResidentMB, st.Memory.GoHeapMB, map[bool]string{true: "  DEGRADED: " + st.Why, false: ""}[st.Degraded])
 		if st.Degraded {
 			if degradedRun++; degradedRun == 2 {
 				break
@@ -106,7 +109,7 @@ func outputProbe(args []string) error {
 	return err
 }
 
-func outputStepRun(exe string, panes, rate, secs int, limit time.Duration, profile string) (outputStep, error) {
+func outputStepRun(exe string, panes, rate, secs int, limit time.Duration, profile string, cost time.Duration) (outputStep, error) {
 	ts, err := startServer(server.Config{})
 	if err != nil {
 		return outputStep{}, err
@@ -131,21 +134,29 @@ func outputStepRun(exe string, panes, rate, secs int, limit time.Duration, profi
 		}
 		blocks = append(blocks, w.BlockIDs...)
 	}
-	r, err := attachReader(ts, blocks)
+	r, err := attachReader(ts, blocks, cost)
 	if err != nil {
 		return outputStep{}, err
 	}
 	defer r.close()
 	time.Sleep(2 * time.Second)
 	r.start()
+	c0, t0 := cpuTime(), time.Now()
 	stopProfile := startProfile(profile)
 	time.Sleep(time.Duration(secs) * time.Second)
 	lat, bytes, resyncs, took := r.stop()
+	r.mu.Lock()
+	frames := r.frames
+	r.mu.Unlock()
+	cores := (cpuTime() - c0).Seconds() / time.Since(t0).Seconds()
 	stopProfile()
-	st := outputStep{Panes: panes, RatePerPane: rate, Latency: dist(lat), Resyncs: resyncs, Memory: memory()}
+	st := outputStep{Panes: panes, RatePerPane: rate, Latency: dist(lat), Resyncs: resyncs, CPUCores: cores, Memory: memory()}
 	st.OfferedMBps = float64(rate*panes) / (1 << 20)
 	st.DeliveredMBps = float64(bytes) / took.Seconds() / (1 << 20)
 	st.Delivered = st.DeliveredMBps / st.OfferedMBps
+	if frames > 0 {
+		st.BytesPerFrame = float64(bytes) / float64(frames)
+	}
 	switch {
 	case resyncs > 0:
 		st.Degraded, st.Why = true, fmt.Sprintf("%d resyncs", resyncs)
@@ -200,9 +211,11 @@ type reader struct {
 	resyncs int
 	tails   map[string][]byte
 	done    chan struct{}
+	cost    time.Duration
+	frames  int
 }
 
-func attachReader(ts *testServer, blocks []string) (*reader, error) {
+func attachReader(ts *testServer, blocks []string, cost time.Duration) (*reader, error) {
 	sock := ts.dir + "/s.sock"
 	hc := &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		var d net.Dialer
@@ -215,7 +228,7 @@ func attachReader(ts *testServer, blocks []string) (*reader, error) {
 		return nil, err
 	}
 	ws.SetReadLimit(256 << 20)
-	r := &reader{ws: ws, cancel: cancel, tails: map[string][]byte{}, done: make(chan struct{})}
+	r := &reader{ws: ws, cancel: cancel, tails: map[string][]byte{}, done: make(chan struct{}), cost: cost}
 	send := func(v any) error {
 		b, _ := json.Marshal(v)
 		return ws.Write(ctx, websocket.MessageText, b)
@@ -266,9 +279,14 @@ func (r *reader) loop(ctx context.Context, send func(any) error) {
 			continue
 		}
 		block, payload := string(data[3:3+n]), data[3+n+8:]
+		if r.cost > 0 {
+			for t := time.Now(); time.Since(t) < r.cost; {
+			}
+		}
 		r.mu.Lock()
 		if r.on {
 			r.bytes += len(payload)
+			r.frames++
 		}
 		stamps, tail := scanStamps(r.tails[block], payload)
 		r.tails[block] = tail

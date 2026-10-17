@@ -410,6 +410,33 @@ func (c *attachConn) subscribe(blockID string) {
 	c.sendJSON(map[string]any{"type": "subscribed", "block_id": blockID, "seq": seq, "cols": cols, "rows": rows})
 	c.send(outMsg{binary: frame(frameSnapshot, blockID, seq, snap)})
 
+	// forward sends one frame; false ends the subscription.
+	var forward func(f block.Frame) bool
+	forward = func(f block.Frame) bool {
+		if f.Resync {
+			c.sendJSON(map[string]any{"type": "resync", "block_id": blockID})
+			c.mu.Lock()
+			if c.subs[blockID] == as {
+				as.b.Detach(as.sub)
+				delete(c.subs, blockID)
+			}
+			c.mu.Unlock()
+			return false
+		}
+		if f.Resize {
+			return c.send(outMsg{binary: frameFor(f)})
+		}
+		// Output already queued goes out as one frame.
+		f, next := coalesce(f, sub.C, maxCoalesce)
+		if !c.send(outMsg{binary: frameFor(f)}) {
+			return false
+		}
+		if next != nil {
+			// A resize, a resync, or output past the cap: in order.
+			return forward(*next)
+		}
+		return true
+	}
 	go func() {
 		for {
 			select {
@@ -433,20 +460,36 @@ func (c *attachConn) subscribe(blockID string) {
 				c.sendJSON(map[string]any{"type": "exited", "block_id": blockID})
 				return
 			case f := <-sub.C:
-				if f.Resync {
-					c.sendJSON(map[string]any{"type": "resync", "block_id": blockID})
-					c.mu.Lock()
-					if c.subs[blockID] == as {
-						as.b.Detach(as.sub)
-						delete(c.subs, blockID)
-					}
-					c.mu.Unlock()
-					return
-				}
-				if !c.send(outMsg{binary: frameFor(f)}) {
+				if !forward(f) {
 					return
 				}
 			}
 		}
 	}()
+}
+
+// maxCoalesce caps a merged output frame.
+const maxCoalesce = 256 << 10
+
+// coalesce merges f with the output frames already queued on q, in order,
+// up to max bytes: a macOS pty gives ~1 KB a read, and a frame each cost a
+// syscall on both ends. It never waits. It stops at a resize or resync, or
+// at output past the cap, and returns that frame as next, taken off q.
+func coalesce(f block.Frame, q <-chan block.Frame, max int) (merged block.Frame, next *block.Frame) {
+	merged = f
+	for {
+		select {
+		case g := <-q:
+			if g.Resync || g.Resize || g.Seq != merged.Seq+uint64(len(merged.Data)) || len(merged.Data)+len(g.Data) > max {
+				return merged, &g
+			}
+			if len(merged.Data) == len(f.Data) {
+				// The first merge: copy, so f's data is left alone.
+				merged.Data = append(make([]byte, 0, min(max, 4*(len(f.Data)+len(g.Data)))), f.Data...)
+			}
+			merged.Data = append(merged.Data, g.Data...)
+		default:
+			return merged, nil
+		}
+	}
 }

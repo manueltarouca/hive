@@ -34,7 +34,7 @@ profile doesn't see.
 | --- | --- | --- |
 | `flush` | busy panes (100 KB/s each), empty and full scrollback, with snapshot saves running back to back | `agent.report` p99 above 50 ms |
 | `ptyread` | busy panes (100 KB/s each), no clients, no saves | under 90% of the offered bytes read |
-| `output` | output rate per pane (64 KB/s to 128 MB/s), stamped by the emitter, read by an attach client as the app does | latency p99 above 50 ms, under 90% of the bytes delivered, or a resync |
+| `output` | output rate per pane (64 KB/s to 128 MB/s), stamped by the emitter, read by an attach client as the app does; `--client-cost` makes the client spend time on each frame, as the app does parsing | latency p99 above 50 ms, under 90% of the bytes delivered, or a resync |
 
 ## Findings
 
@@ -78,3 +78,18 @@ machine already at load ~8, which likely explains the tail; the probe's
 back-to-back saves are far harsher than the real 30 s tick. To confirm on
 a quiet machine. Memory: ~12 MB native per busy pane
 (16 MB scrollback filling), 1.6 GB at 128 panes.
+
+**2026-10-17, output** (same machine, on battery, load ~7). One pane, one
+client: everything arrives up to 64 MB/s, latency p99 0.2–1 ms; at
+128 MB/s 109–113 MB/s arrives (knee 64 MB/s). For scale, the emitter
+writes 256 MB/s and a bare pty read by Python passes ~140 MB/s. A macOS
+pty gives ~1 KB a read (133,000 reads/s at 128 MB/s; reading alone costs
+0.53 cores, `ptyread`), and each read was its own WebSocket frame.
+
+With a client that spends time on each frame (`--client-cost`), the
+server fell behind it and resynced it over and over: at 64 MB/s, 289
+resyncs in 6 s with 20 µs a frame (53% delivered), 200 with 50 µs (25%),
+and 350 MB of RSS. Output already queued for a subscriber now goes out as
+one frame (up to 256 KB): 0 resyncs, 101% delivered, 41 MB, frames of
+1.7–3.9 KB as the client needs. A fast client is unchanged (nothing is
+queued, nothing waits): its cost is the hand-offs per 1 KB read.
