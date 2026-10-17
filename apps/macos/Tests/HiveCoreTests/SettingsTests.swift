@@ -27,6 +27,15 @@ import Testing
     }
 
     /// Without hive's binary or a readable answer, the defaults.
+    /// Blank (null) lets programs decide; older output without the key too.
+    @Test func cursorStyleBlink() throws {
+        #expect(try Settings.decode(Data(Self.shown.utf8)).cursorStyleBlink == nil)
+        let off = Self.shown.replacingOccurrences(of: #""theme":"night"}"#, with: #""theme":"night","cursor-style-blink":false}"#)
+        #expect(try Settings.decode(Data(off.utf8)).cursorStyleBlink == false)
+        let on = Self.shown.replacingOccurrences(of: #""theme":"night"}"#, with: #""theme":"night","cursor-style-blink":true}"#)
+        #expect(try Settings.decode(Data(on.utf8)).cursorStyleBlink == true)
+    }
+
     @Test func defaultsWhenUnreadable() {
         #expect((try? Settings.decode(Data("nonsense".utf8))) == nil)
         let d = Settings.defaults

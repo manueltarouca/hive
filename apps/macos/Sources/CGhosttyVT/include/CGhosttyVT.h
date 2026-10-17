@@ -24,6 +24,9 @@ typedef struct {
   uint8_t cursor_style;  // GhosttyRenderStateCursorVisualStyle
 } HiveFrameMeta;
 
+/// The cursor's default blink: -1 (blank, Ghostty's default) and 1 blink,
+/// 0 doesn't. Programs still change it with DECSCUSR or DEC mode 12.
+void hive_set_default_cursor_blink(GhosttyTerminal t, int blink);
 GhosttyResult hive_terminal_new(uint16_t cols, uint16_t rows, GhosttyTerminal *out);
 GhosttyResult hive_terminal_from_snapshot(const uint8_t *data, size_t len, GhosttyTerminal *out);
 GhosttyResult hive_snapshot(GhosttyTerminal t, uint8_t **out, size_t *len);

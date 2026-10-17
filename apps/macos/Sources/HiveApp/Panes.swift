@@ -10,7 +10,7 @@ final class PaneView: MTKView, NSTextInputClient {
     let blockID: String
     unowned let model: AppModel
     let renderer: Renderer
-    var focused = false { didSet { if focused != oldValue { needsDisplay = true } } }
+    var focused = false { didSet { if focused != oldValue { needsDisplay = true; resetBlink() } } }
     var style: Style { model.style }
 
     private var marked = NSAttributedString() { didSet { showPreedit() } }
@@ -53,6 +53,50 @@ final class PaneView: MTKView, NSTextInputClient {
     }
 
     required init(coder: NSCoder) { fatalError() }
+
+    // MARK: cursor blink
+
+    /// Ghostty's blink, while this is the focused pane of the key window and
+    /// the program's cursor blinks (the default; see cursor-style-blink).
+    private var blink = CursorBlink(at: 0)
+    private var blinkTimer: Timer?
+    private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+
+    private var blinks: Bool {
+        guard focused, window?.isKeyWindow == true, let c = model.frames[blockID]?.cursor else { return false }
+        return c.blinking && c.visible
+    }
+
+    /// Shows the cursor at once and starts the blink again.
+    func resetBlink() {
+        blink.reset(at: now)
+        scheduleBlink()
+    }
+
+    /// Output shows the cursor too, at most every 500 ms as in Ghostty: a
+    /// program that keeps drawing keeps a steady cursor.
+    func outputArrived() {
+        if now - blink.since > 0.5 { resetBlink() }
+    }
+
+    private func scheduleBlink() {
+        blinkTimer?.invalidate()
+        blinkTimer = nil
+        guard blinks else { return }
+        let t = Timer(timeInterval: max(0.01, blink.nextChange(after: now) - now), repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.needsDisplay = true
+                self?.scheduleBlink()
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        blinkTimer = t
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { blinkTimer?.invalidate(); blinkTimer = nil }
+    }
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
@@ -100,6 +144,9 @@ final class PaneView: MTKView, NSTextInputClient {
             var d = PaneDraw(frame: frame, origin: .zero, size: SIMD2(Float(drawableSize.width), Float(drawableSize.height)),
                              focused: focused && (window?.isKeyWindow ?? false))
             d.scrollY = Float(rowOffset * renderer.fonts.cellHeight)
+            // The key window or the program's blink may have changed since.
+            if blinks != (blinkTimer != nil) { resetBlink() }
+            d.cursorShown = !blinks || blink.visible(at: now)
             // Composing text follows the cursor as the program redraws.
             if marked.length > 0 { showPreedit() }
             if !focused {
@@ -216,6 +263,7 @@ final class PaneView: MTKView, NSTextInputClient {
         if f.contains(.control) { mods.insert(.ctrl) }
         if f.contains(.option) { mods.insert(.alt) }
         if f.contains(.command) { mods.insert(.command) }
+        resetBlink()
         if let text = MacBindings.text(key: .mac(event.keyCode), mods: mods) {
             model.text(text)
             return
@@ -539,7 +587,11 @@ final class PanesView: NSView {
         return horizontal ? (max(2, (g.cols - 3) / 2), g.rows) : (g.cols, max(2, (g.rows - 2) / 2))
     }
 
-    func redraw(_ block: String) { cards[block]?.pane.needsDisplay = true }
+    func redraw(_ block: String) {
+        guard let p = cards[block]?.pane else { return }
+        p.outputArrived()
+        p.needsDisplay = true
+    }
 
     /// The font changed: every pane's grid changes size, so lay out again and
     /// claim the new sizes once.

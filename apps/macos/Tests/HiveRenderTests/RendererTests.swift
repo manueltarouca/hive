@@ -40,6 +40,22 @@ func pixels(_ img: CGImage) -> [UInt8] {
 }
 
 @Suite struct RendererTests {
+    /// In the blink's hidden half the focused cursor isn't drawn at all: no
+    /// block colour behind the cell, no bar.
+    @Test func hiddenBlinkPhaseDrawsNoCursor() throws {
+        let r = try Renderer(fonts: FontSet(pointSize: 13, scale: 2))
+        for seq in ["", "\u{1b}[6 q"] {  // block, then bar
+            let m = try Mirror(cols: 10, rows: 3)
+            m.apply(theme: .ghostty)
+            m.feed(Data((seq + "ab").utf8))
+            var d = PaneDraw(frame: m.frame(), origin: .zero, size: SIMD2(400, 200), focused: true)
+            let cursor = SIMD4<Float>(Float(r.theme.cursor.r) / 255, Float(r.theme.cursor.g) / 255, Float(r.theme.cursor.b) / 255, 1)
+            #expect(r.instances(for: [d], viewport: SIMD2(400, 200)).contains { $0.kind == 0 && $0.color == cursor })
+            d.cursorShown = false
+            #expect(!r.instances(for: [d], viewport: SIMD2(400, 200)).contains { $0.kind == 0 && $0.color == cursor })
+        }
+    }
+
     @Test func cellMetricsAreWholePixels() {
         let f = FontSet(pointSize: 13, scale: 2)
         #expect(f.cellWidth >= 14 && f.cellWidth <= 18)

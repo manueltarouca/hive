@@ -11,6 +11,8 @@ public struct Settings: Equatable, Sendable {
     public var bell = "flash"
     public var notify = "background"
     public var confirmPaste = true
+    /// cursor-style-blink: nil blinks unless a program says otherwise.
+    public var cursorStyleBlink: Bool?
     /// Read by the server; shown and set in the Settings window.
     public var scrollbackLimit: UInt64 = 16 << 20
     public var resumeAgents = true
@@ -54,11 +56,12 @@ public struct Settings: Equatable, Sendable {
             var bell: String
             var notify: String
             var confirmPaste: Bool
+            var cursorStyleBlink: Bool?
             var scrollbackLimit: UInt64
             var resumeAgents: Bool
             enum CodingKeys: String, CodingKey {
                 case theme, bell, notify
-                case fontFamily = "font-family", fontSize = "font-size", confirmPaste = "confirm-paste"
+                case fontFamily = "font-family", fontSize = "font-size", confirmPaste = "confirm-paste", cursorStyleBlink = "cursor-style-blink"
                 case scrollbackLimit = "scrollback-limit", resumeAgents = "resume-agents"
             }
         }
@@ -68,7 +71,7 @@ public struct Settings: Equatable, Sendable {
         let s = try JSONDecoder().decode(Shown.self, from: data)
         return Settings(path: s.path, theme: Appearance(stored: s.values.theme), fontFamily: s.values.fontFamily,
                         fontSize: s.values.fontSize, bell: s.values.bell, notify: s.values.notify,
-                        confirmPaste: s.values.confirmPaste, scrollbackLimit: s.values.scrollbackLimit,
+                        confirmPaste: s.values.confirmPaste, cursorStyleBlink: s.values.cursorStyleBlink, scrollbackLimit: s.values.scrollbackLimit,
                         resumeAgents: s.values.resumeAgents, diagnostics: s.diagnostics, keys: s.keys ?? [])
     }
 }

@@ -15,14 +15,16 @@ import (
 
 // Config is the settings, with defaults for whatever the file doesn't say.
 type Config struct {
-	Theme           string  `json:"theme"`
-	FontFamily      string  `json:"font-family"`
-	FontSize        float64 `json:"font-size"`
-	Bell            string  `json:"bell"`
-	Notify          string  `json:"notify"`
-	ConfirmPaste    bool    `json:"confirm-paste"`
-	ScrollbackLimit uint64  `json:"scrollback-limit"`
-	ResumeAgents    bool    `json:"resume-agents"`
+	Theme        string  `json:"theme"`
+	FontFamily   string  `json:"font-family"`
+	FontSize     float64 `json:"font-size"`
+	Bell         string  `json:"bell"`
+	Notify       string  `json:"notify"`
+	ConfirmPaste bool    `json:"confirm-paste"`
+	// Nil lets programs decide, blinking by default (Ghostty's blank).
+	CursorStyleBlink *bool  `json:"cursor-style-blink"`
+	ScrollbackLimit  uint64 `json:"scrollback-limit"`
+	ResumeAgents     bool   `json:"resume-agents"`
 }
 
 // Level is how bad a diagnostic is: an error keeps the default.
@@ -82,6 +84,14 @@ var Keys = []Key{
 		set: oneOf(func(c *Config, v string) { c.Notify = v }, "background", "always", "never")},
 	{Name: "confirm-paste", Default: "true", Help: "ask before pasting lines into a program that would run each one",
 		set: boolean(func(c *Config, b bool) { c.ConfirmPaste = b })},
+	{Name: "cursor-style-blink", Default: "", Choices: []string{"", "true", "false"}, Help: "whether the cursor blinks: blank or true blinks, as in Ghostty; false keeps it steady. Programs can still change it (DECSCUSR, DEC mode 12)",
+		set: func(c *Config, v string) error {
+			if v == "" {
+				c.CursorStyleBlink = nil
+				return nil
+			}
+			return boolean(func(c *Config, b bool) { c.CursorStyleBlink = &b })(c, v)
+		}},
 	{Name: "scrollback-limit", Default: "16m", Server: true, Help: "history kept per terminal, in bytes (k, m, g); at least 64k. Lowering it drops old lines at once",
 		set: func(c *Config, v string) error {
 			n, err := parseSize(v)
@@ -174,7 +184,7 @@ func Parse(src string) (Config, []Diagnostic) {
 		}
 		k := key(name)
 		if !hasEq {
-			if k != nil && (k.Default == "true" || k.Default == "false") {
+			if k != nil && (k.Default == "true" || k.Default == "false" || k.Name == "cursor-style-blink") {
 				value = "true" // a boolean alone means true, as in Ghostty
 			} else {
 				diags = append(diags, Diagnostic{n, name, Error, fmt.Sprintf("%q needs a value: key = value", name)})

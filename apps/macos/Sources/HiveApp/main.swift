@@ -110,6 +110,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .debounce(for: .milliseconds(250), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.applyFont() }
             .store(in: &bag)
+        model.settingsStore.$settings
+            .map(\.cursorStyleBlink)
+            .removeDuplicates()
+            .sink { [weak self] b in
+                guard let self else { return }
+                let engine = self.model.engine
+                self.model.vt.async { engine.cursorBlink = b }
+            }
+            .store(in: &bag)
         model.contextActions = { [weak self] in self?.paneContextActions() ?? [] }
         model.onLayout = { [weak self] in
             self?.panes.sync()

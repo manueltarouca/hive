@@ -244,13 +244,14 @@ final class AppModel: ObservableObject {
     /// Connects, or reconnects with a fresh client and engine. Panes are
     /// attached again and state is re-read, so nothing is stale afterwards.
     private func connect() {
-        let theme = engine.theme
+        let theme = engine.theme, blink = settings.cursorStyleBlink
         client = HiveClient(socketPath: socket, queue: vt)
         engine = Engine(client: client)
         attached.removeAll()
         let engine = engine
         vt.async { [weak self] in
             engine.theme = theme
+            engine.cursorBlink = blink
             // Some events were missed: re-read everything.
             engine.client.onEventsResync = { Task { @MainActor in self?.reloadSessions(); self?.reloadView() } }
             engine.log = { msg in NSLog("hive: %@", msg) }

@@ -5,6 +5,34 @@ import Testing
 private func bytes(_ s: String) -> Data { Data(s.utf8) }
 
 @Suite struct MirrorTests {
+    /// As in Ghostty: the cursor blinks unless a program or cursor-style-blink
+    /// says otherwise. Claude Code never sends DECSCUSR, so this default is
+    /// what makes its input cursor blink.
+    @Test func cursorBlinksByDefaultLikeGhostty() throws {
+        let m = try Mirror(cols: 20, rows: 4)
+        #expect(m.frame().cursor.blinking)
+        m.feed(bytes("\u{1b}[2 q"))  // steady block
+        #expect(!m.frame().cursor.blinking)
+        m.feed(bytes("\u{1b}[0 q"))  // back to the default
+        #expect(m.frame().cursor.blinking)
+        m.feed(bytes("\u{1b}[?12l"))  // DEC mode 12
+        #expect(!m.frame().cursor.blinking)
+        m.feed(bytes("\u{1b}[0 q"))
+        #expect(m.frame().cursor.blinking)
+
+        m.setDefaultCursorBlink(false)
+        #expect(!m.frame().cursor.blinking)
+        m.feed(bytes("\u{1b}[5 q"))  // DECSCUSR still wins
+        #expect(m.frame().cursor.blinking)
+        m.feed(bytes("\u{1b}[0 q"))
+        #expect(!m.frame().cursor.blinking)
+
+        // A snapshot (as the server sends it) comes back blinking too.
+        let fresh = try Mirror(cols: 20, rows: 4)
+        let again = try Mirror(snapshot: try #require(fresh.snapshot()))
+        #expect(again.frame().cursor.blinking)
+    }
+
     @Test func frameCellsAndStyles() throws {
         let m = try Mirror(cols: 20, rows: 4)
         m.feed(bytes("ab\u{1b}[1;31mC\u{1b}[0m 你x\r\n"))

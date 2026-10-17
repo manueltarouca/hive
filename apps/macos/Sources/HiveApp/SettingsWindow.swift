@@ -70,6 +70,7 @@ struct SettingsView: View {
                     Text("Flash and play a sound").tag("flash+sound")
                     Text("Nothing").tag("none")
                 }
+                Toggle("Blinking cursor", isOn: Binding(get: { s.cursorStyleBlink != false }, set: { store.set("cursor-style-blink", $0 ? "" : "false") }))
                 Toggle("Ask before pasting several lines", isOn: Binding(get: { s.confirmPaste }, set: { store.set("confirm-paste", $0 ? "true" : "false") }))
                 Picker("Scrollback", selection: Binding(get: { s.scrollbackLimit }, set: { setServer("scrollback-limit", Self.size($0)) })) {
                     ForEach(Self.scrollbackChoices(current: s.scrollbackLimit), id: \.self) { Text(Self.size($0)).tag($0) }

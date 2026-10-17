@@ -191,6 +191,12 @@ public final class Mirror {
         pal.withUnsafeBufferPointer { hive_set_theme(term, theme.foreground.c, theme.background.c, theme.cursor.c, $0.baseAddress) }
     }
 
+    /// cursor-style-blink: nil (blank) and true blink, as Ghostty does by
+    /// default; programs still change it with DECSCUSR or DEC mode 12.
+    public func setDefaultCursorBlink(_ blink: Bool?) {
+        hive_set_default_cursor_blink(term, blink.map { $0 ? 1 : 0 } ?? -1)
+    }
+
     public func resize(cols: UInt16, rows: UInt16, cellWidth: UInt32, cellHeight: UInt32) {
         ghostty_terminal_resize(term, cols, rows, max(cellWidth, 1), max(cellHeight, 1))
     }

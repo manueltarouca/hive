@@ -276,3 +276,32 @@ func TestBareBooleanIsTrue(t *testing.T) {
 		t.Fatalf("config = %+v, diags = %v", c, diags)
 	}
 }
+
+// cursor-style-blink is Ghostty's: blank lets programs decide (DEC mode 12)
+// and the cursor blinks by default; true or false is the default that
+// programs can still change with DECSCUSR. A bare key is true.
+func TestCursorStyleBlink(t *testing.T) {
+	yes, no := true, false
+	for _, tc := range []struct {
+		src  string
+		want *bool
+	}{
+		{"", nil},
+		{"cursor-style-blink = true\n", &yes},
+		{"cursor-style-blink = false\n", &no},
+		{"cursor-style-blink = false\ncursor-style-blink =\n", nil},
+		{"cursor-style-blink\n", &yes},
+	} {
+		c, diags := Parse(tc.src)
+		if !reflect.DeepEqual(c.CursorStyleBlink, tc.want) || len(diags) > 1 {
+			t.Errorf("%q: blink = %v, diags = %v", tc.src, c.CursorStyleBlink, diags)
+		}
+	}
+	if _, diags := Parse("cursor-style-blink = maybe\n"); len(diags) != 1 || diags[0].Level != Error {
+		t.Fatalf("diags = %v", diags)
+	}
+	b, _ := json.Marshal(Defaults())
+	if !strings.Contains(string(b), `"cursor-style-blink":null`) {
+		t.Fatalf("json = %s", b)
+	}
+}

@@ -35,6 +35,17 @@ public final class Engine {
         }
     }
 
+    /// cursor-style-blink, for every mirror.
+    public var cursorBlink: Bool? {
+        didSet {
+            guard cursorBlink != oldValue else { return }
+            for (_, p) in panes {
+                p.mirror?.setDefaultCursorBlink(cursorBlink)
+                scheduleFrame(p)
+            }
+        }
+    }
+
     public init(client: HiveClient) { self.client = client }
 
     /// Starts mirroring a block. `onFrame` runs on the engine's queue.
@@ -71,6 +82,7 @@ public final class Engine {
             do {
                 let m = try Mirror(snapshot: data)
                 m.apply(theme: theme)
+                m.setDefaultCursorBlink(cursorBlink)
                 pane.mirror = m
                 pane.expected = seq
             } catch {

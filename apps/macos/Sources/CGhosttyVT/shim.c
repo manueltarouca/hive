@@ -8,6 +8,15 @@ static void configure(GhosttyTerminal t) {
   ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_STORAGE_LIMIT, &no_images);
   size_t scrollback = 16u << 20;
   ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_BYTES, &scrollback);
+  // The cursor blinks by default, as in Ghostty (libghostty's own default
+  // is steady).
+  hive_set_default_cursor_blink(t, -1);
+}
+
+void hive_set_default_cursor_blink(GhosttyTerminal t, int blink) {
+  // NULL would mean libghostty's steady default, so blank is true here.
+  bool b = blink != 0;
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_DEFAULT_CURSOR_BLINK, &b);
 }
 
 GhosttyResult hive_terminal_new(uint16_t cols, uint16_t rows, GhosttyTerminal *out) {

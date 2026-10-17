@@ -19,6 +19,8 @@ public struct PaneDraw {
     /// taller than the pane (see Viewport): cells and cursor move, the
     /// background and tint don't.
     public var scrollY: Float = 0
+    /// False in a blinking cursor's hidden half (focused panes only).
+    public var cursorShown = true
     public init(frame: PaneFrame, origin: SIMD2<Float>, size: SIMD2<Float>, focused: Bool) {
         self.frame = frame; self.origin = origin; self.size = size; self.focused = focused
     }
@@ -114,7 +116,7 @@ public final class Renderer {
                     var fgc = cell.fg ?? defaultFG, bgc = cell.bg
                     if cell.inverse { (fgc, bgc) = (bgc ?? defaultBG, fgc) }
                     if cell.selected { bgc = theme.selection }
-                    let isCursor = p.focused && f.cursor.visible && f.cursor.style == .block && f.cursor.x == x && f.cursor.y == y
+                    let isCursor = p.focused && p.cursorShown && f.cursor.visible && f.cursor.style == .block && f.cursor.x == x && f.cursor.y == y
                     if isCursor { bgc = theme.cursor; fgc = defaultBG }
                     if let bgc { bg.append(QuadInstance(pos: pos, size: SIMD2(cw * width, ch), uv: .zero, color: color(bgc), kind: 0)) }
                     if cell.invisible || cell.text.isEmpty || cell.text == " " { continue }
@@ -137,7 +139,7 @@ public final class Renderer {
                 }
             }
             // Non-block cursors, and a hollow block for unfocused panes.
-            if f.cursor.visible, f.cursor.y < f.rows {
+            if f.cursor.visible, f.cursor.y < f.rows, p.cursorShown || !p.focused {
                 let pos = p.origin + SIMD2(Float(f.cursor.x) * cw, Float(f.cursor.y) * ch - p.scrollY)
                 let c = color(theme.cursor)
                 let t = max(1, Float(fonts.scale).rounded())
