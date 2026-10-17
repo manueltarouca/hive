@@ -9,6 +9,11 @@ public struct Theme: Sendable, Equatable {
     public var selection: RGB
     public var palette: [RGB] // 16
 
+    public init(foreground: RGB, background: RGB, cursor: RGB, selection: RGB, palette: [RGB]) {
+        self.foreground = foreground; self.background = background; self.cursor = cursor
+        self.selection = selection; self.palette = palette
+    }
+
     public static let tomorrowNight = Theme(
         foreground: RGB(0xc5, 0xc8, 0xc6), background: RGB(0x1d, 0x1f, 0x21), cursor: RGB(0xc5, 0xc8, 0xc6),
         selection: RGB(0x37, 0x3b, 0x41),

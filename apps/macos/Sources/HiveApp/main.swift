@@ -1,59 +1,201 @@
 import AppKit
+import Combine
+import HiveRender
 import SwiftUI
+
+/// The window's background: a soft vertical gradient from the style.
+final class RootView: NSView {
+    let gradient = CAGradientLayer()
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.addSublayer(gradient)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+    func apply(_ s: Style) {
+        gradient.colors = [s.windowTop.cgColor, s.windowBottom.cgColor]
+    }
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        gradient.frame = bounds
+        CATransaction.commit()
+        for v in subviews {
+            if v is NSHostingView<TitleBar> || v is TitleBarHost<TitleBar> {
+                v.frame = NSRect(x: 0, y: 0, width: bounds.width, height: TitleBar.height)
+            } else if v is PanesView {
+                // Cards start just under the bar, clear of the tabs.
+                let top = TitleBar.height + 4
+                v.frame = NSRect(x: 0, y: top, width: bounds.width, height: bounds.height - top)
+            }
+        }
+    }
+}
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let model = AppModel()
     var window: NSWindow!
-    var terminal: TerminalView!
+    var root: RootView!
+    var panes: PanesView!
+    var renderer: Renderer!
+    let palette = PalettePanel()
+    var bag: Set<AnyCancellable> = []
+    var appearanceObserver: NSKeyValueObservation?
 
     func applicationDidFinishLaunching(_ note: Notification) {
-        terminal = TerminalView(model: model)
-
-        let tabs = NSHostingView(rootView: TabBar(model: model))
-        let right = MainPane(tabs: tabs, terminal: terminal)
-        let split = NSSplitViewController()
-        let sidebarItem = NSSplitViewItem(sidebarWithViewController: NSHostingController(rootView: Sidebar(model: model)))
-        sidebarItem.minimumThickness = 200
-        sidebarItem.maximumThickness = 320
-        let mainVC = NSViewController()
-        mainVC.view = right
-        split.addSplitViewItem(sidebarItem)
-        split.addSplitViewItem(NSSplitViewItem(viewController: mainVC))
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        renderer = try! Renderer(fonts: FontSet(pointSize: 13, scale: scale))
 
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
-        window.title = "Hive"
         window.titlebarAppearsTransparent = true
-        window.appearance = NSAppearance(named: .darkAqua)
-        window.backgroundColor = NSColor(red: 0x1d / 255, green: 0x1f / 255, blue: 0x21 / 255, alpha: 1)
-        window.contentViewController = split
+        window.titleVisibility = .hidden
+        // An empty toolbar makes the title bar taller and centers the
+        // traffic lights in it, so they line up with our bar.
+        let toolbar = NSToolbar(identifier: "hive")
+        toolbar.showsBaselineSeparator = false
+        window.toolbar = toolbar
+        window.toolbarStyle = .unifiedCompact
+        window.title = "Hive"
         window.minSize = NSSize(width: 720, height: 420)
+        window.delegate = self
+
+        root = RootView(frame: window.contentLayoutRect)
+        panes = PanesView(model: model, renderer: renderer)
+        let bar = TitleBarHost(rootView: TitleBar(model: model, openPicker: { [weak self] in self?.showSessionPicker() },
+                                                  openPalette: { [weak self] in self?.showPalette() }))
+        // It sits in the title bar on purpose: no safe-area inset.
+        bar.safeAreaRegions = []
+        root.addSubview(panes)
+        root.addSubview(bar)
+        window.contentView = root
+
         window.setFrameAutosaveName("HiveMain")
-        // The controller sized the window to its fitting size, and a saved
-        // frame may be from a bad launch: never start smaller than useful.
         if window.frame.width < 900 || window.frame.height < 560 {
             window.setContentSize(NSSize(width: 1280, height: 800))
             window.center()
         }
-        window.delegate = self
-        window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(terminal)
+
+        model.onFrame = { [weak self] block in self?.panes.redraw(block) }
+        model.onLayout = { [weak self] in
+            self?.panes.sync()
+            self?.panes.claimSizes()
+        }
+        model.$style.sink { [weak self] s in self?.applyStyle(s) }.store(in: &bag)
+        followSystemAppearance()
 
         buildMenu()
+        window.makeKeyAndOrderFront(nil)
+        if ProcessInfo.processInfo.environment["HIVE_DEBUG"] != nil, let b = window.standardWindowButton(.closeButton) {
+            let f = b.convert(b.bounds, to: nil)
+            NSLog("hive traffic light center y (from top): %.1f  titlebar height: %.1f", window.frame.height - f.midY,
+                  window.frame.height - window.contentLayoutRect.height)
+        }
         model.start()
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func windowDidBecomeKey(_ notification: Notification) {
-        terminal.claimSizes()
-        terminal.needsDisplay = true
+    // MARK: appearance
+
+    private func followSystemAppearance() {
+        let update = { [weak self] in
+            guard let self else { return }
+            let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let s: Style = ProcessInfo.processInfo.environment["HIVE_STYLE"] == "light" ? .light
+                : ProcessInfo.processInfo.environment["HIVE_STYLE"] == "dark" ? .dark : (dark ? .dark : .light)
+            if model.style != s { model.style = s }
+        }
+        update()
+        appearanceObserver = NSApp.observe(\.effectiveAppearance) { _, _ in Task { @MainActor in update() } }
     }
 
-    func windowDidResignKey(_ notification: Notification) { terminal.needsDisplay = true }
+    private func applyStyle(_ s: Style) {
+        window.appearance = NSAppearance(named: s.dark ? .darkAqua : .aqua)
+        window.backgroundColor = s.windowBottom
+        root.apply(s)
+        renderer.theme = s.terminal
+        let engine = model.engine
+        model.vt.async { engine.theme = s.terminal }
+        panes.sync()
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        panes.claimSizes()
+        panes.sync()
+    }
+
+    func windowDidResignKey(_ notification: Notification) { panes.sync() }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    // MARK: palette and picker
+
+    func showPalette() {
+        palette.show(over: window, width: 460, placeholder: "Search commands…", style: model.style) { [weak self] q in
+            (self?.commands() ?? []).filter { fuzzy($0.title, q) }
+        }
+    }
+
+    func showSessionPicker() {
+        palette.show(over: window, at: CGPoint(x: TitleBar.leading - 4, y: TitleBar.height), width: 300,
+                     placeholder: "Filter or create…", style: model.style, items: { [weak self] q in
+            guard let self else { return [] }
+            var rows = self.model.sessions.enumerated().filter { fuzzy($0.element.label, q) }.map { i, s in
+                PaletteItem(title: s.label.isEmpty ? String(s.id.suffix(6)) : s.label,
+                            detail: s.agents > 0 ? "\(s.agents) agent\(s.agents == 1 ? "" : "s")" : (i < 9 ? "⌃\(i + 1)" : ""),
+                            symbol: "rectangle.split.2x1", checked: s.id == self.model.currentSession, section: self.model.host) { [weak self] in
+                    self?.model.select(session: s.id)
+                }
+            }
+            if q.isEmpty {
+                rows.append(PaletteItem(title: "New Session", detail: "⇧⌘N", symbol: "plus", section: "") { [weak self] in self?.model.newSession() })
+            }
+            return rows
+        }, onCreate: { [weak self] name in self?.model.newSession(label: name) })
+    }
+
+    func commands() -> [PaletteItem] {
+        let m = model
+        return [
+            PaletteItem(title: "New Tab", detail: "⌘T", symbol: "plus.square") { m.newTab() },
+            PaletteItem(title: "New Session", detail: "⇧⌘N", symbol: "plus.rectangle.on.rectangle") { m.newSession() },
+            PaletteItem(title: "Change Session…", detail: "⌘K", symbol: "rectangle.stack") { [weak self] in
+                DispatchQueue.main.async { self?.showSessionPicker() }
+            },
+            PaletteItem(title: "Split Right", detail: "⌘D", symbol: "rectangle.split.2x1") { [weak self] in self?.split(true) },
+            PaletteItem(title: "Split Down", detail: "⇧⌘D", symbol: "rectangle.split.1x2") { [weak self] in self?.split(false) },
+            PaletteItem(title: "Zoom Pane", detail: "⇧⌘↩", symbol: "arrow.up.left.and.arrow.down.right") { m.toggleZoom() },
+            PaletteItem(title: "Close Pane", detail: "⌘W", symbol: "xmark") { m.closePane() },
+            PaletteItem(title: "Close Tab", detail: "⇧⌘W", symbol: "xmark.square") { m.closeTab() },
+            PaletteItem(title: "Next Tab", detail: "⇧⌘]", symbol: "arrow.right") { m.selectWindow(offset: 1) },
+            PaletteItem(title: "Previous Tab", detail: "⇧⌘[", symbol: "arrow.left") { m.selectWindow(offset: -1) },
+            PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
+            PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
+        ]
+    }
+
+    private func prompt(_ title: String, _ value: String, done: @escaping (String) -> Void) {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = title
+            let field = NSTextField(string: value)
+            field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+            alert.accessoryView = field
+            alert.addButton(withTitle: "Rename")
+            alert.addButton(withTitle: "Cancel")
+            alert.window.initialFirstResponder = field
+            if alert.runModal() == .alertFirstButtonReturn, !field.stringValue.isEmpty { done(field.stringValue) }
+        }
+    }
+
+    private func split(_ horizontal: Bool) {
+        let s = panes.splitSize(horizontal: horizontal)
+        model.split(horizontal: horizontal, cols: s?.0, rows: s?.1)
+    }
 
     // MARK: menu
 
@@ -72,72 +214,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return i
         }
         let arrows: [(String, String)] = [("Left", "\u{F702}"), ("Right", "\u{F703}"), ("Up", "\u{F700}"), ("Down", "\u{F701}")]
+        let m = model
 
         menu("Hive", [
             NSMenuItem(title: "About Hive", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""),
+            .separator(),
+            item("Command Palette…", "p", [.command, .shift]) { [weak self] in self?.showPalette() },
             .separator(),
             NSMenuItem(title: "Hide Hive", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"),
             NSMenuItem(title: "Quit Hive", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"),
         ])
         menu("Shell", [
-            item("New Session", "n", [.command, .shift]) { [weak self] in self?.model.newSession() },
-            item("New Tab", "t") { [weak self] in self?.model.newTab() },
-            item("Split Right", "d") { [weak self] in
-                guard let self else { return }
-                let s = terminal.splitSize(horizontal: true)
-                model.split(horizontal: true, cols: s?.0, rows: s?.1)
-            },
-            item("Split Down", "d", [.command, .shift]) { [weak self] in
-                guard let self else { return }
-                let s = terminal.splitSize(horizontal: false)
-                model.split(horizontal: false, cols: s?.0, rows: s?.1)
-            },
+            item("New Session", "n", [.command, .shift]) { m.newSession() },
+            item("Change Session…", "k") { [weak self] in self?.showSessionPicker() },
+            item("New Tab", "t") { m.newTab() },
+            item("Split Right", "d") { [weak self] in self?.split(true) },
+            item("Split Down", "d", [.command, .shift]) { [weak self] in self?.split(false) },
             .separator(),
-            item("Close Pane", "w") { [weak self] in self?.model.closePane() },
+            item("Close Pane", "w") { m.closePane() },
+            item("Close Tab", "w", [.command, .shift]) { m.closeTab() },
         ])
         menu("Edit", [
-            NSMenuItem(title: "Copy", action: #selector(TerminalView.copy(_:)), keyEquivalent: "c"),
-            NSMenuItem(title: "Paste", action: #selector(TerminalView.paste(_:)), keyEquivalent: "v"),
+            NSMenuItem(title: "Copy", action: Selector(("copy:")), keyEquivalent: "c"),
+            NSMenuItem(title: "Paste", action: #selector(PaneView.paste(_:)), keyEquivalent: "v"),
         ])
-        var paneItems: [NSMenuItem] = [item("Zoom Pane", "\r", [.command, .shift]) { [weak self] in self?.model.toggleZoom() }, .separator()]
+        var paneItems: [NSMenuItem] = [item("Zoom Pane", "\r", [.command, .shift]) { m.toggleZoom() }, .separator()]
         for (name, key) in arrows {
-            paneItems.append(item("Focus \(name)", key, [.command, .option]) { [weak self] in self?.model.focus(name.lowercased()) })
+            paneItems.append(item("Focus \(name)", key, [.command, .option]) { m.focus(name.lowercased()) })
         }
         paneItems.append(.separator())
         for (name, key) in arrows {
-            paneItems.append(item("Resize \(name)", key, [.command, .control]) { [weak self] in self?.model.resizePane(name.lowercased()) })
+            paneItems.append(item("Resize \(name)", key, [.command, .control]) { m.resizePane(name.lowercased()) })
         }
         menu("Pane", paneItems)
         var windowItems: [NSMenuItem] = [
-            item("Next Tab", "]", [.command, .shift]) { [weak self] in self?.model.selectWindow(offset: 1) },
-            item("Previous Tab", "[", [.command, .shift]) { [weak self] in self?.model.selectWindow(offset: -1) },
+            item("Next Tab", "]", [.command, .shift]) { m.selectWindow(offset: 1) },
+            item("Previous Tab", "[", [.command, .shift]) { m.selectWindow(offset: -1) },
             .separator(),
         ]
         for i in 1...9 {
-            windowItems.append(item("Tab \(i)", "\(i)") { [weak self] in self?.model.selectWindow(index: i - 1) })
+            windowItems.append(item("Tab \(i)", "\(i)") { m.selectWindow(index: i - 1) })
         }
         menu("Window", windowItems)
         NSApp.mainMenu = main
-    }
-}
-
-/// The tab bar on top and the terminal below, laid out by hand: stack
-/// views left the Metal view at its minimum size.
-final class MainPane: NSView {
-    let tabs: NSView, terminal: NSView
-    let tabHeight: CGFloat = 36
-    init(tabs: NSView, terminal: NSView) {
-        self.tabs = tabs; self.terminal = terminal
-        super.init(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
-        addSubview(tabs)
-        addSubview(terminal)
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-    override func layout() {
-        super.layout()
-        tabs.frame = NSRect(x: 0, y: 0, width: bounds.width, height: tabHeight)
-        terminal.frame = NSRect(x: 0, y: tabHeight, width: bounds.width, height: max(0, bounds.height - tabHeight))
     }
 }
 

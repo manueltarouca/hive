@@ -10,6 +10,8 @@ public struct PaneDraw {
     /// Top-left corner in pixels.
     public var origin: SIMD2<Float>
     public var focused: Bool
+    /// Drawn over the whole pane last, to tint unfocused panes.
+    public var tint: SIMD4<Float>? = nil
     /// Pixels of the pane area beyond the grid (letterbox), filled with the
     /// background.
     public var size: SIMD2<Float>
@@ -138,7 +140,11 @@ public final class Renderer {
                 }
             }
         }
-        return bg + fg + deco
+        var tints: [QuadInstance] = []
+        for p in panes {
+            if let t = p.tint { tints.append(QuadInstance(pos: p.origin, size: p.size, uv: .zero, color: t, kind: 0)) }
+        }
+        return bg + fg + deco + tints
     }
 
     // MARK: drawing

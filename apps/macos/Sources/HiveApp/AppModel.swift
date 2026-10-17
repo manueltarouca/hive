@@ -70,6 +70,60 @@ struct BlockInfo: Equatable {
     var cols: Int, rows: Int
     var sizeOwner: String?
     var foreground: String?
+    var cwd: String?
+    var harness: String?
+    var agentState: String?
+    var exited = false
+    var exitCode = 0
+
+    /// The program as people call it: "Node", "Neovim", "Claude Code".
+    var program: String {
+        if let h = harness { return BlockInfo.harnessNames[h] ?? h.capitalized }
+        guard let fg = foreground, !fg.isEmpty else { return "shell" }
+        return BlockInfo.programNames[fg] ?? fg
+    }
+
+    /// An agent's task, from the title it sets ("✳ Arch review" → "Arch review").
+    var task: String? {
+        guard harness != nil else { return nil }
+        let t = title.drop { !$0.isLetter && !$0.isNumber }.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty || t == program ? nil : t
+    }
+
+    var shortDir: String {
+        guard var d = cwd, !d.isEmpty else { return "" }
+        let home = NSHomeDirectory()
+        if d.hasPrefix(home) { d = "~" + d.dropFirst(home.count) }
+        return d
+    }
+
+    /// Header and tab title: the label, an agent's task, or "Program ~/dir".
+    var titleParts: (primary: String, secondary: String) {
+        if !label.isEmpty { return (label, shortDir) }
+        if let task { return (task, (shortDir as NSString).lastPathComponent) }
+        return (program, shortDir)
+    }
+
+    var symbol: String {
+        switch harness ?? foreground ?? "" {
+        case "claude": return "sparkle"
+        case "codex": return "hexagon"
+        case "node", "bun", "deno", "pnpm", "npm": return "hexagon.fill"
+        case "nvim", "vim", "hx", "emacs": return "chevron.left.forwardslash.chevron.right"
+        case "lazygit", "git", "tig": return "plusminus.circle"
+        case "htop", "btop", "top": return "chart.bar.xaxis"
+        case "ssh", "mosh": return "network"
+        case "python", "python3": return "chevron.left.forwardslash.chevron.right"
+        default: return "apple.terminal"
+        }
+    }
+
+    static let programNames = [
+        "node": "Node", "nvim": "Neovim", "vim": "Vim", "hx": "Helix", "emacs": "Emacs", "lazygit": "Git Changes",
+        "python3": "Python", "python": "Python", "ruby": "Ruby", "go": "Go", "cargo": "Cargo", "docker": "Docker",
+        "ssh": "SSH", "bun": "Bun", "deno": "Deno", "claude": "Claude Code", "codex": "Codex",
+    ]
+    static let harnessNames = ["claude": "Claude Code", "codex": "Codex", "opencode": "OpenCode", "gemini": "Gemini", "grok": "Grok"]
 }
 
 /// The app's state. Lives on the main thread; talks to the server through
@@ -90,11 +144,13 @@ final class AppModel: ObservableObject {
     @Published var windows: [WindowInfo] = []
     @Published var activeWindow: String?
     @Published var blocks: [String: BlockInfo] = [:]
+    @Published var style: Style = .light
+    @Published var host = Host.current().localizedName ?? "This Mac"
     var clientID: String?
 
     /// Frames by block, drawn by the terminal view.
     var frames: [String: PaneFrame] = [:]
-    var onFrame: (() -> Void)?
+    var onFrame: ((String) -> Void)?
     /// Runs after the layout changed, so the view can size the panes.
     var onLayout: (() -> Void)?
     private var attached: Set<String> = []
@@ -198,7 +254,9 @@ final class AppModel: ObservableObject {
                 return
             }
             if self.currentSession == nil || !self.sessions.contains(where: { $0.id == self.currentSession }) {
-                select(session: sessions.first?.id)
+                // Like the reference app: come back to the session you were in.
+                let last = UserDefaults.standard.string(forKey: "lastSession")
+                select(session: sessions.first { $0.id == last }?.id ?? sessions.first?.id)
             }
         }
         reloadAgents()
@@ -232,6 +290,7 @@ final class AppModel: ObservableObject {
 
     func select(session id: String?) {
         currentSession = id
+        if let id { UserDefaults.standard.set(id, forKey: "lastSession") }
         reloadView()
     }
 
@@ -247,14 +306,19 @@ final class AppModel: ObservableObject {
             }
             var info: [String: BlockInfo] = [:]
             for (bid, b) in j["blocks"].object {
+                var cwd = b["foreground"]["cwd"].string
+                if let pwd = b["pwd"].string, let u = URL(string: pwd), u.isFileURL { cwd = u.path }
+                if cwd == nil || cwd!.isEmpty { cwd = b["agent"]["cwd"].string ?? b["cwd"].string }
+                let agentState = b["agent"]["state"].string
                 info[bid] = BlockInfo(title: b["title"].string ?? "", label: b["label"].string ?? "",
                                       cols: b["cols"].int ?? 0, rows: b["rows"].int ?? 0, sizeOwner: b["size_owner"].string,
-                                      foreground: b["foreground"]["name"].string)
+                                      foreground: b["foreground"]["name"].string, cwd: cwd,
+                                      harness: agentState == "ended" ? nil : b["agent"]["harness"].string,
+                                      agentState: agentState, exited: b["exited"].bool ?? false, exitCode: b["exit_code"].int ?? 0)
             }
             blocks = info
             attachVisible()
             onLayout?()
-            onFrame?()
         }
     }
 
@@ -280,7 +344,7 @@ final class AppModel: ObservableObject {
                     }
                     Task { @MainActor [weak self] in
                         self?.frames[b] = frame
-                        self?.onFrame?()
+                        self?.onFrame?(b)
                     }
                 }
             }
@@ -297,6 +361,7 @@ final class AppModel: ObservableObject {
         case "session_created", "session_destroyed":
             reloadSessions()
         case "session_event":
+            if ev["payload"]["event"]["payload"]["name"].string == "child_exited" { scheduleReload() }
             let sid = ev["payload"]["session_id"].string
             let inner = ev["payload"]["event"]
             let type = inner["type"].string
@@ -326,11 +391,29 @@ final class AppModel: ObservableObject {
 
     private var sid: JSON { .string(currentSession ?? "") }
 
-    func newSession() {
-        call("session.create", ["cwd": .string(NSHomeDirectory())]) { [weak self] j in
-            self?.currentSession = j["session_id"].string
+    func newSession(label: String = "") {
+        call("session.create", ["cwd": .string(NSHomeDirectory()), "label": .string(label)]) { [weak self] j in
+            self?.select(session: j["session_id"].string)
             self?.reloadSessions()
         }
+    }
+
+    func renameTab(_ label: String) {
+        guard let w = active else { return }
+        call("session.set_window_label", ["session_id": sid, "window_id": .string(w.id), "label": .string(label)])
+    }
+
+    func closeTab() {
+        guard let w = active else { return }
+        call("session.close_window", ["session_id": sid, "window_id": .string(w.id)])
+    }
+
+    /// Whether an agent in the window is working or blocked.
+    func status(of w: WindowInfo) -> String? {
+        let states = (w.layout?.rects().map(\.0) ?? []).compactMap { blocks[$0]?.agentState }
+        if states.contains("blocked") { return "blocked" }
+        if states.contains("working") { return "working" }
+        return nil
     }
 
     func newTab() { call("session.new_window", ["session_id": sid, "layout": ["cwd": .string(currentCwd())]]) }
@@ -388,7 +471,8 @@ final class AppModel: ObservableObject {
 
     /// The directory new panes start in: the focused pane's.
     private func currentCwd() -> String {
-        NSHomeDirectory()
+        if let f = focusedBlock, let d = blocks[f]?.cwd, FileManager.default.fileExists(atPath: d) { return d }
+        return NSHomeDirectory()
     }
 
     // MARK: input and size
