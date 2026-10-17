@@ -21,7 +21,8 @@ export HIVE_RESUME_CLAUDE='["sh","-c","echo resumed {id}; exec cat"]'
 H="$root/bin/hive"
 
 $H new hive-demo --cwd "$root" >/dev/null
-$H -s hive-demo send 'git log --oneline --graph --color=always -- apps/macos/Sources/Hive{Core,Render,Kit}'; $H -s hive-demo send-key enter
+# --no-pager and -n: the pane ends at a prompt, not in a pager, however long the history.
+$H -s hive-demo send 'git --no-pager log -n 12 --oneline --graph --color=always -- apps/macos/Sources/Hive{Core,Render,Kit}'; $H -s hive-demo send-key enter
 # An agent block: reports itself through the hook path and sets a task title.
 # Hooks run inside the pane, as an agent runs them: hive ignores reports from
 # another agent's process tree (this script may run under one).

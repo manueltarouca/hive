@@ -102,7 +102,7 @@ make vt build
   <aside class="panel" aria-label="hive, running">
     <picture>
       <source srcset={asset('/img/window-dark.webp')} media="(prefers-color-scheme: dark)" />
-      <img src={asset('/img/window-light.webp')} alt="hive with three agents in the sidebar, one blocked on a permission prompt, and a session split into a shell, a Claude Code pane and a test run." width="2200" height="1460" />
+      <img src={asset('/img/window-light.webp')} alt="hive with its sidebar of tabs, each a honeycomb of its programs: an agent at work, a Node server, a Python script and Vim. The open tab is split into a shell, a Claude Code pane and a test run." width="2200" height="1466" />
     </picture>
   </aside>
 </div>
