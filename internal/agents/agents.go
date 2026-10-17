@@ -223,6 +223,11 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
+	// Settings are often symlinks into a dotfiles repo: write the target, so
+	// the link survives the rename below.
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}

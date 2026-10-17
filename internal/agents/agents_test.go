@@ -120,3 +120,25 @@ func TestClaudeNotificationTypesAndPostToolUse(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallFollowsSymlinkedSettings(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "dotfiles-settings.json")
+	os.WriteFile(target, []byte(`{"model":"opus"}`), 0o644)
+	cfg := filepath.Join(dir, "claude")
+	os.MkdirAll(cfg, 0o700)
+	link := filepath.Join(cfg, "settings.json")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallClaude(cfg, "/bin/hive", false); err != nil {
+		t.Fatal(err)
+	}
+	if fi, _ := os.Lstat(link); fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("settings.json symlink was replaced by a file")
+	}
+	data, _ := os.ReadFile(target)
+	if !strings.Contains(string(data), "agent hook claude") {
+		t.Fatalf("target not updated: %s", data)
+	}
+}
