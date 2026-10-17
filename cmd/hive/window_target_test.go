@@ -24,7 +24,7 @@ func TestWindowSwitchesFollowTheBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	base := append(os.Environ(), "HIVE_SERVER="+filepath.Join(dir, "s.sock"), "HIVE_STATE_DIR="+filepath.Join(dir, "state"), "HIVE_SESSION=", "HIVE_BLOCK=")
+	base := testEnv(dir)
 	run := func(env []string, args ...string) string {
 		t.Helper()
 		cmd := exec.Command(bin, args...)
@@ -36,6 +36,8 @@ func TestWindowSwitchesFollowTheBlock(t *testing.T) {
 		return string(out)
 	}
 	defer run(base, "server", "stop")
+	run(base, "server", "start")
+	ownSettings(t, bin, base, dir)
 	labels := func() []string {
 		var v struct {
 			Windows []struct {

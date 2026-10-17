@@ -24,13 +24,7 @@ func TestEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := append(os.Environ(),
-		"HIVE_SERVER="+filepath.Join(dir, "s.sock"),
-		"HIVE_STATE_DIR="+filepath.Join(dir, "state"),
-		"HIVE_SESSION=", "HIVE_BLOCK=",
-		"HIVE_CONFIG="+filepath.Join(dir, "config"), // never the real settings
-		`HIVE_RESUME_CLAUDE=["sh","-c","echo resumed-{id}; exec cat"]`,
-	)
+	env := append(testEnv(dir), `HIVE_RESUME_CLAUDE=["sh","-c","echo resumed-{id}; exec cat"]`)
 	hive := func(args ...string) (string, int) {
 		t.Helper()
 		cmd := exec.Command(bin, args...)

@@ -18,11 +18,14 @@ func TestConfigCommands(t *testing.T) {
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
-	conf := filepath.Join(t.TempDir(), "hive", "config")
+	dir := t.TempDir()
+	conf := filepath.Join(dir, "hive", "config")
 	run := func(args ...string) (string, int) {
 		t.Helper()
 		cmd := exec.Command(bin, args...)
-		cmd.Env = append(os.Environ(), "HIVE_CONFIG="+conf, "HIVE_SERVER="+filepath.Join(t.TempDir(), "none.sock"))
+		// The test's own socket and state too, in case a command starts a
+		// server; HIVE_CONFIG last wins over testEnv's.
+		cmd.Env = append(testEnv(dir), "HIVE_CONFIG="+conf)
 		out, err := cmd.CombinedOutput()
 		if ee, ok := err.(*exec.ExitError); ok {
 			return string(out), ee.ExitCode()

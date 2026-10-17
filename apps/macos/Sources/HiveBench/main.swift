@@ -290,7 +290,7 @@ func engineScenario(cols: Int, rows: Int) -> [EngineRow] {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let env = ["HIVE_SERVER": dir.appendingPathComponent("s.sock").path,
                    "HIVE_STATE_DIR": dir.appendingPathComponent("state").path,
-                   "HIVE_CONFIG": dir.appendingPathComponent("config").path]
+                   "HIVE_CONFIG": dir.appendingPathComponent("config").path, "HIVE_SESSION": "", "HIVE_BLOCK": ""]
         func run(_ args: [String]) -> String {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: hive)

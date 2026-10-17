@@ -13,6 +13,12 @@ final class Server {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         process.executableURL = repo.appendingPathComponent("bin/hive")
         process.arguments = ["server", "run", "--socket", socket, "--state-dir", state.path]
+        // Its own socket, state and settings, always together: never the
+        // user's settings file (the server reads HIVE_CONFIG).
+        process.environment = ProcessInfo.processInfo.environment.merging([
+            "HIVE_SERVER": socket, "HIVE_STATE_DIR": state.path,
+            "HIVE_CONFIG": state.appendingPathComponent("config").path, "HIVE_SESSION": "", "HIVE_BLOCK": "",
+        ]) { $1 }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
@@ -78,6 +84,16 @@ func randomVT(seed: UInt64, count: Int) -> Data {
 }
 
 @Suite(.serialized) struct EngineTests {
+    /// The test's server reads a settings file in the test's own dir, never
+    /// the user's.
+    @Test func serverUsesItsOwnSettings() async throws {
+        let s = try Server(); defer { s.stop() }
+        let rig = Rig(s)
+        try await rig.connect()
+        let path = try await rig.call("config.get")["path"].string ?? ""
+        #expect(path.hasPrefix(s.state.path + "/"), "settings file: \(path)")
+    }
+
     @Test func mirrorMatchesServerOnRandomStreams() async throws {
         let server = try Server(); defer { server.stop() }
         let rig = Rig(server)

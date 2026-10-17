@@ -17,6 +17,12 @@ final class TestServer {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         process.executableURL = repo.appendingPathComponent("bin/hive")
         process.arguments = ["server", "run", "--socket", socket, "--state-dir", dir.appendingPathComponent("state").path]
+        // Its own socket, state and settings, always together: never the
+        // user's settings file (the server reads HIVE_CONFIG).
+        process.environment = ProcessInfo.processInfo.environment.merging([
+            "HIVE_SERVER": socket, "HIVE_STATE_DIR": dir.appendingPathComponent("state").path,
+            "HIVE_CONFIG": dir.appendingPathComponent("config").path, "HIVE_SESSION": "", "HIVE_BLOCK": "",
+        ]) { $1 }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
@@ -64,6 +70,16 @@ final class Updates: @unchecked Sendable {
 }
 
 @Suite(.serialized) struct HiveClientTests {
+    /// The test's server reads a settings file in the test's own dir, never
+    /// the user's.
+    @Test func serverUsesItsOwnSettings() async throws {
+        let s = try TestServer(); defer { s.stop() }
+        let h = Harness(s)
+        _ = try await h.connect()
+        let path = try await h.call("config.get")["path"].string ?? ""
+        #expect(path.hasPrefix(s.dir.path + "/"), "settings file: \(path)")
+    }
+
     @Test func callsAndErrors() async throws {
         let s = try TestServer(); defer { s.stop() }
         let h = Harness(s)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,7 +33,7 @@ func TestVersionIsStampedAtBuild(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	call := exec.Command(bin, "api", "call", "server.version")
-	call.Env = append(os.Environ(), "HIVE_SERVER="+filepath.Join(dir, "s.sock"), "HIVE_STATE_DIR="+filepath.Join(dir, "state"))
+	call.Env = testEnv(dir)
 	out, err = call.Output()
 	stop := exec.Command(bin, "server", "stop")
 	stop.Env = call.Env
@@ -42,5 +43,24 @@ func TestVersionIsStampedAtBuild(t *testing.T) {
 	}
 	if !strings.Contains(string(out), `"9.8.7-rc.1"`) {
 		t.Fatalf("server.version = %s", out)
+	}
+	ownSettings(t, bin, call.Env, dir)
+}
+
+// ownSettings fails unless the test's server reads a settings file in the
+// test's own dir: never the user's.
+func ownSettings(t *testing.T, bin string, env []string, dir string) {
+	t.Helper()
+	get := exec.Command(bin, "api", "call", "config.get")
+	get.Env = env
+	out, err := get.Output()
+	if err != nil {
+		t.Fatalf("config.get: %v", err)
+	}
+	var v struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(out, &v); err != nil || !strings.HasPrefix(v.Path, dir+"/") {
+		t.Fatalf("the test server's settings file is %q, not in %s", v.Path, dir)
 	}
 }
