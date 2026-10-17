@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -193,5 +194,60 @@ func TestScrollbackLimit(t *testing.T) {
 	fill(restored)
 	if has(restored, "line 00000") {
 		t.Fatal("a restored terminal ignored its limit")
+	}
+}
+
+// blockingWriter holds a snapshot mid-write until released.
+type blockingWriter struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (w *blockingWriter) Write(p []byte) (int, error) {
+	w.once.Do(func() { close(w.started) })
+	<-w.release
+	return len(p), nil
+}
+
+// The size is read without waiting for the terminal: encoding a snapshot
+// of full scrollback takes ~150 ms, and the server reads every terminal's
+// size while holding its own lock, so every API call would wait for it.
+func TestSizeDoesNotWaitForASnapshot(t *testing.T) {
+	v, err := New(80, 24, Hooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer v.Close()
+	v.Feed([]byte("hello\r\n"))
+	w := &blockingWriter{started: make(chan struct{}), release: make(chan struct{})}
+	done := make(chan error, 1)
+	go func() { done <- v.SnapshotTo(w) }()
+	<-w.started
+	sized := make(chan [2]uint16, 1)
+	go func() {
+		c, r := v.Size()
+		cw, ch := v.CellSize()
+		_, _ = cw, ch
+		sized <- [2]uint16{c, r}
+	}()
+	select {
+	case s := <-sized:
+		if s != [2]uint16{80, 24} {
+			t.Fatalf("size = %v", s)
+		}
+	case <-time.After(2 * time.Second):
+		close(w.release)
+		t.Fatal("Size waited for the snapshot")
+	}
+	close(w.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Resize(100, 30); err != nil {
+		t.Fatal(err)
+	}
+	if c, r := v.Size(); c != 100 || r != 30 {
+		t.Fatalf("after resize: %dx%d", c, r)
 	}
 }

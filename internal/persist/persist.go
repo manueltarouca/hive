@@ -177,7 +177,7 @@ func (s *Store) atomicWith(path string, write func(io.Writer) error, durable boo
 		return err
 	}
 	if durable {
-		if err := f.Sync(); err != nil {
+		if err := syncFile(f); err != nil {
 			return err
 		}
 	}

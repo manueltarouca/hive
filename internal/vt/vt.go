@@ -74,6 +74,10 @@ type Term struct {
 	t       *ghostty.Terminal
 	hooks   Hooks
 
+	// sizeMu guards the size, so reading it never waits for mu: a snapshot
+	// of full scrollback holds mu for ~150 ms. Taken last, never held while
+	// taking another lock.
+	sizeMu       sync.Mutex
 	cols, rows   uint16
 	cellW, cellH uint32
 	pending      []func()
@@ -152,6 +156,8 @@ func (v *Term) install() {
 		return da, true
 	})
 	t.SetEffectSize(func(*ghostty.Terminal) (ghostty.SizeReportSize, bool) {
+		v.sizeMu.Lock()
+		defer v.sizeMu.Unlock()
 		return ghostty.SizeReportSize{Rows: v.rows, Columns: v.cols, CellWidth: v.cellW, CellHeight: v.cellH}, true
 	})
 	t.SetEffectColorScheme(func(*ghostty.Terminal) (ghostty.ColorScheme, bool) {
@@ -300,9 +306,7 @@ func (v *Term) Feed(data []byte) {
 
 // Resize changes the terminal's size in cells, keeping the cell size.
 func (v *Term) Resize(cols, rows uint16) error {
-	v.mu.Lock()
-	cw, ch := v.cellW, v.cellH
-	v.mu.Unlock()
+	cw, ch := v.CellSize()
 	return v.ResizePx(cols, rows, cw, ch)
 }
 
@@ -316,22 +320,24 @@ func (v *Term) ResizePx(cols, rows uint16, cellW, cellH uint32) error {
 		if err := t.Resize(cols, rows, cellW, cellH); err != nil {
 			return err
 		}
+		v.sizeMu.Lock()
 		v.cols, v.rows, v.cellW, v.cellH = cols, rows, cellW, cellH
+		v.sizeMu.Unlock()
 		return nil
 	})
 }
 
 // CellSize returns the size of a cell in pixels.
 func (v *Term) CellSize() (w, h uint32) {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.sizeMu.Lock()
+	defer v.sizeMu.Unlock()
 	return v.cellW, v.cellH
 }
 
 // Size returns the terminal's size in cells.
 func (v *Term) Size() (cols, rows uint16) {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.sizeMu.Lock()
+	defer v.sizeMu.Unlock()
 	return v.cols, v.rows
 }
 

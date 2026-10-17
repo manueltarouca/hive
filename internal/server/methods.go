@@ -1100,9 +1100,7 @@ func (s *Server) registerAgentMethods() {
 				"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": a.Message, "event": in.Event,
 			})
 			s.mu.Unlock()
-			if err := s.flushState(); err != nil {
-				return nil, api.Internal("save: %v", err)
-			}
+			s.saveStateSoon()
 			return &copyA, nil
 		})
 

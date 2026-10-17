@@ -63,13 +63,17 @@ type Config struct {
 	ConfigPoll time.Duration
 	// OnFlush, when set, hears about every save (benchmarks).
 	OnFlush func(FlushStats)
+	// beforeSnapshot, when set, runs before each snapshot is written (tests).
+	beforeSnapshot func(blockID string)
+	// beforeStateSave, when set, runs before state.json is written (tests).
+	beforeStateSave func()
 }
 
 // FlushStats describes one save: how long it took, from waiting for the
 // previous one to state.json written, and how many terminals it snapshotted.
 type FlushStats struct {
 	Took      time.Duration
-	Wait      time.Duration // waiting for another save to finish
+	Wait      time.Duration // waiting for other saves' locks
 	Snapshots int
 }
 
@@ -123,6 +127,8 @@ type Server struct {
 
 	dirty    chan struct{}
 	flushReq chan chan error
+	// stateSave asks stateLoop to write state.json now (agent.report).
+	stateSave chan struct{}
 	quit     chan struct{}
 	stopped  chan struct{}
 	stopOnce sync.Once
@@ -149,7 +155,7 @@ func New(cfg Config) (*Server, error) {
 		cfg: cfg, log: cfg.Logger, reg: api.New(), bus: events.New(4096),
 		store:  persist.New(cfg.StateDir),
 		blocks: map[string]*rec{}, clients: map[string]*Client{}, exits: map[string]exitRec{}, started: time.Now(),
-		dirty: make(chan struct{}, 1), flushReq: make(chan chan error),
+		dirty: make(chan struct{}, 1), flushReq: make(chan chan error), stateSave: make(chan struct{}, 1),
 		quit: make(chan struct{}), stopped: make(chan struct{}),
 	}
 	s.conf, s.confDiags, s.confStamp = s.readConfig()
@@ -203,6 +209,7 @@ func (s *Server) Serve() error {
 	}
 	s.ln = ln
 	go s.persistLoop()
+	go s.stateLoop()
 	s.log.Info("listening", "socket", s.cfg.Socket, "state", s.cfg.StateDir)
 	err = s.srv.Serve(ln)
 	if errors.Is(err, http.ErrServerClosed) {
@@ -561,6 +568,29 @@ func (s *Server) markDirty() {
 	}
 }
 
+// saveStateSoon writes state.json right away, in the background: callers
+// such as agent.report don't wait for the disk. Requests made during a save
+// coalesce into one more save.
+func (s *Server) saveStateSoon() {
+	select {
+	case s.stateSave <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Server) stateLoop() {
+	for {
+		select {
+		case <-s.quit:
+			return
+		case <-s.stateSave:
+			if err := s.flushState(); err != nil {
+				s.log.Error("save failed", "err", err)
+			}
+		}
+	}
+}
+
 func (s *Server) persistLoop() {
 	tick := time.NewTicker(30 * time.Second)
 	defer tick.Stop()
@@ -588,70 +618,77 @@ func (s *Server) persistLoop() {
 	}
 }
 
-var flushMu sync.Mutex
+// Saves take two locks. snapMu serializes snapshot writes and the GC of
+// snapshot files, so a GC never removes a snapshot's temp file mid-write.
+// stateMu serializes state.json. agent.report takes only stateMu: with many
+// full panes the snapshots take seconds, and a report mustn't wait for them.
+var snapMu, stateMu sync.Mutex
 
 // flush snapshots every block whose output changed and writes state.json.
 // With all, every block is snapshotted.
 func (s *Server) flush(all bool) error { return s.save(all, true) }
 
 // flushState saves sessions, layouts and agents, but no terminal snapshots:
-// for agent.report, whose record must reach the disk now, while snapshots
+// for agent.report (in the background, see saveStateSoon), while snapshots
 // (scrollback) can wait for the next timed save.
 func (s *Server) flushState() error { return s.save(false, false) }
 
 func (s *Server) save(all, snapshots bool) error {
 	start := time.Now()
-	flushMu.Lock()
-	defer flushMu.Unlock()
-	locked := time.Now()
+	var wait time.Duration
 	snaps := 0
 	if s.cfg.OnFlush != nil {
-		defer func() { s.cfg.OnFlush(FlushStats{Took: time.Since(start), Wait: locked.Sub(start), Snapshots: snaps}) }()
+		defer func() { s.cfg.OnFlush(FlushStats{Took: time.Since(start), Wait: wait, Snapshots: snaps}) }()
 	}
-	s.mu.Lock()
-	sessions, err := json.Marshal(s.sessions)
-	if err != nil {
-		s.mu.Unlock()
-		return err
+	if snapshots {
+		snapMu.Lock()
+		defer snapMu.Unlock()
+		wait = time.Since(start)
+		snaps = s.saveSnapshots(all)
 	}
-	// Block states are encoded while s.mu is held: events and agent reports
-	// change their maps and pointers in place.
-	recs := map[string]*rec{}
-	lastSnap := map[string]uint64{}
-	for bid, r := range s.blocks {
-		if r.closing {
-			continue
-		}
-		r.st.Cols, r.st.Rows = r.b.Size()
-		recs[bid] = r
-		lastSnap[bid] = r.snapSeq
+	// The state is read after the snapshots, never before: a report saved
+	// meanwhile must not be overwritten by older state.
+	t := time.Now()
+	stateMu.Lock()
+	wait += time.Since(t)
+	if s.cfg.beforeStateSave != nil {
+		s.cfg.beforeStateSave()
 	}
-	states := map[string]*persist.BlockState{}
-	for bid, r := range recs {
-		states[bid] = r.st
-	}
-	blocksJSON, err := json.Marshal(states)
-	s.mu.Unlock()
+	live, err := s.saveState()
+	stateMu.Unlock()
 	if err != nil {
 		return err
 	}
+	if snapshots {
+		s.store.GC(live)
+	}
+	return nil
+}
 
+// saveSnapshots writes the snapshot of every block whose output changed
+// (every block, with all), under snapMu, and says how many it wrote.
+func (s *Server) saveSnapshots(all bool) int {
 	type snapJob struct {
 		id  string
 		r   *rec
 		seq uint64
 	}
 	var jobs []snapJob
-	for bid, r := range recs {
-		if !snapshots {
-			break
+	s.mu.Lock()
+	for bid, r := range s.blocks {
+		if r.closing {
+			continue
 		}
-		if seq := r.b.Seq(); all || seq != lastSnap[bid] {
+		if seq := r.b.Seq(); all || seq != r.snapSeq {
 			jobs = append(jobs, snapJob{bid, r, seq})
 		}
 	}
-
+	s.mu.Unlock()
+	n := 0
 	for _, j := range jobs {
+		if s.cfg.beforeSnapshot != nil {
+			s.cfg.beforeSnapshot(j.id)
+		}
 		if err := s.store.SaveSnapshot(j.id, j.r.b.SnapshotTo); err != nil {
 			s.log.Warn("snapshot failed", "block", j.id, "err", err)
 			continue
@@ -659,33 +696,58 @@ func (s *Server) save(all, snapshots bool) error {
 		s.mu.Lock()
 		j.r.snapSeq = j.seq
 		s.mu.Unlock()
-		snaps++
+		n++
+	}
+	return n
+}
+
+// saveState writes state.json, under stateMu, and returns its blocks.
+func (s *Server) saveState() (map[string]bool, error) {
+	s.mu.Lock()
+	sessions, err := json.Marshal(s.sessions)
+	if err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	// Block states are encoded while s.mu is held: events and agent reports
+	// change their maps and pointers in place.
+	states := map[string]*persist.BlockState{}
+	for bid, r := range s.blocks {
+		if r.closing {
+			continue
+		}
+		r.st.Cols, r.st.Rows = r.b.Size()
+		states[bid] = r.st
+	}
+	blocksJSON, err := json.Marshal(states)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
 	}
 	st := &persist.State{}
 	if err := json.Unmarshal(sessions, &st.Sessions); err != nil {
-		return err
+		return nil, err
 	}
 	if err := json.Unmarshal(blocksJSON, &st.Blocks); err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.store.SaveState(st); err != nil {
-		return err
+		return nil, err
 	}
 	live := map[string]bool{}
 	for bid := range st.Blocks {
 		live[bid] = true
 	}
-	s.store.GC(live)
-	return nil
+	return live, nil
 }
 
 // Flush writes state now and waits for it.
 func (s *Server) Flush() error { return s.flush(false) }
 
 func (s *Server) snapshotBlock(blockID string) {
-	// Under flushMu, so a flush's GC never removes this snapshot's temp file.
-	flushMu.Lock()
-	defer flushMu.Unlock()
+	// Under snapMu, so a flush's GC never removes this snapshot's temp file.
+	snapMu.Lock()
+	defer snapMu.Unlock()
 	s.mu.Lock()
 	r := s.blocks[blockID]
 	s.mu.Unlock()

@@ -233,6 +233,17 @@ func TestRestoreAfterRestart(t *testing.T) {
 	h.call("agent.report", map[string]any{"block_id": agentBlock, "harness": "claude", "state": "idle",
 		"session_id": "33333333-4444", "event": "SessionStart"})
 	h.call("session.set_window_label", map[string]any{"session_id": sid, "window_id": created["window_id"], "label": "main"})
+	// The program's title arrives on its own time: wait for it before
+	// stopping, or the final save can run first.
+	for deadline := time.Now().Add(3 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		raw, _ := json.Marshal(h.call("agent.list", nil))
+		if strings.Contains(string(raw), "Fix login") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the title never arrived: %s", raw)
+		}
+	}
 	h.stop()
 
 	h2 := start(t, state, resume)

@@ -148,8 +148,10 @@ These amendments win over the M1 detail above where they conflict.
    - `client.register` / `client.list` / `client_connected`.
    - Each block has a `size_owner`: the most recent attaching client with
      size authority sets the PTY size, and the others letterbox.
-4. **Durability.** `agent.report` flushes `state.json` synchronously, and a
-   block is snapshotted on `child_exited`.
+4. **Durability.** `agent.report` saves `state.json` at once in the
+   background (made durable before its rename), so hooks never wait for
+   the disk; a block is snapshotted on `child_exited`. Snapshots and
+   `state.json` take separate locks (bench/README.md has the numbers).
 5. **Claude hooks.**
    - SessionStart (any `source`, overwriting `session_id`: `/clear` mints a
      new one) and SessionEnd (the agent ended, so don't resume it).
