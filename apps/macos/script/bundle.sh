@@ -8,6 +8,10 @@ root="$(cd "$here/../.." && pwd)"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
 make -C "$root" build >/dev/null
+# Semver from the Makefile (the git tag). Info.plist takes only x.y.z, so the
+# full version, with any pre-release or build part, goes in HiveVersion.
+version="$(make -s -C "$root" version)"
+core="$(printf '%s' "$version" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
 cd "$here"
 swift build -c "$config" --product Hive
 bin="$(swift build -c "$config" --show-bin-path)"
@@ -43,12 +47,16 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleExecutable</key><string>Hive</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>$core</string>
+  <key>CFBundleVersion</key><string>$core</string>
+  <key>HiveVersion</key><string>$version</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
 PLIST
+# Extended attributes (com.apple.provenance, quarantine) would be sealed into
+# the signature and then shipped as ._ files that break it when unzipped.
+xattr -cr "$app"
 codesign --force --deep --sign - "$app" >/dev/null
 echo "$app"

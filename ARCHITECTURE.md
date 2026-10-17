@@ -6,7 +6,8 @@ A terminal multiplexer for agent-heavy work. It replaces tmux.
 
 - **Stable names.** CLI verbs and flags, method names and arguments, event
   names and exit codes are a contract. Scripts and agents rely on them, so
-  they don't change.
+  they break only in a new major version (semver; during 0.x, in a minor
+  version), and `CHANGELOG.md` lists it.
 - **One API.** The app, the CLI and scripts all use the server's API. There
   is nothing only the app can do.
 - **Agents are first-class.** Persistence, agent hooks and resume live in

@@ -45,7 +45,7 @@ Copy the three folders in `skills/` of https://github.com/manueltarouca/hive to 
 Follow the `hive-setup` skill. If you can't load skills yet, read it here:
 https://raw.githubusercontent.com/manueltarouca/hive/main/skills/hive-setup/SKILL.md
 
-It builds hive from source, puts it on `PATH`, checks that it works, and connects Claude Code with hooks.
+It installs hive from a release (macOS on Apple Silicon, Linux x86_64) or builds it from source, puts it on `PATH`, checks that it works, and connects Claude Code with hooks.
 
 ---
 

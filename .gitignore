@@ -10,3 +10,4 @@ site/node_modules/
 third_party/
 CLAUDE.local.md
 .DS_Store
+dist/

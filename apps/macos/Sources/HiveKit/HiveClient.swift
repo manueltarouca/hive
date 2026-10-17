@@ -55,7 +55,7 @@ public final class HiveClient {
     }
 
     /// Connects and says hello. `ready` runs once the server has welcomed us.
-    public func connect(name: String, version: String = "0.1", ready: @escaping (Result<String, Error>) -> Void) {
+    public func connect(name: String, version: String, ready: @escaping (Result<String, Error>) -> Void) {
         var greeted = false
         ws.onOpen = { [weak self] in
             self?.sendJSON(["type": "hello", "name": .string(name), "kind": "app", "platform": "darwin", "version": .string(version)])

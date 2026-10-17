@@ -43,10 +43,21 @@ Note each agent's full command line. Flags such as `--model` or
 **The window you are in.** If `TMUX_PANE` is set, that pane is you:
 `tmux display -p -t "$TMUX_PANE" '#{session_name}:#{window_index}'`.
 
+**Some windows stay in tmux.** A moved pane gets a new process. Anything
+whose value lives in the running process is lost by moving it, for example:
+- a long job or migration in the middle of its run
+- an SSH session or a REPL holding state
+- a process that can't simply be started again, such as one holding a lock,
+  a tunnel, a `caffeinate`, or a foreground job the user is watching
+
+Plan those as **stays in tmux**, and never stop them to move them. When
+unsure, ask. A partial move is a normal outcome, not a failure.
+
 Show the user a table with these columns, and agree on what moves:
 - tmux window
 - what runs in each pane
-- the plan for each pane: resume the agent, re-run the command, or plain
+- the plan for each pane: resume the agent, re-run the command, stays in
+  tmux, or plain
   shell
 
 ## 2. Find each agent's session
@@ -123,13 +134,17 @@ For each agent pane, in order:
    - If the resume failed, the hive pane still has its shell. Read the error
      and fix it, or resume it in tmux again. Nothing is lost.
 
-Other programs (dev servers, watchers, `tail -f`): stop them in tmux
-(`ctrl+c`), then start them in hive. Plain shells need nothing; their
-directory is enough.
+Other programs:
+- **Easy to restart** (dev servers, watchers, `tail -f`): with the user's OK,
+  stop them in tmux (`ctrl+c`), then start them in hive.
+- **Can't restart without loss:** they stay in tmux, as agreed in step 1.
+- **Plain shells:** need nothing; their directory is enough.
 
 ## 5. Finish
 
-- **Tell the user what moved and what didn't**, as a short list.
+- **Tell the user what moved and what stayed in tmux, and why**, as a short
+  list. The windows that stayed can move later, once their process
+  finishes.
 - **Leave the old tmux windows open** for the user to close when happy. Their
   scrollback is still useful. Don't run `tmux kill-session` yourself.
 - **Your own window goes last.** Tell the user the command that resumes this

@@ -160,6 +160,9 @@ struct BlockInfo: Equatable {
 /// the engine on the `hive.vt` queue.
 @MainActor
 final class AppModel: ObservableObject {
+    /// The semver the bundle was built with (Info.plist HiveVersion).
+    static let version = Bundle.main.object(forInfoDictionaryKey: "HiveVersion") as? String ?? "0.0.0-dev"
+
     let vt = DispatchQueue(label: "hive.vt", qos: .userInteractive)
     /// Replaced on every reconnect.
     private(set) var client: HiveClient
@@ -249,7 +252,7 @@ final class AppModel: ObservableObject {
             engine.client.onEvent = { ev in Task { @MainActor in self?.handleEvent(ev) } }
             engine.client.onClose = { err in Task { @MainActor in self?.disconnected(err) } }
             engine.client.onError = { kind, block, err in NSLog("hive error (%@ %@): %@", kind ?? "-", block ?? "-", err.description) }
-            engine.client.connect(name: "Hive.app", version: "0.1") { result in
+            engine.client.connect(name: "Hive.app", version: AppModel.version) { result in
                 Task { @MainActor in
                     switch result {
                     case .success(let id):

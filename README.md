@@ -49,8 +49,15 @@ an agent can do through the same API.
 
 ## Install
 
-hive builds from source. You need Go 1.26 and Zig **0.16** exactly (Ghostty's
-build refuses other versions). The Mac app needs macOS 14 and Xcode 16.
+Download `hive` for macOS (Apple Silicon) or Linux (x86_64), and `Hive.app`,
+from [Releases](https://github.com/manueltarouca/hive/releases).
+[Installation](https://manueltarouca.github.io/hive/docs/installation) shows
+how to check the download, and how to open the app, which isn't signed with
+an Apple Developer ID yet.
+
+To build from source, you need Go 1.26 and Zig **0.16** exactly (Ghostty's
+build refuses other versions). The Mac app needs macOS 14 to run, and
+Xcode 27 to build.
 
 ```sh
 brew install go zig@0.16
@@ -131,8 +138,8 @@ curl --unix-socket "$HIVE_SERVER" http://hive/v1/call \
   -H 'content-type: application/json' -d '{"method":"session.list"}'
 ```
 
-Command names, method names and exit codes don't change between versions, so
-scripts keep working. See [the CLI](https://manueltarouca.github.io/hive/docs/cli)
+Command names, method names and exit codes are stable: they break only in a
+new major version (see the [changelog](CHANGELOG.md)). See [the CLI](https://manueltarouca.github.io/hive/docs/cli)
 and [the server API](https://manueltarouca.github.io/hive/docs/api).
 
 ## Restarts

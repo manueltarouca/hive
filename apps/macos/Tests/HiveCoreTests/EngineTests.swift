@@ -38,7 +38,7 @@ final class Rig: @unchecked Sendable {
     }
     func connect() async throws {
         _ = try await withCheckedThrowingContinuation { (c: CheckedContinuation<String, Error>) in
-            queue.async { self.client.connect(name: "engine-tests") { c.resume(with: $0) } }
+            queue.async { self.client.connect(name: "engine-tests", version: "0.0.0-test") { c.resume(with: $0) } }
         }
     }
     func call(_ method: String, _ params: JSON = [:]) async throws -> JSON {

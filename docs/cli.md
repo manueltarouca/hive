@@ -10,8 +10,10 @@ description: Every hive command, its options, and its exit codes.
 `hive` is the server and the command-line interface in one program. Inside a
 hive terminal it is already on `PATH`.
 
-Commands, flags and exit codes don't change between versions, so your scripts
-keep working.
+Commands, flags and exit codes are stable. They break only in a new major
+version, and the
+[changelog](https://github.com/manueltarouca/hive/blob/main/CHANGELOG.md)
+lists every change.
 
 ## Sessions
 

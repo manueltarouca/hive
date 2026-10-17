@@ -45,7 +45,9 @@ A call answers with `{"result": …}`, or with `{"error": {"status", "code",
 
 ## Methods
 
-Method names don't change between versions, so scripts keep working.
+Method names are stable. They break only in a new major version, and the
+[changelog](https://github.com/manueltarouca/hive/blob/main/CHANGELOG.md)
+lists every change.
 
 | Group | Methods |
 | --- | --- |

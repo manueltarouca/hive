@@ -37,7 +37,7 @@ final class Harness: @unchecked Sendable {
 
     func connect() async throws -> String {
         try await withCheckedThrowingContinuation { c in
-            queue.async { self.client.connect(name: "tests") { c.resume(with: $0) } }
+            queue.async { self.client.connect(name: "tests", version: "0.0.0-test") { c.resume(with: $0) } }
         }
     }
 

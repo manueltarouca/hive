@@ -1,25 +1,56 @@
 ---
 name: hive-setup
-description: Install hive, the terminal multiplexer for agent-heavy work, from source; build the macOS app; connect Claude Code to it with hooks; check it works; or remove it. Use it when the user wants to try, install, set up, update, or uninstall hive, when `hive` is not found, or when they paste a hive setup prompt.
+description: Install hive, the terminal multiplexer for agent-heavy work, from a release or from source; set up the macOS app; connect Claude Code to it with hooks; check it works; or remove it. Use it when the user wants to try, install, set up, update, or uninstall hive, when `hive` is not found, or when they paste a hive setup prompt.
 ---
 
 # Setting up hive
 
-hive builds from source; there are no binaries yet. It is one Go program,
-`hive` (server and CLI), plus an optional native macOS app. The server runs
-on macOS and Linux.
+hive is one program, `hive` (server and CLI), plus an optional native macOS
+app. Releases have binaries for macOS on Apple Silicon and Linux x86_64. On
+any other platform, or to follow `main`, build from source.
 
 Do the steps yourself and report what you did. Before each step that changes
 something outside the clone, say what it changes.
 
-## 1. Check the tools
+## 1. From a release (macOS arm64, Linux x86_64)
+
+Use `curl`, not a browser: macOS blocks command-line programs that a browser
+downloaded. Take the latest version from
+https://github.com/manueltarouca/hive/releases, and always check the
+checksum:
+
+```sh
+V=0.1.0 OS=macos-arm64    # or linux-amd64 (needs glibc 2.28+)
+cd "$(mktemp -d)"
+curl -fsSLO https://github.com/manueltarouca/hive/releases/download/v$V/hive-$V-$OS.tar.gz
+curl -fsSLO https://github.com/manueltarouca/hive/releases/download/v$V/SHA256SUMS
+shasum -a 256 --ignore-missing -c SHA256SUMS   # Linux: sha256sum --ignore-missing -c SHA256SUMS
+tar -xzf hive-$V-$OS.tar.gz
+mkdir -p ~/.local/bin && mv hive-$V-$OS/hive ~/.local/bin/
+```
+
+- **The app:** download `Hive-$V-macos-arm64.zip` the same way, then
+  `ditto -x -k Hive-$V-macos-arm64.zip /Applications`. Use `ditto`: it keeps
+  the app's signature intact.
+- **First launch:** a `curl` download carries no quarantine, so the app
+  opens normally. If the user downloaded it in a browser instead, macOS blocks
+  the first launch:
+  - macOS 15+: **Open Anyway** in System Settings → Privacy & Security.
+  - macOS 14: Control-click → **Open**.
+- **PATH:** if `~/.local/bin` isn't on `PATH`, tell the user which line to
+  add to their shell profile.
+
+Then skip to step 3 (Check it works). Steps 1b and 2 below build from source
+instead.
+
+## 1b. Check the tools
 
 | Tool | Version | Notes |
 | --- | --- | --- |
 | git | any | |
 | Go | 1.26+ | `go version` |
 | Zig | **0.16.x exactly** | Ghostty's build refuses other minor versions. The default `brew install zig` is newer, so use `zig@0.16`. |
-| Xcode | 16+ | Only for the macOS app. |
+| Xcode | 27+ | Only to build the macOS app. |
 
 On macOS with Homebrew: `brew install go zig@0.16`. Ask before installing
 anything the user doesn't have.

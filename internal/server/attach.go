@@ -22,7 +22,7 @@ import (
 //
 // Client → server, JSON text messages:
 //
-//	{"type":"hello","name":"Hive.app","kind":"app","platform":"darwin","version":"0.1"}
+//	{"type":"hello","name":"Hive.app","kind":"app","platform":"darwin","version":"0.1.0"}
 //	{"type":"subscribe","block_id":"block:…"}
 //	{"type":"unsubscribe","block_id":"block:…"}
 //	{"type":"input","block_id":"block:…","data":"ls\r"}

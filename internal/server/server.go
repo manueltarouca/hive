@@ -38,8 +38,9 @@ import (
 	"github.com/manueltarouca/hive/internal/vt"
 )
 
-// Version of hive.
-const Version = "0.1.0-dev"
+// Version of hive, as semver. Release builds set it at link time from the
+// git tag (see the Makefile); other builds are 0.0.0-dev.
+var Version = "0.0.0-dev"
 
 // Config for a server.
 type Config struct {
