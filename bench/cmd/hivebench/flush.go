@@ -23,8 +23,8 @@ type flushStep struct {
 	Report     Dist   `json:"agent_report"`
 	Save       Dist   `json:"save"`
 	SaveWait   Dist   `json:"save_wait"`
-	// The reports' own saves (state.json only): waiting for locks, and the
-	// rest (writing and syncing).
+	// The reports' own saves (state.json only): waiting for the save locks,
+	// and the rest (s.mu, encoding, writing and syncing).
 	StateWait Dist   `json:"state_save_wait"`
 	StateIO   Dist   `json:"state_save_io"`
 	Snapshots int    `json:"snapshots_per_save_max"`

@@ -57,8 +57,9 @@ panes, `agent.report` p99, empty / full scrollback:
 | a terminal's size read without its lock | 3.3 ms | 107 ms |
 
 Each fix was found by measuring the one before it: the report's own save
-split into lock wait (~5 ms) and I/O (203 ms, a full cache flush behind
-1.5 GB of snapshots), then state saves stuck behind `s.mu`, which
+split into save-lock wait (~5 ms) and the rest (203 ms: mostly a full
+cache flush behind 1.5 GB of snapshots; it also counts `s.mu`, encoding
+and writing), then state saves stuck behind `s.mu`, which
 `saveState` held while `Term.Size` waited ~150 ms for a snapshot's encode.
 Full scrollback at 128 panes stays degraded (p99 85–107 ms, p50 under
 1 ms). The CPU profile there is 86% pty `read` syscalls (128 readers at

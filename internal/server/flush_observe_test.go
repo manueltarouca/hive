@@ -74,7 +74,7 @@ func TestAgentReportSavesOnlyState(t *testing.T) {
 	if len(saves) != 1 || saves[0].Snapshots != 0 {
 		t.Fatalf("agent.report's save = %+v, want one save with no snapshots", saves)
 	}
-	if st, err := persist.New(h.state).LoadState(); err != nil || st.Blocks[bid].Agent == nil {
+	if st, err := persist.New(h.state).LoadState(); err != nil || st == nil || st.Blocks[bid] == nil || st.Blocks[bid].Agent == nil {
 		t.Fatalf("the agent record wasn't saved: %v", err)
 	}
 }
@@ -100,6 +100,9 @@ func TestAgentReportDoesNotWaitForSnapshots(t *testing.T) {
 		}
 	})
 	defer h.stop()
+	var once sync.Once
+	unblock := func() { armed.Store(false); once.Do(func() { close(release) }) }
+	defer unblock() // before stop: a held snapshot would hang shutdown
 	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c", "echo busy; exec cat"}})
 	sid, bid := created["session_id"].(string), strs(created["block_ids"])[0]
 	h.waitScreen(sid, bid, "busy")
@@ -123,12 +126,18 @@ func TestAgentReportDoesNotWaitForSnapshots(t *testing.T) {
 			t.Fatal(err)
 		}
 	case <-time.After(2 * time.Second):
-		armed.Store(false)
-		close(release)
 		t.Fatal("agent.report waited for the snapshot save")
 	}
-	armed.Store(false)
-	close(release)
+	// The report's record reaches the disk while the snapshot is still held.
+	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		if st, err := persist.New(h.state).LoadState(); err == nil && st != nil && st.Blocks[bid] != nil && st.Blocks[bid].Agent != nil && st.Blocks[bid].Agent.State == "working" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the report's save waited for the snapshot save")
+		}
+	}
+	unblock()
 	if err := <-saved; err != nil {
 		t.Fatal(err)
 	}
@@ -175,4 +184,27 @@ func TestAgentReportDoesNotWaitForItsSave(t *testing.T) {
 		t.Fatal("agent.report waited for its save")
 	}
 	stuck.Store(false)
+}
+
+// Once Shutdown's final save is done, no later save may write: blocks are
+// closing by then and saveState skips them, so a save from a report that
+// arrives during shutdown (an agent's exit hook) or a pending background
+// save would leave a state.json with no blocks, and nothing to restore.
+func TestNoSaveAfterShutdownsFinalSave(t *testing.T) {
+	state := t.TempDir()
+	h := startCfg(t, state, func(c *Config) { c.FlushDelay = time.Hour })
+	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c", "echo up; exec cat"}})
+	sid, bid := created["session_id"].(string), strs(created["block_ids"])[0]
+	h.waitScreen(sid, bid, "up")
+	h.stop()
+	if err := h.srv.flushState(); err != nil {
+		t.Fatal(err)
+	}
+	st, err := persist.New(state).LoadState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Blocks) != 1 {
+		t.Fatalf("after a late save, state.json has %d blocks", len(st.Blocks))
+	}
 }

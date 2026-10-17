@@ -149,8 +149,11 @@ These amendments win over the M1 detail above where they conflict.
    - Each block has a `size_owner`: the most recent attaching client with
      size authority sets the PTY size, and the others letterbox.
 4. **Durability.** `agent.report` saves `state.json` at once in the
-   background (made durable before its rename), so hooks never wait for
-   the disk; a block is snapshotted on `child_exited`. Snapshots and
+   background, so hooks never wait for the disk; a save error is logged,
+   not returned to the hook. The data is ordered before the rename
+   (F_BARRIERFSYNC on macOS, fsync on Linux): a power cut can lose the
+   latest save, never tear the file. Once Shutdown's final save is done,
+   no later save writes. A block is snapshotted on `child_exited`. Snapshots and
    `state.json` take separate locks (bench/README.md has the numbers).
 5. **Claude hooks.**
    - SessionStart (any `source`, overwriting `session_id`: `/clear` mints a

@@ -129,6 +129,9 @@ type Server struct {
 	flushReq chan chan error
 	// stateSave asks stateLoop to write state.json now (agent.report).
 	stateSave chan struct{}
+	// sealed, under stateMu: Shutdown's final save is done, and no later
+	// save may write (blocks are closing, so their state would be lost).
+	sealed bool
 	quit     chan struct{}
 	stopped  chan struct{}
 	stopOnce sync.Once
@@ -229,6 +232,9 @@ func (s *Server) Shutdown() {
 			if err := s.flush(true); err != nil {
 				s.log.Error("final save failed", "err", err)
 			}
+			stateMu.Lock()
+			s.sealed = true
+			stateMu.Unlock()
 			s.mu.Lock()
 			var all []*rec
 			for _, r := range s.blocks {
@@ -651,6 +657,10 @@ func (s *Server) save(all, snapshots bool) error {
 	t := time.Now()
 	stateMu.Lock()
 	wait += time.Since(t)
+	if s.sealed {
+		stateMu.Unlock()
+		return nil
+	}
 	if s.cfg.beforeStateSave != nil {
 		s.cfg.beforeStateSave()
 	}
