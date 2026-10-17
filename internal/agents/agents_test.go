@@ -211,9 +211,10 @@ func TestStateFromProgramStatus(t *testing.T) {
 	}{
 		{"claude", "claude-code", "idle", "idle", true},
 		{"claude", "claude-code", "working", "working", true},
-		{"claude", "claude-code", "waiting", "blocked", true},
+		{"claude", "claude-code", "blocked", "blocked", true},
 		{"claude", "claude-code", "done", "done", true},
-		{"claude", "claude-code", "failed", "done", true},
+		// error: failed and stopped, such as Claude Code at the usage limit.
+		{"claude", "claude-code", "error", "done", true},
 		{"grok", "grok", "working", "working", true},
 		{"claude", "claude-code", "clear", "", false}, // a record removed says nothing
 		{"claude", "cargo", "working", "", false},     // another program in the pane

@@ -101,8 +101,11 @@ func Harness(reported, running string) string {
 // (OSC 7501). Agents not listed report under their own name.
 var statusApps = map[string]string{"claude": "claude-code"}
 
+// The protocol's states (libghostty's program_status.zig): error is
+// "failed and stopped", such as Claude Code at its usage limit; the turn is
+// over and the message says why.
 var statusStates = map[string]string{
-	"idle": "idle", "working": "working", "waiting": "blocked", "done": "done", "failed": "done",
+	"idle": "idle", "working": "working", "blocked": "blocked", "done": "done", "error": "done",
 }
 
 // StateFromStatus maps an agent's own status report (OSC 7501) to hive's

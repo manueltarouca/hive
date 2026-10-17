@@ -145,8 +145,9 @@ import Testing
 @Suite struct AgentStatusTests {
     @Test func statusMapsOntoAgentStates() {
         #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "idle") == "idle")
-        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "waiting") == "blocked")
-        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "failed") == "done")
+        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "blocked") == "blocked")
+        // error: failed and stopped, such as Claude Code at the usage limit.
+        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "error") == "done")
         #expect(AgentStatus.state(harness: "grok", app: "grok", status: "working") == "working")
         #expect(AgentStatus.state(harness: "claude", app: "cargo", status: "working") == nil)
         #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "clear") == nil)

@@ -4,7 +4,9 @@
 public enum AgentStatus {
     /// The app each agent reports under; others use their own name.
     static let apps = ["claude": "claude-code"]
-    static let states = ["idle": "idle", "working": "working", "waiting": "blocked", "done": "done", "failed": "done"]
+    /// The protocol's states; error is "failed and stopped" (Claude Code at
+    /// its usage limit): the turn is over and the message says why.
+    static let states = ["idle": "idle", "working": "working", "blocked": "blocked", "done": "done", "error": "done"]
 
     public static func state(harness: String, app: String, status: String) -> String? {
         guard app == (apps[harness] ?? harness) else { return nil }
