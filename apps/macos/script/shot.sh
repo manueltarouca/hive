@@ -41,25 +41,39 @@ done_b=$($H -s api-gateway split --json --cwd "$root" -- sh -c 'printf "\033]2;â
 printf '{"session_id":"a2","cwd":"%s","hook_event_name":"Stop"}' "$root" | HIVE_BLOCK=$done_b $H agent hook claude
 sleep 2
 
-pkill -f 'Hive.app/Contents/MacOS/Hive' 2>/dev/null || true
 # The app keeps its preferences in a separate suite for these runs.
 suite=xyz.matm.hive.shots
 defaults delete "$suite" >/dev/null 2>&1 || true
 [ "${SIDEBAR:-0}" = 1 ] && defaults write "$suite" sidebar -bool true
-# Leave nothing running behind: the fixture server and its programs.
-cleanup() { [ "${KEEP:-0}" = 1 ] || { "$H" server stop >/dev/null 2>&1 || true; }; }
+# Start our own copy of the app and track its PID, so we never touch a Hive
+# window the maintainer is using. `open -n` makes it the active app, as a real launch
+# would; the PID comes from the log file only our copy has open. Leave
+# nothing running behind: the app, the fixture server and its programs.
+: > "$out/app.log"
+app=
+cleanup() {
+  [ "${KEEP:-0}" = 1 ] && return
+  [ -n "$app" ] && kill "$app" 2>/dev/null || true
+  "$H" server stop >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
   --stdout "$out/app.log" --stderr "$out/app.log" "$here/build/Hive.app"
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  app=$(lsof -t "$out/app.log" 2>/dev/null | head -1)
+  [ -n "$app" ] && break
+  sleep 0.3
+done
+[ -n "$app" ] || { echo "Hive did not start" >&2; exit 1; }
 sleep 4
-W=$($tools/winid Hive)
+W=$($tools/winid "$app")
 # Only Hive's own windows are captured (by window ID), never a screen
 # region, so nothing else on the screen can end up in a shot.
 screencapture -x -o -l "$W" "$out/$style.png"
 # With the native window shadow and corners, for the website.
 screencapture -x -l "$W" "$out/$style-shadow.png"
 if [ -n "$overlay" ]; then
-  P=$($tools/winid Hive small)
+  P=$($tools/winid "$app" small)
   screencapture -x -o -l "$P" "$out/$style-$overlay.png"
   cwebp -quiet -q 85 "$out/$style-$overlay.png" -o "$out/$style-$overlay.webp"
 fi
