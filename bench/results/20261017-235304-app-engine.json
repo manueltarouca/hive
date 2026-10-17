@@ -1,0 +1,71 @@
+{
+  "meta" : {
+    "build" : "release",
+    "commit" : "80fe9e0+dirty",
+    "cpu" : "Apple M5 Pro",
+    "load_before" : "{ 6.12 6.31 7.58 }",
+    "machine" : "Mac17,8",
+    "os" : "macOS 27.0.1",
+    "power" : "Now drawing from 'Battery Power'",
+    "when" : "2026-10-17T22:53:04Z"
+  },
+  "rows" : [
+    {
+      "cpu_cores" : 0.03453322319327174,
+      "degraded" : false,
+      "frames_per_s" : 108.09693513542639,
+      "rate_m_bps" : 1,
+      "resyncs" : 0
+    },
+    {
+      "cpu_cores" : 0.07206959172062755,
+      "degraded" : false,
+      "frames_per_s" : 108.30566950210833,
+      "rate_m_bps" : 4,
+      "resyncs" : 0
+    },
+    {
+      "cpu_cores" : 0.22833198173810804,
+      "degraded" : false,
+      "frames_per_s" : 108.299964922841,
+      "rate_m_bps" : 16,
+      "resyncs" : 0
+    },
+    {
+      "cpu_cores" : 0.813745676868672,
+      "degraded" : false,
+      "frames_per_s" : 105.13895379076331,
+      "rate_m_bps" : 64,
+      "resyncs" : 0
+    },
+    {
+      "cpu_cores" : 0.09776974374892931,
+      "degraded" : false,
+      "frames_per_s" : 109.2931764337064,
+      "rate_m_bps" : 1,
+      "resyncs" : 0
+    },
+    {
+      "cpu_cores" : 0.13668999285314717,
+      "degraded" : false,
+      "frames_per_s" : 108.8101099371644,
+      "rate_m_bps" : 4,
+      "resyncs" : 0
+    },
+    {
+      "cpu_cores" : 0.27694254184034933,
+      "degraded" : false,
+      "frames_per_s" : 108.25595212309702,
+      "rate_m_bps" : 16,
+      "resyncs" : 0
+    },
+    {
+      "cpu_cores" : 0.7815048162646543,
+      "degraded" : false,
+      "frames_per_s" : 105.96842656601342,
+      "rate_m_bps" : 64,
+      "resyncs" : 0
+    }
+  ],
+  "scenario" : "app-engine"
+}

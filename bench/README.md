@@ -44,6 +44,8 @@ settings, and needs `/tmp/hivebench` (above) as the pane's program.
 | --- | --- | --- |
 | `flush` | busy panes (100 KB/s each), empty and full scrollback, with snapshot saves running back to back | `agent.report` p99 above 50 ms |
 | `ptyread` | busy panes (100 KB/s each), no clients, no saves | under 90% of the offered bytes read |
+| `storm` | OSC sequences a second per pane (100 to 100,000), per kind: title, pwd, status, bell, clipboard, notify | API p99 above 50 ms, an events subscriber dropped, under 90% delivered, or the Go heap growing over 64 MB |
+| `bench/app-storm.sh` | the real Hive.app (release) on a throwaway server, a pane storming one OSC kind | none: app CPU and memory growth; `SAMPLE=1` samples its stacks |
 | app `feed` | content (plain, SGR colour, unicode, a full-screen TUI) × chunk size | none: µs per KB parsed |
 | app `frame` | grid 80x24 to 500x150, every row or one row changed | frame + encode p99 above 8 ms (half a 60 Hz frame) |
 | app `pipeline` | grid × chunk, a frame after every chunk | under the server's 64 MB/s |
@@ -122,3 +124,25 @@ vt queue from 16 MB/s (1.02 cores). Frames are now paced to 120 Hz
 (FramePacer; the first after a quiet spell at once): ~108 frames/s at
 every rate, 300x80 at 16 MB/s takes 0.28 cores, and 64 MB/s is no longer
 degraded at either size (0.78–0.81 cores, parsing and the socket).
+
+**2026-10-18, storm** (same machine, on battery). The server takes every
+kind at 100,000 sequences a second from one pane: all events delivered,
+API p99 under 1 ms, saves still once a second, flat heap, 1.1–1.5 cores.
+
+The app had three problems under it, all fixed:
+- When the app fell behind on events, the server sent `events_resync` and
+  ended the stream; the app re-read once and never subscribed again, so
+  titles, agent status and bells stopped until a reconnect. The stream now
+  goes on (subscribed again first, then `events_resync`).
+- Its main thread spent ~83% of its time asleep in `CAMetalLayer
+  nextDrawable`: each title change reloads the view and redraws the panes,
+  and a window behind others gets drawables slowly. Panes no longer draw
+  while their window is occluded, and draw when it shows. 10 titles a
+  second went from 0.19 to 0.12 cores.
+- Events waiting for the main thread had no bound: clipboard writes at
+  100,000 a second grew the app 447 MB in 6 s. They now go in one bounded
+  batch per hop (EventBatch, 4,096); past that, the app re-reads state.
+  Same load: +0 MB.
+
+Left: a title change still reloads the whole view (~12 ms of CPU each);
+updating it in place would make an agent's title spinner nearly free.

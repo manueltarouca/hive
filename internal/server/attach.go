@@ -356,14 +356,30 @@ func (c *attachConn) handle(m attachMsg) {
 		if sub.Gap {
 			c.sendJSON(map[string]any{"type": "events_resync", "reason": "since is older than the event history"})
 		}
-		go func() {
-			for e := range sub.C {
-				c.sendJSON(map[string]any{"type": "event", "event": e})
-			}
-			if sub.Dropped() {
+		filter := events.Filter{SessionID: m.SessionID, All: m.All}
+		go func(sub *events.Sub) {
+			for {
+				for e := range sub.C {
+					c.sendJSON(map[string]any{"type": "event", "event": e})
+				}
+				if !sub.Dropped() {
+					return // closed, or replaced by a new "events"
+				}
+				// It fell behind. The stream goes on, live, and events_resync
+				// tells the client to re-read state; subscribing first means
+				// nothing after that re-read is missed. Ending the stream left
+				// the app hearing nothing until it reconnected.
+				c.mu.Lock()
+				if c.evs != sub || c.ctx.Err() != nil {
+					c.mu.Unlock()
+					return
+				}
+				sub = c.s.bus.Subscribe(filter, events.Live, 1024)
+				c.evs = sub
+				c.mu.Unlock()
 				c.sendJSON(map[string]any{"type": "events_resync"})
 			}
-		}()
+		}(sub)
 	default:
 		c.sendErrFor(m, api.BadRequest("unknown message type %q", m.Type))
 	}

@@ -196,3 +196,41 @@ func TestAttachSlowClientGetsResync(t *testing.T) {
 	}
 	t.Fatal("no resync for a client that fell behind")
 }
+
+// A client that falls behind on events gets events_resync, and then events
+// again: the stream goes on and the client re-reads state, as the protocol
+// says. The stream used to end there, and the app, which doesn't subscribe
+// again, heard nothing more (titles, agent status) until it reconnected.
+func TestEventsGoOnAfterResync(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"sh"}})
+	sid, bid := created["session_id"].(string), strs(created["block_ids"])[0]
+	c := dial(t, h, "slow")
+	c.send(map[string]any{"type": "events", "session_id": sid, "all": true})
+	for m := c.nextJSON(); m["type"] != "events_subscribed"; m = c.nextJSON() {
+	}
+	// A burst while the client reads nothing: more than it can queue.
+	h.call("hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{
+		"data": "i=0; while [ $i -lt 20000 ]; do printf '\\033]2;t%d\\007' $i; i=$((i+1)); done; echo burst-done\n"}})
+	time.Sleep(3 * time.Second)
+	for deadline := time.Now().Add(20 * time.Second); ; {
+		if m := c.nextJSON(); m["type"] == "events_resync" {
+			t.Log("got events_resync")
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("no events_resync after the burst")
+		}
+	}
+	h.call("hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{"data": "printf '\\033]2;after-resync\\007'\n"}})
+	for deadline := time.Now().Add(20 * time.Second); ; {
+		_, b := c.next()
+		if strings.Contains(string(b), "after-resync") {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("no events after events_resync")
+		}
+	}
+}

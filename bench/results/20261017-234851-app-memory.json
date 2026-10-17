@@ -1,0 +1,40 @@
+{
+  "meta" : {
+    "build" : "release",
+    "commit" : "80fe9e0+dirty",
+    "cpu" : "Apple M5 Pro",
+    "load_before" : "{ 6.16 6.53 8.09 }",
+    "machine" : "Mac17,8",
+    "os" : "macOS 27.0.1",
+    "power" : "Now drawing from 'Battery Power'",
+    "when" : "2026-10-17T22:48:50Z"
+  },
+  "rows" : [
+    {
+      "footprint_mb" : 84.17253875732422,
+      "mirrors" : 1,
+      "per_mirror_mb" : 76.45319366455078
+    },
+    {
+      "footprint_mb" : 100.51628875732422,
+      "mirrors" : 2,
+      "per_mirror_mb" : 46.39847183227539
+    },
+    {
+      "footprint_mb" : 133.1256866455078,
+      "mirrors" : 4,
+      "per_mirror_mb" : 31.351585388183594
+    },
+    {
+      "footprint_mb" : 198.360107421875,
+      "mirrors" : 8,
+      "per_mirror_mb" : 23.830095291137695
+    },
+    {
+      "footprint_mb" : 329.1726989746094,
+      "mirrors" : 16,
+      "per_mirror_mb" : 20.090834617614746
+    }
+  ],
+  "scenario" : "app-memory"
+}

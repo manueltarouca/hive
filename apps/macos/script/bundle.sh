@@ -1,6 +1,8 @@
 #!/bin/sh
 # Builds Hive.app: the Swift app, the hive server binary, fonts.
 # Usage: script/bundle.sh [debug|release]   (default release)
+# HIVE_BUNDLE_OUT puts it elsewhere than build/ (benchmarks: never replace
+# the bundle of an app that's running).
 set -eu
 config="${1:-release}"
 here="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,7 +18,7 @@ cd "$here"
 swift build -c "$config" --product Hive
 bin="$(swift build -c "$config" --show-bin-path)"
 
-app="$here/build/Hive.app"
+app="${HIVE_BUNDLE_OUT:-$here/build}/Hive.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin/Hive" "$app/Contents/MacOS/Hive"

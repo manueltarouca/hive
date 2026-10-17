@@ -1,0 +1,43 @@
+{
+  "meta" : {
+    "build" : "release",
+    "commit" : "80fe9e0+dirty",
+    "cpu" : "Apple M5 Pro",
+    "load_before" : "{ 6.18 6.54 8.10 }",
+    "machine" : "Mac17,8",
+    "os" : "macOS 27.0.1",
+    "power" : "Now drawing from 'Battery Power'",
+    "when" : "2026-10-17T22:48:49Z"
+  },
+  "rows" : [
+    {
+      "chunk" : 1024,
+      "cols" : 120,
+      "frames_per_s" : 7075.684223867157,
+      "mb_per_s" : 6.9098478748702705,
+      "rows" : 40
+    },
+    {
+      "chunk" : 16384,
+      "cols" : 120,
+      "frames_per_s" : 6038.236106215622,
+      "mb_per_s" : 94.30583140871408,
+      "rows" : 40
+    },
+    {
+      "chunk" : 1024,
+      "cols" : 300,
+      "frames_per_s" : 1491.254551999572,
+      "mb_per_s" : 1.456303273437082,
+      "rows" : 80
+    },
+    {
+      "chunk" : 16384,
+      "cols" : 300,
+      "frames_per_s" : 1418.7731145327677,
+      "mb_per_s" : 22.15792889842697,
+      "rows" : 80
+    }
+  ],
+  "scenario" : "app-pipeline"
+}

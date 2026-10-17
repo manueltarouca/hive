@@ -96,6 +96,13 @@ final class PaneView: MTKView, NSTextInputClient {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window == nil { blinkTimer?.invalidate(); blinkTimer = nil }
+        if let o = occlusionObserver { NotificationCenter.default.removeObserver(o); occlusionObserver = nil }
+        if let w = window {
+            occlusionObserver = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification,
+                                                                       object: w, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if self?.windowVisible == true { self?.needsDisplay = true } }
+            }
+        }
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -136,7 +143,15 @@ final class PaneView: MTKView, NSTextInputClient {
         needsDisplay = true
     }
 
+    /// An occluded window's Metal layer hands out drawables slowly, up to a
+    /// 1 s timeout each, and draw() waited for one on the main thread: hive
+    /// behind other windows spent most of its main thread asleep there
+    /// (bench/app-storm.sh). Hidden, it doesn't draw; it draws once it shows.
+    private var windowVisible: Bool { window?.occlusionState.contains(.visible) ?? false }
+    private var occlusionObserver: NSObjectProtocol?
+
     override func draw(_ dirtyRect: NSRect) {
+        guard windowVisible else { return }
         guard let drawable = currentDrawable, let cb = renderer.makeCommandBuffer() else { return }
         let bg = style.terminal.background
         var draws: [PaneDraw] = []

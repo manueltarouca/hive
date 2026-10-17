@@ -255,7 +255,18 @@ final class AppModel: ObservableObject {
             // Some events were missed: re-read everything.
             engine.client.onEventsResync = { Task { @MainActor in self?.reloadSessions(); self?.reloadView() } }
             engine.log = { msg in NSLog("hive: %@", msg) }
-            engine.client.onEvent = { ev in Task { @MainActor in self?.handleEvent(ev) } }
+            // One hop to the main thread per batch, not per event.
+            let batch = EventBatch()
+            engine.client.onEvent = { ev in
+                if batch.add(ev) {
+                    Task { @MainActor in
+                        let (events, overflowed) = batch.takeAll()
+                        // Too many to keep: re-read everything instead.
+                        if overflowed { self?.reloadSessions(); self?.reloadView(); self?.reloadAgents(); return }
+                        for e in events { self?.handleEvent(e) }
+                    }
+                }
+            }
             engine.client.onClose = { err in Task { @MainActor in self?.disconnected(err) } }
             engine.client.onError = { kind, block, err in NSLog("hive error (%@ %@): %@", kind ?? "-", block ?? "-", err.description) }
             engine.client.connect(name: "Hive.app", version: AppModel.version) { result in

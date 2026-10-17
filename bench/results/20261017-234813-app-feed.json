@@ -1,0 +1,63 @@
+{
+  "meta" : {
+    "build" : "release",
+    "commit" : "80fe9e0+dirty",
+    "cpu" : "Apple M5 Pro",
+    "load_before" : "{ 5.26 6.42 8.12 }",
+    "machine" : "Mac17,8",
+    "os" : "macOS 27.0.1",
+    "power" : "Now drawing from 'Battery Power'",
+    "when" : "2026-10-17T22:48:13Z"
+  },
+  "rows" : [
+    {
+      "chunk" : 1024,
+      "content" : "plain",
+      "mb_per_s" : 1174.2003386158897,
+      "us_per_kb" : 0.8316830338774566
+    },
+    {
+      "chunk" : 65536,
+      "content" : "plain",
+      "mb_per_s" : 1503.163193526352,
+      "us_per_kb" : 0.649671641912033
+    },
+    {
+      "chunk" : 1024,
+      "content" : "sgr",
+      "mb_per_s" : 566.5060079791168,
+      "us_per_kb" : 1.723834321693547
+    },
+    {
+      "chunk" : 65536,
+      "content" : "sgr",
+      "mb_per_s" : 594.878114610371,
+      "us_per_kb" : 1.6416177970164898
+    },
+    {
+      "chunk" : 1024,
+      "content" : "unicode",
+      "mb_per_s" : 695.4435546290428,
+      "us_per_kb" : 1.4042297085072695
+    },
+    {
+      "chunk" : 65536,
+      "content" : "unicode",
+      "mb_per_s" : 769.1850943617233,
+      "us_per_kb" : 1.269606635851882
+    },
+    {
+      "chunk" : 1024,
+      "content" : "tui 120x40",
+      "mb_per_s" : 395.59654285181534,
+      "us_per_kb" : 2.468581987496807
+    },
+    {
+      "chunk" : 65536,
+      "content" : "tui 120x40",
+      "mb_per_s" : 410.22712941464096,
+      "us_per_kb" : 2.3805409978454404
+    }
+  ],
+  "scenario" : "app-feed"
+}
