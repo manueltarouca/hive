@@ -74,7 +74,23 @@ final class PaneView: MTKView, NSTextInputClient {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         model.focus(block: blockID)
+        select(.press, event)
     }
+
+    override func mouseDragged(with event: NSEvent) { select(.drag, event) }
+    override func mouseUp(with event: NSEvent) { select(.release, event) }
+
+    /// Selection runs in the mirror through libghostty's gestures: drag,
+    /// double-click for a word, triple-click for a line.
+    private func select(_ type: Mirror.SelectEvent, _ event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        let col = Int(p.x / cellSize.width), row = Int(p.y / cellSize.height)
+        model.select(block: blockID, type, col: col, row: row, x: Double(p.x * scale), y: Double(p.y * scale),
+                     cellWidth: Double(renderer.fonts.cellWidth), cellHeight: Double(renderer.fonts.cellHeight),
+                     repeatInterval: NSEvent.doubleClickInterval, repeatDistance: Double(4 * scale))
+    }
+
+    @objc func copy(_ sender: Any?) { model.copySelection(block: blockID) }
 
     override func scrollWheel(with event: NSEvent) {
         let lines = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY / cellSize.height : event.scrollingDeltaY * 3

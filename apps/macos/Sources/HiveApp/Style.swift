@@ -26,7 +26,7 @@ struct Style: Equatable {
         accent: hex(0xF2A93B), blocked: hex(0xE5645B), done: hex(0x7DBE8F), sidebar: hex(0x111014),
         terminal: Theme(
             foreground: RGB(0xE3, 0xDF, 0xD8), background: RGB(0x1B, 0x1A, 0x1F), cursor: RGB(0xF2, 0xA9, 0x3B),
-            selection: RGB(0x3A, 0x33, 0x26),
+            selection: RGB(0x4D, 0x41, 0x2A),
             palette: Theme.tomorrowNight.palette))
 
     /// "Hive Day": warm paper with a hint of honey.

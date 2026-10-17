@@ -37,7 +37,8 @@ sleep 2
 pkill -f 'Hive.app/Contents/MacOS/Hive' 2>/dev/null || true
 defaults delete xyz.matm.hive >/dev/null 2>&1 || true
 [ "${SIDEBAR:-0}" = 1 ] && defaults write xyz.matm.hive sidebar -bool true
-open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" --env HIVE_OPEN="$overlay" "$here/build/Hive.app"
+open -n --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_STYLE="$style" --env HIVE_OPEN="$overlay" \
+  --stdout "$out/app.log" --stderr "$out/app.log" "$here/build/Hive.app"
 sleep 4
 W=$($tools/winid Hive)
 # Only Hive's own windows are captured (by window ID), never a screen

@@ -85,3 +85,28 @@ private func bytes(_ s: String) -> Data { Data(s.utf8) }
         #expect(Key.mac(0xFF) == .unidentified)
     }
 }
+
+@Suite struct SelectionTests {
+    @Test func dragSelectsAndCopies() throws {
+        let m = try Mirror(cols: 20, rows: 4)
+        m.feed(Data("hello world\r\nsecond line".utf8))
+        let cw: Double = 10, ch: Double = 20
+        m.select(.press, col: 0, row: 0, x: 2, y: 8, cellWidth: cw, cellHeight: ch, timeNs: 1_000_000_000)
+        m.select(.drag, col: 4, row: 0, x: 46, y: 8, cellWidth: cw, cellHeight: ch, timeNs: 1_050_000_000)
+        m.select(.release, col: 4, row: 0, x: 46, y: 8, cellWidth: cw, cellHeight: ch, timeNs: 1_100_000_000)
+        #expect(m.selectedText() == "hello")
+        #expect(m.frame().cells[0][0].selected && !m.frame().cells[0][6].selected)
+        m.clearSelection()
+        #expect(m.selectedText() == nil)
+    }
+
+    @Test func doubleClickSelectsAWord() throws {
+        let m = try Mirror(cols: 20, rows: 4)
+        m.feed(Data("hello world".utf8))
+        let t: UInt64 = 5_000_000_000
+        for (i, type) in [Mirror.SelectEvent.press, .release, .press, .release].enumerated() {
+            m.select(type, col: 7, row: 0, x: 75, y: 8, cellWidth: 10, cellHeight: 20, timeNs: t + UInt64(i) * 40_000_000)
+        }
+        #expect(m.selectedText() == "world")
+    }
+}

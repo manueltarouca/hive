@@ -50,3 +50,15 @@ void hive_scroll_bottom(GhosttyTerminal t);
 // libghostty's 256-color defaults).
 void hive_set_theme(GhosttyTerminal t, GhosttyColorRgb fg, GhosttyColorRgb bg, GhosttyColorRgb cursor,
                     const GhosttyColorRgb *palette16);
+
+// Selection through libghostty's gesture engine (click counting, word and
+// line selection, drag). type: 0 press, 1 release, 2 drag. The resulting
+// selection is set on the terminal, so the render state marks it.
+GhosttySelectionGesture hive_gesture_new(void);
+void hive_gesture_free(GhosttySelectionGesture g, GhosttyTerminal t);
+void hive_select(GhosttyTerminal t, GhosttySelectionGesture g, int type, uint16_t col, uint16_t row,
+                 double x, double y, uint32_t cols, uint32_t cell_width, uint32_t screen_height, uint64_t time_ns,
+                 uint64_t repeat_interval_ns, double repeat_distance);
+// The selected text, or NULL. Free with hive_free.
+bool hive_selection_text(GhosttyTerminal t, uint8_t **out, size_t *len);
+void hive_clear_selection(GhosttyTerminal t);

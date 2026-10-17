@@ -169,3 +169,55 @@ void hive_set_theme(GhosttyTerminal t, GhosttyColorRgb fg, GhosttyColorRgb bg, G
   if (palette16) memcpy(palette, palette16, 16 * sizeof(GhosttyColorRgb));
   ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_COLOR_PALETTE, palette);
 }
+
+GhosttySelectionGesture hive_gesture_new(void) {
+  GhosttySelectionGesture g = NULL;
+  ghostty_selection_gesture_new(NULL, &g);
+  return g;
+}
+
+void hive_gesture_free(GhosttySelectionGesture g, GhosttyTerminal t) {
+  if (g) ghostty_selection_gesture_free(g, t);
+}
+
+void hive_select(GhosttyTerminal t, GhosttySelectionGesture g, int type, uint16_t col, uint16_t row,
+                 double x, double y, uint32_t cols, uint32_t cell_width, uint32_t screen_height, uint64_t time_ns,
+                 uint64_t repeat_interval_ns, double repeat_distance) {
+  GhosttySelectionGestureEventType types[] = {
+    GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_PRESS, GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_RELEASE,
+    GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_DRAG,
+  };
+  GhosttySelectionGestureEvent ev = NULL;
+  if (ghostty_selection_gesture_event_new(NULL, &ev, types[type]) != GHOSTTY_SUCCESS) return;
+  GhosttyGridRef ref = GHOSTTY_INIT_SIZED(GhosttyGridRef);
+  GhosttyPoint p = {.tag = GHOSTTY_POINT_TAG_VIEWPORT, .value = {.coordinate = {.x = col, .y = row}}};
+  if (ghostty_terminal_grid_ref(t, p, &ref) == GHOSTTY_SUCCESS)
+    ghostty_selection_gesture_event_set(ev, GHOSTTY_SELECTION_GESTURE_EVENT_OPT_REF, &ref);
+  GhosttySurfacePosition pos = {.x = x, .y = y};
+  ghostty_selection_gesture_event_set(ev, GHOSTTY_SELECTION_GESTURE_EVENT_OPT_POSITION, &pos);
+  GhosttySelectionGestureGeometry geo = {.columns = cols, .cell_width = cell_width, .padding_left = 0, .screen_height = screen_height};
+  ghostty_selection_gesture_event_set(ev, GHOSTTY_SELECTION_GESTURE_EVENT_OPT_GEOMETRY, &geo);
+  ghostty_selection_gesture_event_set(ev, GHOSTTY_SELECTION_GESTURE_EVENT_OPT_TIME_NS, &time_ns);
+  // Without these every press is a single click.
+  ghostty_selection_gesture_event_set(ev, GHOSTTY_SELECTION_GESTURE_EVENT_OPT_REPEAT_INTERVAL_NS, &repeat_interval_ns);
+  ghostty_selection_gesture_event_set(ev, GHOSTTY_SELECTION_GESTURE_EVENT_OPT_REPEAT_DISTANCE, &repeat_distance);
+  GhosttySelection sel = GHOSTTY_INIT_SIZED(GhosttySelection);
+  GhosttyResult r = ghostty_selection_gesture_event(g, t, ev, &sel);
+  if (r == GHOSTTY_SUCCESS) ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_SELECTION, &sel);
+  ghostty_selection_gesture_event_free(ev);
+}
+
+bool hive_selection_text(GhosttyTerminal t, uint8_t **out, size_t *len) {
+  GhosttySelection sel = GHOSTTY_INIT_SIZED(GhosttySelection);
+  if (ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_SELECTION, &sel) != GHOSTTY_SUCCESS) return false;
+  GhosttyTerminalSelectionFormatOptions o = GHOSTTY_INIT_SIZED(GhosttyTerminalSelectionFormatOptions);
+  o.emit = GHOSTTY_FORMATTER_FORMAT_PLAIN;
+  o.trim = true;
+  o.unwrap = true;
+  o.selection = &sel;
+  return ghostty_terminal_selection_format_alloc(t, NULL, o, out, len) == GHOSTTY_SUCCESS && *len > 0;
+}
+
+void hive_clear_selection(GhosttyTerminal t) {
+  ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_SELECTION, NULL);
+}

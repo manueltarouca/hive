@@ -112,7 +112,24 @@ public final class Engine {
 
     // MARK: input
 
+    public func select(block: String, _ type: Mirror.SelectEvent, col: Int, row: Int, x: Double, y: Double,
+                       cellWidth: Double, cellHeight: Double, repeatInterval: TimeInterval = 0.5, repeatDistance: Double = 8) {
+        guard let pane = panes[block], let m = pane.mirror else { return }
+        m.select(type, col: col, row: row, x: x, y: y, cellWidth: cellWidth, cellHeight: cellHeight,
+                 timeNs: DispatchTime.now().uptimeNanoseconds, repeatInterval: repeatInterval, repeatDistance: repeatDistance)
+        scheduleFrame(pane)
+    }
+
+    public func selectedText(block: String) -> String? { panes[block]?.mirror?.selectedText() }
+
+    private func clearSelection(_ block: String) {
+        guard let pane = panes[block], let m = pane.mirror, m.selectedText() != nil else { return }
+        m.clearSelection()
+        scheduleFrame(pane)
+    }
+
     public func key(block: String, _ k: KeyInput) {
+        clearSelection(block)
         guard let m = panes[block]?.mirror else { return }
         let bytes = m.encodeKey(k)
         if !bytes.isEmpty {
@@ -122,6 +139,7 @@ public final class Engine {
     }
 
     public func text(block: String, _ s: String) {
+        clearSelection(block)
         guard let m = panes[block]?.mirror, !s.isEmpty else { return }
         m.scrollToBottom()
         client.input(block: block, Data(s.utf8))

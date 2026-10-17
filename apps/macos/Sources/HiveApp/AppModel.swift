@@ -517,6 +517,26 @@ final class AppModel: ObservableObject {
         vt.async { engine.paste(block: b, s) }
     }
 
+    func select(block: String, _ type: Mirror.SelectEvent, col: Int, row: Int, x: Double, y: Double,
+                cellWidth: Double, cellHeight: Double, repeatInterval: TimeInterval, repeatDistance: Double) {
+        let engine = engine
+        vt.async {
+            engine.select(block: block, type, col: col, row: row, x: x, y: y, cellWidth: cellWidth, cellHeight: cellHeight,
+                          repeatInterval: repeatInterval, repeatDistance: repeatDistance)
+        }
+    }
+
+    func copySelection(block: String) {
+        let engine = engine
+        vt.async {
+            guard let text = engine.selectedText(block: block), !text.isEmpty else { return }
+            DispatchQueue.main.async {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+        }
+    }
+
     func scroll(block: String, rows: Int) {
         let engine = engine
         vt.async { engine.scroll(block: block, rows: rows) }

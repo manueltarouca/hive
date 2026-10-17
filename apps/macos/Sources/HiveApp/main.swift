@@ -118,6 +118,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let what = ProcessInfo.processInfo.environment["HIVE_OPEN"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
                 if what == "palette" { self?.showPalette() } else if what == "picker" { self?.showSessionPicker() }
+                if what == "select", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
+                    // The mouse path, driven by hand: press, drag along row 1.
+                    let p = card.pane, cw = Double(p.renderer.fonts.cellWidth), ch = Double(p.renderer.fonts.cellHeight)
+                    self.model.select(block: b, .press, col: 4, row: 1, x: 4 * cw + 2, y: ch + 4, cellWidth: cw, cellHeight: ch,
+                                      repeatInterval: 0.5, repeatDistance: 8)
+                    self.model.select(block: b, .drag, col: 30, row: 1, x: 30 * cw + 2, y: ch + 4, cellWidth: cw, cellHeight: ch,
+                                      repeatInterval: 0.5, repeatDistance: 8)
+                    let engine = self.model.engine
+                    self.model.vt.asyncAfter(deadline: .now() + 0.3) { NSLog("hive selected: %@", engine.selectedText(block: b) ?? "<none>") }
+                }
             }
         }
     }
@@ -260,7 +270,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             item("Close Tab", "w", [.command, .shift]) { m.closeTab() },
         ])
         menu("Edit", [
-            NSMenuItem(title: "Copy", action: Selector(("copy:")), keyEquivalent: "c"),
+            NSMenuItem(title: "Copy", action: #selector(PaneView.copy(_:)), keyEquivalent: "c"),
             NSMenuItem(title: "Paste", action: #selector(PaneView.paste(_:)), keyEquivalent: "v"),
         ])
         var paneItems: [NSMenuItem] = [item("Zoom Pane", "\r", [.command, .shift]) { m.toggleZoom() }, .separator()]

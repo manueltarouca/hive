@@ -112,6 +112,7 @@ public final class Mirror {
     private var rowCells: GhosttyRenderStateRowCells?
     private var scratch = [HiveCell](repeating: HiveCell(), count: 512)
 
+    private var gesture: GhosttySelectionGesture?
     private var last: PaneFrame?
     private var generation: UInt64 = 0
     /// Synchronized output (mode 2026): while held, frame() returns the last
@@ -154,6 +155,7 @@ public final class Mirror {
     }
 
     deinit {
+        if let gesture { hive_gesture_free(gesture, term) }
         if let rowCells { ghostty_render_state_row_cells_free(rowCells) }
         if let rowIter { ghostty_render_state_row_iterator_free(rowIter) }
         if let renderState { ghostty_render_state_free(renderState) }
@@ -199,6 +201,31 @@ public final class Mirror {
         let r = hive_encode_paste(term, &data, data.count, &out, out.count, &written)
         return r == GHOSTTY_SUCCESS ? Data(out.prefix(written)) : Data(text.utf8)
     }
+
+    public enum SelectEvent: Int32 { case press = 0, release = 1, drag = 2 }
+
+    /// Feeds a mouse event to libghostty's selection gestures: drag to
+    /// select, double-click for a word, triple-click for a line.
+    public func select(_ type: SelectEvent, col: Int, row: Int, x: Double, y: Double,
+                       cellWidth: Double, cellHeight: Double, timeNs: UInt64,
+                       repeatInterval: TimeInterval = 0.5, repeatDistance: Double = 8) {
+        if gesture == nil { gesture = hive_gesture_new() }
+        let f = last ?? frame()
+        let c = UInt16(max(0, min(col, f.cols - 1))), r = UInt16(max(0, min(row, f.rows - 1)))
+        hive_select(term, gesture, type.rawValue, c, r, x, y, UInt32(f.cols), UInt32(cellWidth),
+                    UInt32(Double(f.rows) * cellHeight), timeNs, UInt64(repeatInterval * 1e9), repeatDistance)
+    }
+
+    /// The selected text, or nil.
+    public func selectedText() -> String? {
+        var ptr: UnsafeMutablePointer<UInt8>?
+        var len = 0
+        guard hive_selection_text(term, &ptr, &len), let ptr else { return nil }
+        defer { hive_free(ptr, len) }
+        return String(decoding: UnsafeBufferPointer(start: ptr, count: len), as: UTF8.self)
+    }
+
+    public func clearSelection() { hive_clear_selection(term) }
 
     public func snapshot() -> Data? {
         var ptr: UnsafeMutablePointer<UInt8>?
