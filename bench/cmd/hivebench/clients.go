@@ -114,7 +114,7 @@ func clientsStepRun(exe string, clients, panes, rate, secs int, limit time.Durat
 			r.close()
 		}
 	}()
-	for i := 0; i < clients; i++ {
+	for i := range clients {
 		r, err := attachReader(ts, blocks, 0)
 		if err != nil {
 			return clientsStep{}, fmt.Errorf("client %d: %w", i+1, err)

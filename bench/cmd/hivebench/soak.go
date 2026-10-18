@@ -69,6 +69,7 @@ func soakProbe(args []string) error {
 	rate := fs.Int("rate", 100<<10, "bytes a second each pane writes")
 	limit := fs.Duration("limit", 50*time.Millisecond, "an interval's latency p99 above this is degraded")
 	out := fs.String("out", "bench/results", "where results go")
+	reconnectEvery := fs.Duration("reconnect", 30*time.Second, "how often a client reconnects (0: never), to tell its share of any growth")
 	heapProf := fs.String("heap", "", "write heap profiles after the warm-up and at the end here (prefix), for pprof -diff_base")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -78,7 +79,7 @@ func soakProbe(args []string) error {
 		return err
 	}
 	res := soakResult{Scenario: "soak", Meta: meta(), PerHour: map[string]float64{},
-		Params: map[string]any{"minutes": *minutes, "every_s": every.Seconds(), "warmup_min": *warmup, "panes": *panes, "rate_bytes_per_s": *rate}}
+		Params: map[string]any{"minutes": *minutes, "every_s": every.Seconds(), "warmup_min": *warmup, "panes": *panes, "rate_bytes_per_s": *rate, "reconnect_s": reconnectEvery.Seconds()}}
 	ts, err := startServer(server.Config{})
 	if err != nil {
 		return err
@@ -122,10 +123,14 @@ func soakProbe(args []string) error {
 	go func() {
 		report := time.NewTicker(2 * time.Second)
 		churn := time.NewTicker(10 * time.Second)
-		reconnect := time.NewTicker(30 * time.Second)
+		var reconnectC <-chan time.Time // nil, never ready, with --reconnect 0
+		if *reconnectEvery > 0 {
+			reconnect := time.NewTicker(*reconnectEvery)
+			defer reconnect.Stop()
+			reconnectC = reconnect.C
+		}
 		defer report.Stop()
 		defer churn.Stop()
-		defer reconnect.Stop()
 		states := []string{"working", "done", "idle"}
 		for i := 0; ; i++ {
 			select {
@@ -142,7 +147,7 @@ func soakProbe(args []string) error {
 					time.Sleep(2 * time.Second)
 					_ = ts.call("session.close_window", map[string]any{"session_id": created.SessionID, "window_id": w.WindowID}, nil)
 				}
-			case <-reconnect.C:
+			case <-reconnectC:
 				if r, err := attachReader(ts, blocks, 0); err == nil {
 					time.Sleep(time.Second)
 					r.close()
@@ -155,7 +160,7 @@ func soakProbe(args []string) error {
 	tick := time.NewTicker(*every)
 	defer tick.Stop()
 	steady.start()
-	fmt.Printf("soak: %v, sampling every %v (%d panes at %d KB/s, churn on)\n", time.Duration(*minutes*float64(time.Minute)), *every, *panes, *rate>>10)
+	fmt.Printf("soak: %v, sampling every %v (%d panes at %d KB/s, window churn on, reconnect every %v)\n", time.Duration(*minutes*float64(time.Minute)), *every, *panes, *rate>>10, *reconnectEvery)
 	for time.Since(start) < time.Duration(*minutes*float64(time.Minute)) {
 		<-tick.C
 		lat, _, rs, _ := steady.stop()

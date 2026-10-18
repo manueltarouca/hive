@@ -3,13 +3,15 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -45,7 +47,49 @@ func sh(name string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func loadAvg() string { return strings.Trim(sh("sysctl", "-n", "vm.loadavg"), "{} ") }
+func loadAvg() string {
+	if runtime.GOOS == "linux" {
+		b, _ := os.ReadFile("/proc/loadavg")
+		return procLoadavg(string(b))
+	}
+	return strings.Trim(sh("sysctl", "-n", "vm.loadavg"), "{} ")
+}
+
+// procLoadavg is /proc/loadavg's three averages, as sysctl's vm.loadavg.
+func procLoadavg(s string) string {
+	f := strings.Fields(s)
+	return strings.Join(f[:min(3, len(f))], " ")
+}
+
+func memTotalGB(meminfo string) float64 {
+	for l := range strings.SplitSeq(meminfo, "\n") {
+		if f := strings.Fields(l); len(f) >= 2 && f[0] == "MemTotal:" {
+			kb, _ := strconv.ParseFloat(f[1], 64)
+			return kb / (1 << 20)
+		}
+	}
+	return 0
+}
+
+func osRelease(s string) string {
+	for l := range strings.SplitSeq(s, "\n") {
+		if v, ok := strings.CutPrefix(l, "PRETTY_NAME="); ok {
+			return strings.Trim(v, `"`)
+		}
+	}
+	return "Linux"
+}
+
+func lscpuModel(s string) string {
+	for l := range strings.SplitSeq(s, "\n") {
+		if v, ok := strings.CutPrefix(l, "Model name:"); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+func readFile(p string) string { b, _ := os.ReadFile(p); return string(b) }
 
 func meta() Meta {
 	m := Meta{When: time.Now().UTC().Format(time.RFC3339), Go: runtime.Version(), GoMaxProcs: runtime.GOMAXPROCS(0),
@@ -63,6 +107,17 @@ func meta() Meta {
 		m.Power = strings.TrimSuffix(strings.TrimPrefix(strings.SplitN(sh("pmset", "-g", "batt"), "\n", 2)[0], "Now drawing from '"), "'")
 		m.PtyMax, _ = strconv.Atoi(sh("sysctl", "-n", "kern.tty.ptmx_max"))
 		m.PtyInUse = len(globN("/dev/ttys*"))
+	}
+	if runtime.GOOS == "linux" {
+		// On EC2 (Nitro) the product name is the instance type.
+		m.Machine = strings.TrimSpace(readFile("/sys/devices/virtual/dmi/id/product_name"))
+		m.CPU = lscpuModel(sh("lscpu"))
+		m.Cores = runtime.NumCPU()
+		m.MemoryGB = memTotalGB(readFile("/proc/meminfo"))
+		m.OS = osRelease(readFile("/etc/os-release")) + " (" + sh("uname", "-r") + ")"
+		m.Power = "n/a"
+		m.PtyMax, _ = strconv.Atoi(strings.TrimSpace(readFile("/proc/sys/kernel/pty/max")))
+		m.PtyInUse, _ = strconv.Atoi(strings.TrimSpace(readFile("/proc/sys/kernel/pty/nr")))
 	}
 	var why []string
 	if l, _ := strconv.ParseFloat(strings.Fields(m.LoadBefore + " 0")[0], 64); l > 1.5 {
@@ -99,7 +154,7 @@ func dist(d []time.Duration) Dist {
 		return Dist{}
 	}
 	s := append([]time.Duration(nil), d...)
-	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
+	slices.Sort(s)
 	ms := func(x time.Duration) float64 { return math.Round(float64(x)/1e4) / 100 }
 	q := func(p float64) time.Duration { return s[int(math.Ceil(p*float64(len(s))))-1] }
 	return Dist{N: len(s), P50: ms(q(0.5)), P99: ms(q(0.99)), Max: ms(s[len(s)-1])}
@@ -136,7 +191,11 @@ func startServer(cfg server.Config) (*testServer, error) {
 }
 
 func (t *testServer) call(method string, params any, out any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	return t.callWithin(30*time.Second, method, params, out)
+}
+
+func (t *testServer) callWithin(d time.Duration, method string, params any, out any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
 	return t.c.Call(ctx, method, params, out)
 }
@@ -174,6 +233,24 @@ func writeResult(dir, scenario string, v any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	name := filepath.Join(dir, fmt.Sprintf("%s-%s.json", time.Now().Format("20060102-150405"), scenario))
-	return name, os.WriteFile(name, b, 0o644)
+	// Never overwrite: two runs ending in the same second get -2, -3…
+	base := filepath.Join(dir, fmt.Sprintf("%s-%s", time.Now().Format("20060102-150405"), scenario))
+	for i := 1; ; i++ {
+		name := base + ".json"
+		if i > 1 {
+			name = fmt.Sprintf("%s-%d.json", base, i)
+		}
+		f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		if _, err := f.Write(b); err != nil {
+			f.Close()
+			return "", err
+		}
+		return name, f.Close()
+	}
 }

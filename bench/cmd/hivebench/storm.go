@@ -75,7 +75,7 @@ func stormProbe(args []string) error {
 	}
 	res := stormResult{Scenario: "storm", Meta: meta(), Knee: map[string]int{},
 		Params: map[string]any{"panes": *panes, "secs": *secs, "rates": rates, "limit_ms": limit.Milliseconds()}}
-	for _, kind := range strings.Split(*kinds, ",") {
+	for kind := range strings.SplitSeq(*kinds, ",") {
 		if oscEvents[kind] == "" {
 			return fmt.Errorf("unknown kind %q", kind)
 		}

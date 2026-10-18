@@ -1,0 +1,3399 @@
+{
+  "scenario": "soak",
+  "meta": {
+    "when": "2026-10-18T10:35:47Z",
+    "machine": "Mac17,8",
+    "cpu": "Apple M5 Pro",
+    "cores": 18,
+    "memory_gb": 48,
+    "os": "macOS 27.0.1",
+    "go": "go1.26.2",
+    "commit": "4a6d228+dirty",
+    "power": "AC Power",
+    "load_before": "5.45 4.73 4.64",
+    "load_after": "3.94 4.45 4.55",
+    "pty_max": 511,
+    "pty_in_use": 33,
+    "open_files_limit": "1048576",
+    "gomaxprocs": 18,
+    "fit_for_baseline": false,
+    "why_not_baseline": "load average 5.45 4.73 4.64"
+  },
+  "params": {
+    "every_s": 30,
+    "minutes": 120,
+    "panes": 8,
+    "rate_bytes_per_s": 102400,
+    "reconnect_s": 30,
+    "warmup_min": 5
+  },
+  "samples": [
+    {
+      "minute": 0.50010226945,
+      "resident_mb": 183,
+      "go_heap_mb": 26.26032257080078,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.34,
+        "max_ms": 3.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 1.00014672015,
+      "resident_mb": 230,
+      "go_heap_mb": 9.394294738769531,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.36,
+        "max_ms": 12.55
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 1.5001063451499999,
+      "resident_mb": 231,
+      "go_heap_mb": 24.431655883789062,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.39,
+        "max_ms": 14.07
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 2.0001219722333334,
+      "resident_mb": 231,
+      "go_heap_mb": 14.854362487792969,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.39,
+        "max_ms": 14.78
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 2.5000978757,
+      "resident_mb": 235,
+      "go_heap_mb": 10.597358703613281,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.37,
+        "max_ms": 12.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 3.0000976173666665,
+      "resident_mb": 237,
+      "go_heap_mb": 10.95819091796875,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.45,
+        "max_ms": 9.69
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 3.5000924236166666,
+      "resident_mb": 237,
+      "go_heap_mb": 14.231803894042969,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.36,
+        "max_ms": 13.8
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 4.0001088264,
+      "resident_mb": 251,
+      "go_heap_mb": 10.012496948242188,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.45,
+        "max_ms": 10.44
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 4.500158772233333,
+      "resident_mb": 248,
+      "go_heap_mb": 25.014251708984375,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.1,
+        "p99_ms": 0.49,
+        "max_ms": 5.02
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 5.000113134733334,
+      "resident_mb": 235,
+      "go_heap_mb": 10.812461853027344,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.38,
+        "max_ms": 7.71
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 5.50008916875,
+      "resident_mb": 248,
+      "go_heap_mb": 14.229141235351562,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.37,
+        "max_ms": 9.39
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 6.000130320833334,
+      "resident_mb": 178,
+      "go_heap_mb": 9.778793334960938,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.07,
+        "p99_ms": 0.27,
+        "max_ms": 2.62
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 6.5000940499999995,
+      "resident_mb": 259,
+      "go_heap_mb": 10.15728759765625,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.36,
+        "max_ms": 13.93
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 7.000142991666666,
+      "resident_mb": 208,
+      "go_heap_mb": 26.170578002929688,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.18,
+        "max_ms": 2.48
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 7.500108759733333,
+      "resident_mb": 253,
+      "go_heap_mb": 10.95794677734375,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.32,
+        "max_ms": 5.01
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 8.000114109733333,
+      "resident_mb": 253,
+      "go_heap_mb": 18.515975952148438,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.42,
+        "max_ms": 8.13
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 8.50010963195,
+      "resident_mb": 255,
+      "go_heap_mb": 9.903564453125,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.34,
+        "max_ms": 11.21
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 9.000099524316667,
+      "resident_mb": 244,
+      "go_heap_mb": 25.841293334960938,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.06,
+        "p99_ms": 0.23,
+        "max_ms": 2.33
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 9.500083672916666,
+      "resident_mb": 280,
+      "go_heap_mb": 19.777969360351562,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.27,
+        "max_ms": 17.09
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 10.000111008333333,
+      "resident_mb": 284,
+      "go_heap_mb": 23.682403564453125,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.07,
+        "p99_ms": 0.32,
+        "max_ms": 11.49
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 10.5001432764,
+      "resident_mb": 240,
+      "go_heap_mb": 9.659706115722656,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.43,
+        "max_ms": 11.08
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 11.000089265283334,
+      "resident_mb": 258,
+      "go_heap_mb": 18.952781677246094,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.04,
+        "p99_ms": 0.14,
+        "max_ms": 1.95
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 11.50010322015,
+      "resident_mb": 202,
+      "go_heap_mb": 26.2156982421875,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 11.65
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 12.000111936816667,
+      "resident_mb": 264,
+      "go_heap_mb": 10.951385498046875,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.15,
+        "max_ms": 1.42
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 12.500088159733334,
+      "resident_mb": 298,
+      "go_heap_mb": 9.453964233398438,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.04,
+        "p99_ms": 0.15,
+        "max_ms": 2.32
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 13.000084061116667,
+      "resident_mb": 323,
+      "go_heap_mb": 9.860107421875,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.04,
+        "p99_ms": 0.15,
+        "max_ms": 1.32
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 13.500093989583334,
+      "resident_mb": 234,
+      "go_heap_mb": 10.28643798828125,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.15,
+        "max_ms": 1.58
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 14.000107797916666,
+      "resident_mb": 278,
+      "go_heap_mb": 10.633041381835938,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 2.17
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 14.500086352783333,
+      "resident_mb": 187,
+      "go_heap_mb": 19.952110290527344,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 1.72
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 15.000104802083333,
+      "resident_mb": 195,
+      "go_heap_mb": 9.645286560058594,
+      "goroutines": 70,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 3.29
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 15.500131524316666,
+      "resident_mb": 198,
+      "go_heap_mb": 10.080459594726562,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24002,
+        "p50_ms": 0.13,
+        "p99_ms": 1.1,
+        "max_ms": 13.11
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 16.000170661116666,
+      "resident_mb": 198,
+      "go_heap_mb": 10.928909301757812,
+      "goroutines": 66,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.14,
+        "p99_ms": 1.51,
+        "max_ms": 13.57
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 16.500221890283335,
+      "resident_mb": 201,
+      "go_heap_mb": 10.908714294433594,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.13,
+        "p99_ms": 1.53,
+        "max_ms": 19.21
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 17.00069335625,
+      "resident_mb": 276,
+      "go_heap_mb": 29.489768981933594,
+      "goroutines": 72,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.13,
+        "p99_ms": 1.22,
+        "max_ms": 13.87
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 17.500390985416665,
+      "resident_mb": 235,
+      "go_heap_mb": 28.638717651367188,
+      "goroutines": 69,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.13,
+        "p99_ms": 1.35,
+        "max_ms": 12.29
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 18.00022668195,
+      "resident_mb": 215,
+      "go_heap_mb": 25.109474182128906,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.14,
+        "p99_ms": 3.95,
+        "max_ms": 20.48
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 18.50040369515,
+      "resident_mb": 218,
+      "go_heap_mb": 38.86786651611328,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.13,
+        "p99_ms": 1.13,
+        "max_ms": 14.74
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 19.000176058333334,
+      "resident_mb": 180,
+      "go_heap_mb": 10.988746643066406,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.14,
+        "p99_ms": 1.43,
+        "max_ms": 15.29
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 19.50030795625,
+      "resident_mb": 182,
+      "go_heap_mb": 9.785659790039062,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.14,
+        "p99_ms": 1.7,
+        "max_ms": 24.15
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 20.00052832015,
+      "resident_mb": 181,
+      "go_heap_mb": 10.162437438964844,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23996,
+        "p50_ms": 0.14,
+        "p99_ms": 1.52,
+        "max_ms": 13.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 20.500354277783334,
+      "resident_mb": 181,
+      "go_heap_mb": 10.513648986816406,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.13,
+        "p99_ms": 1.13,
+        "max_ms": 10.68
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 21.000269304166668,
+      "resident_mb": 200,
+      "go_heap_mb": 10.734123229980469,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.12,
+        "p99_ms": 0.87,
+        "max_ms": 16.35
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 21.50083861528333,
+      "resident_mb": 239,
+      "go_heap_mb": 52.056785583496094,
+      "goroutines": 72,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.13,
+        "p99_ms": 1.03,
+        "max_ms": 12.23
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 22.000282217366667,
+      "resident_mb": 189,
+      "go_heap_mb": 9.882575988769531,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.13,
+        "p99_ms": 1.14,
+        "max_ms": 14.98
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 22.500142636816665,
+      "resident_mb": 200,
+      "go_heap_mb": 25.13526153564453,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.12,
+        "p99_ms": 1.13,
+        "max_ms": 21.93
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 23.000175893066668,
+      "resident_mb": 232,
+      "go_heap_mb": 10.693557739257812,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.13,
+        "p99_ms": 1.6,
+        "max_ms": 12.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 23.50008657015,
+      "resident_mb": 199,
+      "go_heap_mb": 25.268478393554688,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.66,
+        "max_ms": 10.26
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 24.000140620833335,
+      "resident_mb": 235,
+      "go_heap_mb": 9.532882690429688,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.06,
+        "p99_ms": 0.26,
+        "max_ms": 11.58
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 24.500084552083333,
+      "resident_mb": 256,
+      "go_heap_mb": 9.9278564453125,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.07,
+        "p99_ms": 0.25,
+        "max_ms": 6.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 25.0000926014,
+      "resident_mb": 258,
+      "go_heap_mb": 24.102317810058594,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24002,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 2.04
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 25.500083005566665,
+      "resident_mb": 258,
+      "go_heap_mb": 19.679595947265625,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 1.26
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 26.000116189583334,
+      "resident_mb": 267,
+      "go_heap_mb": 11.166862487792969,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.06,
+        "p99_ms": 0.22,
+        "max_ms": 2.6
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 26.50009468265,
+      "resident_mb": 235,
+      "go_heap_mb": 9.779312133789062,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.31,
+        "max_ms": 7.07
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 27.000097499316666,
+      "resident_mb": 276,
+      "go_heap_mb": 19.572593688964844,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 8.43
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 27.500116279166665,
+      "resident_mb": 236,
+      "go_heap_mb": 10.383132934570312,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 4.79
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 28.00012705695,
+      "resident_mb": 272,
+      "go_heap_mb": 10.961235046386719,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.05,
+        "p99_ms": 0.23,
+        "max_ms": 8.79
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 28.500095330566666,
+      "resident_mb": 236,
+      "go_heap_mb": 9.584342956542969,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 3.8
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 29.000099290983332,
+      "resident_mb": 245,
+      "go_heap_mb": 14.714248657226562,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.05,
+        "p99_ms": 0.19,
+        "max_ms": 1.83
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 29.500128884033334,
+      "resident_mb": 263,
+      "go_heap_mb": 10.3197021484375,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 1.73
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 30.000176259033335,
+      "resident_mb": 268,
+      "go_heap_mb": 10.933006286621094,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 5.02
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 30.5000902007,
+      "resident_mb": 272,
+      "go_heap_mb": 11.1380615234375,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 2.35
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 31.000085685416668,
+      "resident_mb": 272,
+      "go_heap_mb": 9.709785461425781,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 2.48
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 31.5001762882,
+      "resident_mb": 240,
+      "go_heap_mb": 10.159530639648438,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 3.09
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 32.000316383333335,
+      "resident_mb": 286,
+      "go_heap_mb": 20.34784698486328,
+      "goroutines": 71,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 3.41
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 32.50008401598333,
+      "resident_mb": 304,
+      "go_heap_mb": 19.863006591796875,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 2.09
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 33.000142884733336,
+      "resident_mb": 212,
+      "go_heap_mb": 9.477851867675781,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 1.92
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 33.50017753056667,
+      "resident_mb": 205,
+      "go_heap_mb": 26.706214904785156,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.05,
+        "p99_ms": 0.18,
+        "max_ms": 12.49
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 34.00021621528333,
+      "resident_mb": 264,
+      "go_heap_mb": 10.271690368652344,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24002,
+        "p50_ms": 0.12,
+        "p99_ms": 1.01,
+        "max_ms": 18.61
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 34.500558855566666,
+      "resident_mb": 273,
+      "go_heap_mb": 40.332191467285156,
+      "goroutines": 73,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.13,
+        "p99_ms": 1.26,
+        "max_ms": 12.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 35.000213409033336,
+      "resident_mb": 243,
+      "go_heap_mb": 34.43079376220703,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24002,
+        "p50_ms": 0.12,
+        "p99_ms": 1.45,
+        "max_ms": 11.31
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 35.50019596041667,
+      "resident_mb": 230,
+      "go_heap_mb": 9.712791442871094,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.13,
+        "p99_ms": 1.11,
+        "max_ms": 12.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 36.000247985416664,
+      "resident_mb": 241,
+      "go_heap_mb": 18.83106231689453,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.12,
+        "p99_ms": 1.07,
+        "max_ms": 14.65
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 36.500170255566665,
+      "resident_mb": 215,
+      "go_heap_mb": 33.75651550292969,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.13,
+        "p99_ms": 1.19,
+        "max_ms": 12.73
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 37.00115220556667,
+      "resident_mb": 237,
+      "go_heap_mb": 10.960838317871094,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23997,
+        "p50_ms": 0.12,
+        "p99_ms": 1.02,
+        "max_ms": 13.09
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 37.50024439723333,
+      "resident_mb": 181,
+      "go_heap_mb": 11.188468933105469,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24003,
+        "p50_ms": 0.13,
+        "p99_ms": 1.37,
+        "max_ms": 14.79
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 38.000993815983335,
+      "resident_mb": 250,
+      "go_heap_mb": 37.74677276611328,
+      "goroutines": 73,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.13,
+        "p99_ms": 1.55,
+        "max_ms": 21.62
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 38.5001773764,
+      "resident_mb": 194,
+      "go_heap_mb": 10.265876770019531,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.13,
+        "p99_ms": 1.33,
+        "max_ms": 13.81
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 39.00030021041667,
+      "resident_mb": 195,
+      "go_heap_mb": 10.671394348144531,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.13,
+        "p99_ms": 1.03,
+        "max_ms": 12.34
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 39.500155722916666,
+      "resident_mb": 214,
+      "go_heap_mb": 11.036422729492188,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.12,
+        "p99_ms": 0.83,
+        "max_ms": 12.27
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 40.0002691889,
+      "resident_mb": 201,
+      "go_heap_mb": 9.664527893066406,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.12,
+        "p99_ms": 0.9,
+        "max_ms": 11.98
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 40.50030693265,
+      "resident_mb": 196,
+      "go_heap_mb": 9.924400329589844,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.13,
+        "p99_ms": 0.98,
+        "max_ms": 11.92
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 41.00040215556667,
+      "resident_mb": 223,
+      "go_heap_mb": 24.83771514892578,
+      "goroutines": 69,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.12,
+        "p99_ms": 0.98,
+        "max_ms": 13.77
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 41.50027885903334,
+      "resident_mb": 248,
+      "go_heap_mb": 10.794769287109375,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.11,
+        "p99_ms": 0.76,
+        "max_ms": 14.19
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 42.000130852783336,
+      "resident_mb": 213,
+      "go_heap_mb": 28.053421020507812,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.45,
+        "max_ms": 4.51
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 42.500100830566666,
+      "resident_mb": 228,
+      "go_heap_mb": 18.934921264648438,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.07,
+        "p99_ms": 0.25,
+        "max_ms": 10.08
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 43.000087984733334,
+      "resident_mb": 262,
+      "go_heap_mb": 10.133392333984375,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.2,
+        "max_ms": 1.83
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 43.500094559033336,
+      "resident_mb": 232,
+      "go_heap_mb": 10.462455749511719,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 1.24
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 44.00010709306667,
+      "resident_mb": 268,
+      "go_heap_mb": 10.876121520996094,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.05,
+        "p99_ms": 0.16,
+        "max_ms": 2.45
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 44.500104459733336,
+      "resident_mb": 259,
+      "go_heap_mb": 9.451034545898438,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.07,
+        "p99_ms": 0.25,
+        "max_ms": 2.52
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 45.00010119791666,
+      "resident_mb": 255,
+      "go_heap_mb": 9.867271423339844,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 4.42
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 45.50009162916667,
+      "resident_mb": 263,
+      "go_heap_mb": 19.361183166503906,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 9.48
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 46.00011273056667,
+      "resident_mb": 250,
+      "go_heap_mb": 10.644737243652344,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 11.75
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 46.500099877783335,
+      "resident_mb": 286,
+      "go_heap_mb": 11.019844055175781,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 4.98
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 47.000083293066666,
+      "resident_mb": 255,
+      "go_heap_mb": 18.72191619873047,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 10.92
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 47.500119079866664,
+      "resident_mb": 257,
+      "go_heap_mb": 19.5799560546875,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 9.57
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 48.00014276945,
+      "resident_mb": 284,
+      "go_heap_mb": 25.302444458007812,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 4.63
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 48.5001029,
+      "resident_mb": 279,
+      "go_heap_mb": 19.829330444335938,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 12.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 49.00010491945,
+      "resident_mb": 266,
+      "go_heap_mb": 11.271095275878906,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.33,
+        "max_ms": 10.8
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 49.5001137889,
+      "resident_mb": 266,
+      "go_heap_mb": 19.578155517578125,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 2.8
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 50.00012442291667,
+      "resident_mb": 261,
+      "go_heap_mb": 10.23931884765625,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 4.61
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 50.5001166014,
+      "resident_mb": 261,
+      "go_heap_mb": 10.383499145507812,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.28,
+        "max_ms": 4.01
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 51.00008145416667,
+      "resident_mb": 270,
+      "go_heap_mb": 20.039581298828125,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 11.23
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 51.5001276875,
+      "resident_mb": 262,
+      "go_heap_mb": 14.484382629394531,
+      "goroutines": 67,
+      "open_files": 24,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.33,
+        "max_ms": 12.73
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 52.00011727223333,
+      "resident_mb": 248,
+      "go_heap_mb": 19.248855590820312,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 4.66
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 52.500091404866666,
+      "resident_mb": 248,
+      "go_heap_mb": 10.467582702636719,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 2.89
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 53.000114591666666,
+      "resident_mb": 248,
+      "go_heap_mb": 10.709602355957031,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 10.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 53.50012950556667,
+      "resident_mb": 248,
+      "go_heap_mb": 20.925827026367188,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.08,
+        "p99_ms": 0.31,
+        "max_ms": 7.11
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 54.00011120208333,
+      "resident_mb": 279,
+      "go_heap_mb": 9.748191833496094,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 9.09
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 54.5000817382,
+      "resident_mb": 248,
+      "go_heap_mb": 19.64874267578125,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 15.69
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 55.00017084445,
+      "resident_mb": 284,
+      "go_heap_mb": 26.10736846923828,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 3.02
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 55.50010675556667,
+      "resident_mb": 243,
+      "go_heap_mb": 10.985382080078125,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 13.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 56.00011278473333,
+      "resident_mb": 284,
+      "go_heap_mb": 18.653175354003906,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 11.02
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 56.50008917015,
+      "resident_mb": 280,
+      "go_heap_mb": 9.975677490234375,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 3.37
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 57.00013505208333,
+      "resident_mb": 271,
+      "go_heap_mb": 26.092315673828125,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 3.08
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 57.5000991014,
+      "resident_mb": 253,
+      "go_heap_mb": 19.712310791015625,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 10.19
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 58.00011257291667,
+      "resident_mb": 253,
+      "go_heap_mb": 11.053276062011719,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.32,
+        "max_ms": 13.13
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 58.50012131041667,
+      "resident_mb": 253,
+      "go_heap_mb": 19.45397186279297,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 3.95
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 59.00010825903333,
+      "resident_mb": 284,
+      "go_heap_mb": 19.698028564453125,
+      "goroutines": 67,
+      "open_files": 24,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.33,
+        "max_ms": 13.63
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 59.50010821041667,
+      "resident_mb": 243,
+      "go_heap_mb": 10.4150390625,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 7.77
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 60.000108228483334,
+      "resident_mb": 248,
+      "go_heap_mb": 10.826454162597656,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 8.31
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 60.50011450348333,
+      "resident_mb": 248,
+      "go_heap_mb": 11.28167724609375,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 7.43
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 61.000144493066664,
+      "resident_mb": 262,
+      "go_heap_mb": 26.968490600585938,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.33,
+        "max_ms": 12
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 61.50008148958333,
+      "resident_mb": 253,
+      "go_heap_mb": 10.196327209472656,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 6.92
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 62.000117121533336,
+      "resident_mb": 294,
+      "go_heap_mb": 20.532333374023438,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 2.78
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 62.50011599931667,
+      "resident_mb": 280,
+      "go_heap_mb": 11.001289367675781,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 10.24
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 63.00009235973334,
+      "resident_mb": 266,
+      "go_heap_mb": 9.610206604003906,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 7.58
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 63.5001122875,
+      "resident_mb": 266,
+      "go_heap_mb": 10.101455688476562,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 2.7
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 64.00010205278333,
+      "resident_mb": 266,
+      "go_heap_mb": 10.42413330078125,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 10.36
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 64.50009187916666,
+      "resident_mb": 266,
+      "go_heap_mb": 20.59759521484375,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 2.62
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 65.00010362223334,
+      "resident_mb": 280,
+      "go_heap_mb": 11.1324462890625,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 8.33
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 65.5001156014,
+      "resident_mb": 275,
+      "go_heap_mb": 9.821441650390625,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 10.95
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 66.0001071,
+      "resident_mb": 270,
+      "go_heap_mb": 19.319992065429688,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 7.73
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 66.50009168056667,
+      "resident_mb": 261,
+      "go_heap_mb": 10.525489807128906,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 3.35
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 67.00011195416667,
+      "resident_mb": 261,
+      "go_heap_mb": 10.799690246582031,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 13.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 67.50009322778334,
+      "resident_mb": 271,
+      "go_heap_mb": 19.424339294433594,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.34,
+        "max_ms": 5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 68.00012950765,
+      "resident_mb": 257,
+      "go_heap_mb": 10.202598571777344,
+      "goroutines": 66,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 5.06
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 68.5001210264,
+      "resident_mb": 248,
+      "go_heap_mb": 10.387039184570312,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 8.05
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 69.00011597848334,
+      "resident_mb": 248,
+      "go_heap_mb": 10.768310546875,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 2.71
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 69.50010988681667,
+      "resident_mb": 248,
+      "go_heap_mb": 16.078292846679688,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 5.52
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 70.00010795556666,
+      "resident_mb": 280,
+      "go_heap_mb": 9.712600708007812,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 12.03
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 70.50014029445,
+      "resident_mb": 248,
+      "go_heap_mb": 14.795417785644531,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 11.61
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 71.00010672291667,
+      "resident_mb": 279,
+      "go_heap_mb": 10.545700073242188,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 10.37
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 71.50009765278334,
+      "resident_mb": 248,
+      "go_heap_mb": 20.929962158203125,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 5.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 72.00012526458333,
+      "resident_mb": 284,
+      "go_heap_mb": 20.84551239013672,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 5.49
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 72.50011391181667,
+      "resident_mb": 280,
+      "go_heap_mb": 9.925888061523438,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 6.59
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 73.00008849861666,
+      "resident_mb": 284,
+      "go_heap_mb": 19.60064697265625,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 3.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 73.50011490416667,
+      "resident_mb": 271,
+      "go_heap_mb": 10.685859680175781,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 9.21
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 74.0000969375,
+      "resident_mb": 262,
+      "go_heap_mb": 20.890602111816406,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 11.31
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 74.50009847916667,
+      "resident_mb": 262,
+      "go_heap_mb": 18.71015167236328,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 2.78
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 75.00011811598333,
+      "resident_mb": 262,
+      "go_heap_mb": 25.790069580078125,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24002,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 9.89
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 75.50010284791666,
+      "resident_mb": 284,
+      "go_heap_mb": 26.116249084472656,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 3.26
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 76.00009329098333,
+      "resident_mb": 275,
+      "go_heap_mb": 10.873008728027344,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 8.33
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 76.50010148681666,
+      "resident_mb": 266,
+      "go_heap_mb": 11.164260864257812,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 2.94
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 77.00009820278333,
+      "resident_mb": 257,
+      "go_heap_mb": 9.848983764648438,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 14.88
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 77.50013736598333,
+      "resident_mb": 257,
+      "go_heap_mb": 10.272239685058594,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 14.36
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 78.00009302431667,
+      "resident_mb": 257,
+      "go_heap_mb": 10.61627197265625,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 12.72
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 78.50009776666667,
+      "resident_mb": 257,
+      "go_heap_mb": 11.00555419921875,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 4.17
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 79.00012135208334,
+      "resident_mb": 294,
+      "go_heap_mb": 9.651199340820312,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 7.62
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 79.50020400486666,
+      "resident_mb": 285,
+      "go_heap_mb": 24.973495483398438,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.28,
+        "max_ms": 10.7
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 80.00007956666667,
+      "resident_mb": 248,
+      "go_heap_mb": 19.447555541992188,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 2.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 80.50009010208333,
+      "resident_mb": 248,
+      "go_heap_mb": 10.832489013671875,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.28,
+        "max_ms": 2.63
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 81.00011754445,
+      "resident_mb": 248,
+      "go_heap_mb": 11.119842529296875,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 12.19
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 81.50011690765,
+      "resident_mb": 280,
+      "go_heap_mb": 10.064765930175781,
+      "goroutines": 66,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 3.81
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 82.00009299861667,
+      "resident_mb": 244,
+      "go_heap_mb": 10.148048400878906,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 8.66
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 82.50011719445,
+      "resident_mb": 284,
+      "go_heap_mb": 15.234527587890625,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 2.57
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 83.00011997916667,
+      "resident_mb": 244,
+      "go_heap_mb": 10.956253051757812,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 4.67
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 83.50009756945,
+      "resident_mb": 279,
+      "go_heap_mb": 11.379814147949219,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 5.66
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 84.00019317153334,
+      "resident_mb": 280,
+      "go_heap_mb": 10.019615173339844,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 3.05
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 84.50010688473333,
+      "resident_mb": 266,
+      "go_heap_mb": 24.77741241455078,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 4.25
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 85.00011654445,
+      "resident_mb": 248,
+      "go_heap_mb": 19.777313232421875,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 3.67
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 85.50011885486667,
+      "resident_mb": 248,
+      "go_heap_mb": 11.166450500488281,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 9.54
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 86.00008356598333,
+      "resident_mb": 248,
+      "go_heap_mb": 9.779884338378906,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 3.03
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 86.50013109375,
+      "resident_mb": 248,
+      "go_heap_mb": 10.075729370117188,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 5.37
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 87.00009321598333,
+      "resident_mb": 284,
+      "go_heap_mb": 19.939178466796875,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 10.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 87.50009247291666,
+      "resident_mb": 244,
+      "go_heap_mb": 10.864501953125,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 8.21
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 88.0001274132,
+      "resident_mb": 284,
+      "go_heap_mb": 21.550216674804688,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 14.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 88.50012999375,
+      "resident_mb": 248,
+      "go_heap_mb": 14.477432250976562,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 14.8
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 89.0000851014,
+      "resident_mb": 284,
+      "go_heap_mb": 20.099227905273438,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.31,
+        "max_ms": 11.82
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 89.5000973757,
+      "resident_mb": 320,
+      "go_heap_mb": 19.946571350097656,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 5.49
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 90.00009279515,
+      "resident_mb": 262,
+      "go_heap_mb": 25.00402069091797,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 9.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 90.50014977986666,
+      "resident_mb": 262,
+      "go_heap_mb": 24.58782958984375,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 16.47
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 91.0000925382,
+      "resident_mb": 262,
+      "go_heap_mb": 24.0784912109375,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 2.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 91.5001271382,
+      "resident_mb": 262,
+      "go_heap_mb": 10.46209716796875,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 2.83
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 92.00010944028334,
+      "resident_mb": 262,
+      "go_heap_mb": 10.833900451660156,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 13.63
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 92.50014900695,
+      "resident_mb": 284,
+      "go_heap_mb": 20.608169555664062,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 8.8
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 93.0001220889,
+      "resident_mb": 248,
+      "go_heap_mb": 14.477745056152344,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 6.65
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 93.50011058125,
+      "resident_mb": 253,
+      "go_heap_mb": 24.383499145507812,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.31,
+        "max_ms": 7.45
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 94.00012180208333,
+      "resident_mb": 284,
+      "go_heap_mb": 10.597328186035156,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 5.57
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 94.50009512083334,
+      "resident_mb": 248,
+      "go_heap_mb": 20.525314331054688,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 14.6
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 95.00014435556666,
+      "resident_mb": 280,
+      "go_heap_mb": 11.444900512695312,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 14.07
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 95.50011022223333,
+      "resident_mb": 276,
+      "go_heap_mb": 9.926109313964844,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.35,
+        "max_ms": 10.05
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 96.00013273541667,
+      "resident_mb": 262,
+      "go_heap_mb": 10.327018737792969,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 3.74
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 96.50009904375,
+      "resident_mb": 262,
+      "go_heap_mb": 10.658554077148438,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 2.66
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 97.00012640556666,
+      "resident_mb": 267,
+      "go_heap_mb": 11.13140869140625,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 10.63
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 97.50011008681666,
+      "resident_mb": 267,
+      "go_heap_mb": 18.708175659179688,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 12.57
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 98.00009474445,
+      "resident_mb": 285,
+      "go_heap_mb": 10.095710754394531,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 7.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 98.50009621111667,
+      "resident_mb": 276,
+      "go_heap_mb": 10.542236328125,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 8.25
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 99.00009993125,
+      "resident_mb": 270,
+      "go_heap_mb": 19.84300994873047,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.34,
+        "max_ms": 9.89
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 99.50015000278333,
+      "resident_mb": 273,
+      "go_heap_mb": 28.34716796875,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 5.09
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 100.00010827153334,
+      "resident_mb": 272,
+      "go_heap_mb": 14.907867431640625,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 2.62
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 100.50009757778334,
+      "resident_mb": 272,
+      "go_heap_mb": 19.465049743652344,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 3.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 101.0001168632,
+      "resident_mb": 303,
+      "go_heap_mb": 10.677101135253906,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 2.59
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 101.5001727007,
+      "resident_mb": 340,
+      "go_heap_mb": 10.944259643554688,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 3.28
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 102.00009756875,
+      "resident_mb": 285,
+      "go_heap_mb": 24.832176208496094,
+      "goroutines": 67,
+      "open_files": 24,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 6.96
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 102.5001028625,
+      "resident_mb": 285,
+      "go_heap_mb": 15.017265319824219,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 13.07
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 103.00011013541666,
+      "resident_mb": 290,
+      "go_heap_mb": 19.43126678466797,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 15.46
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 103.50008878681666,
+      "resident_mb": 249,
+      "go_heap_mb": 10.781257629394531,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.34,
+        "max_ms": 14.6
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 104.00018236181667,
+      "resident_mb": 285,
+      "go_heap_mb": 11.593536376953125,
+      "goroutines": 66,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 9.78
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 104.50014831945,
+      "resident_mb": 249,
+      "go_heap_mb": 9.872642517089844,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.27,
+        "max_ms": 4.63
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 105.00013677848334,
+      "resident_mb": 285,
+      "go_heap_mb": 10.234527587890625,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 5.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 105.5000829382,
+      "resident_mb": 280,
+      "go_heap_mb": 10.607131958007812,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.08,
+        "p99_ms": 0.28,
+        "max_ms": 13.84
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 106.00009296806667,
+      "resident_mb": 316,
+      "go_heap_mb": 19.95148468017578,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 10.6
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 106.50010994861667,
+      "resident_mb": 253,
+      "go_heap_mb": 25.670082092285156,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.28,
+        "max_ms": 4.58
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 107.00011494166667,
+      "resident_mb": 258,
+      "go_heap_mb": 9.946487426757812,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24002,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 14.08
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 107.50011649166666,
+      "resident_mb": 258,
+      "go_heap_mb": 24.362091064453125,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.33,
+        "max_ms": 5.06
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 108.00011384445,
+      "resident_mb": 258,
+      "go_heap_mb": 10.772773742675781,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 7.13
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 108.50013492223333,
+      "resident_mb": 258,
+      "go_heap_mb": 20.52648162841797,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 9.62
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 109.0000993139,
+      "resident_mb": 285,
+      "go_heap_mb": 9.785598754882812,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 9.96
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 109.5001003,
+      "resident_mb": 285,
+      "go_heap_mb": 19.276962280273438,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 2.72
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 110.00009274931666,
+      "resident_mb": 280,
+      "go_heap_mb": 20.228927612304688,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 12.7
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 110.5001175389,
+      "resident_mb": 280,
+      "go_heap_mb": 22.196319580078125,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 16.61
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 111.00014435208334,
+      "resident_mb": 312,
+      "go_heap_mb": 11.2606201171875,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.32,
+        "max_ms": 4.75
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 111.50008762778333,
+      "resident_mb": 316,
+      "go_heap_mb": 19.001441955566406,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24001,
+        "p50_ms": 0.09,
+        "p99_ms": 0.33,
+        "max_ms": 8.55
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 112.00013439375,
+      "resident_mb": 249,
+      "go_heap_mb": 10.309349060058594,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.29,
+        "max_ms": 6.67
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 112.50014926111666,
+      "resident_mb": 285,
+      "go_heap_mb": 10.60198974609375,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 9.44
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 113.00009615348333,
+      "resident_mb": 285,
+      "go_heap_mb": 24.993026733398438,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 2.72
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 113.50014694306667,
+      "resident_mb": 285,
+      "go_heap_mb": 24.76636505126953,
+      "goroutines": 68,
+      "open_files": 24,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 9.48
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 114.00016733611666,
+      "resident_mb": 285,
+      "go_heap_mb": 10.086578369140625,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23999,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 12.66
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 114.50011771041666,
+      "resident_mb": 285,
+      "go_heap_mb": 24.705345153808594,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 5.32
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 115.00009727223333,
+      "resident_mb": 280,
+      "go_heap_mb": 10.762283325195312,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 3.75
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 115.50013701875,
+      "resident_mb": 271,
+      "go_heap_mb": 11.211868286132812,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.33,
+        "max_ms": 5.16
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 116.00010458265,
+      "resident_mb": 307,
+      "go_heap_mb": 9.849716186523438,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "n": 24002,
+        "p50_ms": 0.08,
+        "p99_ms": 0.3,
+        "max_ms": 4.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 116.5001370889,
+      "resident_mb": 271,
+      "go_heap_mb": 29.094406127929688,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.34,
+        "max_ms": 10.24
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 117.00009936806667,
+      "resident_mb": 303,
+      "go_heap_mb": 19.884963989257812,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.3,
+        "max_ms": 8.73
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 117.5001368507,
+      "resident_mb": 290,
+      "go_heap_mb": 26.739166259765625,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 23998,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 3.52
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 118.00011396041667,
+      "resident_mb": 312,
+      "go_heap_mb": 25.418067932128906,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.08,
+        "p99_ms": 0.31,
+        "max_ms": 9.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 118.5001187382,
+      "resident_mb": 263,
+      "go_heap_mb": 10.014900207519531,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 4.85
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 119.00010144236667,
+      "resident_mb": 263,
+      "go_heap_mb": 19.604782104492188,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24002,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 9.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 119.50017898541667,
+      "resident_mb": 294,
+      "go_heap_mb": 34.193077087402344,
+      "goroutines": 68,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.31,
+        "max_ms": 2.78
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 120.00012655695,
+      "resident_mb": 254,
+      "go_heap_mb": 26.776519775390625,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "n": 24000,
+        "p50_ms": 0.09,
+        "p99_ms": 0.29,
+        "max_ms": 6.24
+      },
+      "resyncs": 0
+    }
+  ],
+  "growth_per_hour_after_warmup": {
+    "go_heap_mb": 0.3707348690965239,
+    "goroutines": -0.5140250572853524,
+    "open_files": 0.10023586035570377,
+    "resident_mb": 28.573923290046686
+  },
+  "degraded": false
+}

@@ -47,7 +47,7 @@ settings, and needs `/tmp/hivebench` (above) as the pane's program.
 | `storm` | OSC sequences a second per pane (100 to 100,000), per kind: title, pwd, status, bell, clipboard, notify | API p99 above 50 ms, an events subscriber dropped, under 90% delivered, or the Go heap growing over 64 MB |
 | `resize` | resizes a second (10 to 1,000, one caller), alternating sizes, a pane streaming 1 MB/s to an attach client | resize or output p99 above 50 ms, a resync, or the terminal not at the size last asked for |
 | `clients` | attach clients (1 to 256), each subscribed to 4 panes streaming 256 KB/s | latency p99 above 50 ms, a resync, or a client short of bytes |
-| `soak` | time: steady load (8 busy panes, 2 clients, an events subscriber, agent reports, titles) with churn (a window opened and closed every 10 s, a client reconnecting every 30 s) | Go heap growing over 10 MB an hour, goroutines or open files growing, or an interval's latency p99 above 50 ms |
+| `soak` | time: steady load (8 busy panes, 2 clients, an events subscriber, agent reports, titles) with churn (a window opened and closed every 10 s, a client reconnecting every 30 s, `--reconnect 0` to turn it off) | Go heap growing over 10 MB an hour, goroutines or open files growing, or an interval's latency p99 above 50 ms |
 | `churn` | windows opened and closed, in batches | resident memory per closed window above 16 KB |
 | `bench/app-soak.sh` | time: the real app on a throwaway server, 4 busy panes, titles, window churn | none: app RSS growth per hour |
 | `bench/app-storm.sh` | the real Hive.app (release) on a throwaway server, a pane storming one OSC kind | none: app CPU and memory growth; `SAMPLE=1` samples its stacks |
@@ -186,8 +186,41 @@ stays.
   in-flight frames (`server.frame`, the client's reads), no retained
   structure; the likely source is the reconnecting client, whose snapshots
   of 8 full panes (~96 MB) every 30 s go through the heap and return to the
-  OS lazily. Not proven: a 2+ hour soak on a quiet machine would settle it.
+  OS lazily. Settled below.
+- Server, 2 h × 2, side by side, the same load, with `--reconnect 30s`
+  and `--reconnect 0` (on AC, load ~4.5 from other work; this measures
+  memory, not latency). **No leak; the drift was the reconnecting client.**
+  - Without reconnects: RSS flat at 173–178 MB from minute 1 to 120
+    (+3 MB an hour), live heap 9.2–10.4 MB, goroutines 66–70, files 22.
+  - With them: a sawtooth, live heap 9.4–52 MB and RSS 178–340 MB, each
+    reconnect's snapshots of 8 full panes passing through. The live heap's
+    floor doesn't move (9.4 to 9.8 MB, +0.4 MB an hour fitted); RSS's
+    floor rises over the first hour (178 to 248 MB) and then holds
+    (244–249 MB for the last hour): pages the runtime keeps for the next
+    burst, not growth.
+  - Latency p99 0.3 ms after the first 20 min in both, no resyncs.
 - Churn: 3,000 windows opened (with output) and closed. Memory levels off:
   heap flat at 5.2–5.8 MB from 900 windows, RSS flat at 34 MB from 1,500;
   the growth before that is the event bus's replay ring filling. Native
   memory flat: libghostty frees closed terminals. Goroutines and files flat.
+
+**2026-10-18, Linux** (AWS m7g.xlarge: 4 Neoverse-V1 cores, 16 GB, gp3
+root at its default 125 MB/s; Ubuntu 24.04; quiet, load < 0.5 before each
+run). The first knee anywhere in the suite, and both causes are the machine:
+- flush, empty scrollback: `agent.report` p99 under 5 ms to 128 panes,
+  65 ms at 192 (degraded), p50 93 ms at 256. The whole VM was saturated:
+  idle ~10%, a run queue of 17–43 on 4 cores, 55% system time. 192 emitter
+  processes push ~19 MB/s through ptys; the server itself used 1.4 cores.
+  Not a hive lock: the mutex profile's waits are pty output behind snapshot
+  encodes, and reports don't take that lock.
+- flush, full scrollback (12 MB a pane): saves are disk-bound. Every save
+  rewrites each changed pane's whole scrollback: 192 panes are ~2.3 GB,
+  p99 25.5 s on a 125 MB/s disk (a call's 30 s deadline cut the first run
+  short; saves now get 10 minutes). On the Mac's SSD it doesn't show. With
+  ordinary use (20 busy panes, 12 MB each: ~240 MB a save) a slow disk, as
+  on a cheap VPS or a Raspberry Pi, would feel it: an incremental snapshot
+  (only the rows written since the last save) is the fix to consider when
+  remote servers make such machines common.
+- Snapshot saves are slower than on the Mac at any size (p99 65 ms at 8
+  panes, against ~6 ms): no F_BARRIERFSYNC on Linux, so a full fsync on a
+  network disk. Reports don't wait for them.

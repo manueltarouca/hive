@@ -1,0 +1,2680 @@
+{
+  "scenario": "soak",
+  "meta": {
+    "when": "2026-10-18T10:35:47Z",
+    "machine": "Mac17,8",
+    "cpu": "Apple M5 Pro",
+    "cores": 18,
+    "memory_gb": 48,
+    "os": "macOS 27.0.1",
+    "go": "go1.26.2",
+    "commit": "4a6d228+dirty",
+    "power": "AC Power",
+    "load_before": "5.45 4.73 4.64",
+    "load_after": "3.94 4.45 4.55",
+    "pty_max": 511,
+    "pty_in_use": 33,
+    "open_files_limit": "1048576",
+    "gomaxprocs": 18,
+    "fit_for_baseline": false,
+    "why_not_baseline": "load average 5.45 4.73 4.64"
+  },
+  "params": {
+    "every_s": 30,
+    "minutes": 120,
+    "panes": 8,
+    "rate_bytes_per_s": 102400,
+    "reconnect_s": 0,
+    "warmup_min": 5
+  },
+  "samples": [
+    {
+      "minute": 0.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 1.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 9.4,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 1.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 2.0,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 2.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 3.0,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 3.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 4.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 4.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 5.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 5.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 9.3,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 6.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 6.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 7.0,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 7.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 8.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 8.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 9.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 9.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 10.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 10.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.6,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 11.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 11.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 12.0,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 12.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 9.4,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 13.0,
+      "resident_mb": 174.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 13.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 14.0,
+      "resident_mb": 172.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 14.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 15.0,
+      "resident_mb": 171.0,
+      "go_heap_mb": 9.6,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 15.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.0
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 16.0,
+      "resident_mb": 172.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 16.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 17.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 9.4,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 17.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 18.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 4.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 18.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 19.0,
+      "resident_mb": 171.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 19.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.6
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 20.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 20.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 21.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 21.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.0
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 22.0,
+      "resident_mb": 172.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 22.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 23.0,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 23.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.7
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 24.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 9.4,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 24.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 25.0,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 25.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 26.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 26.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 27.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 27.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 28.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 28.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 29.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 29.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 30.0,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 30.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 31.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 31.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 32.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 32.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 33.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 33.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 34.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 34.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 35.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.5
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 35.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.0
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 36.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.0
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 36.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 37.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 37.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 38.0,
+      "resident_mb": 172.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 38.5,
+      "resident_mb": 172.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 39.0,
+      "resident_mb": 172.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 1.1
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 39.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 40.0,
+      "resident_mb": 172.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.8
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 40.5,
+      "resident_mb": 173.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 41.0,
+      "resident_mb": 173.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.9
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 41.5,
+      "resident_mb": 174.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.7
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 42.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.4
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 42.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.4,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 43.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 43.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 44.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 44.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 45.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.6,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 45.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 46.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 46.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 47.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 11.2,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 47.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 48.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 48.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 49.0,
+      "resident_mb": 175.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 49.5,
+      "resident_mb": 175.0,
+      "go_heap_mb": 9.3,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 50.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 50.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 51.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 51.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 11.3,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 52.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 9.6,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 52.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 53.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 53.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 54.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 54.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 55.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 55.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 56.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 56.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 57.0,
+      "resident_mb": 176.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 57.5,
+      "resident_mb": 176.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 73,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 58.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 58.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 59.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 59.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 60.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 60.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 61.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 61.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 62.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 62.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 63.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 63.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 64.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 64.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 65.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.2
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 65.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 66.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 66.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 67.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 67.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 68.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 69,
+      "open_files": 23,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 68.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 69.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 69.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 70.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 70.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 71.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 71.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 72.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 72.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 73.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 73.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 74.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 74.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 75.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.4,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 75.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 76.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 76.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 77.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 77.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 78.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 78.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 79.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 79.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 80.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 80.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 81.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 81.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.3,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 82.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.6,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 82.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 83.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 83.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 84.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.2,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 84.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 85.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 85.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 86.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 86.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.4,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 87.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 87.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 88.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 88.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 89.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 89.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 90.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 90.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 91.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.3,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 91.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 92.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 92.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 93.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 93.5,
+      "resident_mb": 177.0,
+      "go_heap_mb": 9.6,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 94.0,
+      "resident_mb": 177.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 94.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 95.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 95.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.2,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 96.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 96.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 97.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 97.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 98.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.2,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 98.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 99.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 99.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 100.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 100.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 101.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 101.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 102.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 69,
+      "open_files": 23,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 102.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 103.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 103.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 104.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 67,
+      "open_files": 23,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 104.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 105.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.3,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 105.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 106.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.3,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 106.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 107.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 107.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.6,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 108.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 108.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 109.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.8,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 109.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.3,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 110.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 110.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 111.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.7,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 111.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.9,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 112.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.7,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 112.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.9,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 113.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 113.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 69,
+      "open_files": 23,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 114.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 114.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 115.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 115.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.5,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 116.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 116.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 117.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.8,
+      "goroutines": 67,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 117.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.2,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 118.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.6,
+      "goroutines": 68,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 118.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 11.1,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 119.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 9.5,
+      "goroutines": 66,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 119.5,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.0,
+      "goroutines": 69,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    },
+    {
+      "minute": 120.0,
+      "resident_mb": 178.0,
+      "go_heap_mb": 10.4,
+      "goroutines": 70,
+      "open_files": 22,
+      "latency": {
+        "p99_ms": 0.3
+      },
+      "resyncs": 0
+    }
+  ],
+  "growth_per_hour_after_warmup": {
+    "resident_mb": 3.0,
+    "go_heap_mb": 0.2,
+    "goroutines": 0.2,
+    "open_files": 0.0
+  },
+  "degraded": false,
+  "note": "rebuilt from the run's log: it ended in the same second as the --reconnect 30s run beside it, whose result overwrote this file (fixed: writeResult never overwrites). meta is the twin run's (same machine, same start); latency has p99 only."
+}

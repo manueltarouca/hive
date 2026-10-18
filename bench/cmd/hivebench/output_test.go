@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -49,5 +51,39 @@ func TestReaderStartResets(t *testing.T) {
 	r.start()
 	if len(r.lat) != 0 || r.bytes != 0 || r.resyncs != 0 || r.frames != 0 {
 		t.Fatalf("after start: %d samples, %d bytes, %d resyncs, %d frames", len(r.lat), r.bytes, r.resyncs, r.frames)
+	}
+}
+
+// Two runs that end in the same second keep both results.
+func TestWriteResultNeverOverwrites(t *testing.T) {
+	dir := t.TempDir()
+	a, err := writeResult(dir, "soak", map[string]int{"run": 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := writeResult(dir, "soak", map[string]int{"run": 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a == b {
+		t.Fatalf("both runs wrote %s", a)
+	}
+	if got, _ := os.ReadFile(a); !strings.Contains(string(got), `"run": 1`) {
+		t.Fatalf("first result overwritten: %s", got)
+	}
+}
+
+func TestLinuxMetaParsing(t *testing.T) {
+	if got := procLoadavg("0.52 0.58 0.59 1/389 12345\n"); got != "0.52 0.58 0.59" {
+		t.Errorf("procLoadavg = %q", got)
+	}
+	if got := memTotalGB("MemTotal:       16303840 kB\nMemFree:  1 kB\n"); got < 15.5 || got > 15.6 {
+		t.Errorf("memTotalGB = %v", got)
+	}
+	if got := osRelease("NAME=\"Ubuntu\"\nPRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\n"); got != "Ubuntu 24.04.1 LTS" {
+		t.Errorf("osRelease = %q", got)
+	}
+	if got := lscpuModel("Architecture: aarch64\nModel name:  Neoverse-V1\n"); got != "Neoverse-V1" {
+		t.Errorf("lscpuModel = %q", got)
 	}
 }

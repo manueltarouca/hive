@@ -160,7 +160,9 @@ func flushStepRun(exe string, panes, prefill, rate, secs int, limit time.Duratio
 				return
 			default:
 			}
-			if err := ts.call("server.flush", map[string]any{}, nil); err != nil {
+			// A save is what's measured: on a slow disk, every pane's full
+			// scrollback takes longer than a call's usual 30 s.
+			if err := ts.callWithin(10*time.Minute, "server.flush", map[string]any{}, nil); err != nil {
 				savesDone <- err
 				return
 			}

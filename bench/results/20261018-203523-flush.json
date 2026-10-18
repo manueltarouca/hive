@@ -1,0 +1,119 @@
+{
+  "scenario": "flush",
+  "meta": {
+    "when": "2026-10-18T20:34:08Z",
+    "machine": "m7g.xlarge",
+    "cpu": "Neoverse-V1",
+    "cores": 4,
+    "memory_gb": 15.298763275146484,
+    "os": "Ubuntu 24.04.5 LTS (7.0.0-1014-aws)",
+    "go": "go1.26.2",
+    "commit": "4a6d228+dirty",
+    "power": "n/a",
+    "load_before": "0.48 4.91 3.42",
+    "load_after": "16.99 9.22 5.06",
+    "pty_max": 4096,
+    "pty_in_use": 0,
+    "open_files_limit": "1024",
+    "gomaxprocs": 4,
+    "fit_for_baseline": true
+  },
+  "params": {
+    "limit_ms": 50,
+    "rate_bytes_per_s": 102400,
+    "secs": 8,
+    "steps": "1 8 32 64 128 192 256"
+  },
+  "steps": [
+    {
+      "panes": 192,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 396,
+        "p50_ms": 6.29,
+        "p99_ms": 34.73,
+        "max_ms": 41.54
+      },
+      "save": {
+        "n": 288,
+        "p50_ms": 20.89,
+        "p99_ms": 2708.18,
+        "max_ms": 5062.42
+      },
+      "save_wait": {
+        "n": 288,
+        "p50_ms": 0,
+        "p99_ms": 13.54,
+        "max_ms": 891.69
+      },
+      "state_save_wait": {
+        "n": 284,
+        "p50_ms": 0,
+        "p99_ms": 4.41,
+        "max_ms": 13.54
+      },
+      "state_save_io": {
+        "n": 284,
+        "p50_ms": 20.82,
+        "p99_ms": 127.26,
+        "max_ms": 146.95
+      },
+      "snapshots_per_save_max": 192,
+      "cpu_cores": 1.4635171856502474,
+      "memory": {
+        "resident_mb": 2897,
+        "go_heap_mb": 28,
+        "native_mb": 2869,
+        "goroutines": 971
+      },
+      "degraded": false
+    },
+    {
+      "panes": 192,
+      "scrollback": "full (12 MB written first)",
+      "agent_report": {
+        "n": 81,
+        "p50_ms": 92.47,
+        "p99_ms": 205.27,
+        "max_ms": 205.27
+      },
+      "save": {
+        "n": 70,
+        "p50_ms": 106.35,
+        "p99_ms": 24651.4,
+        "max_ms": 24651.4
+      },
+      "save_wait": {
+        "n": 70,
+        "p50_ms": 0,
+        "p99_ms": 16173.68,
+        "max_ms": 16173.68
+      },
+      "state_save_wait": {
+        "n": 67,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 0
+      },
+      "state_save_io": {
+        "n": 67,
+        "p50_ms": 102.77,
+        "p99_ms": 268.36,
+        "max_ms": 268.36
+      },
+      "snapshots_per_save_max": 192,
+      "cpu_cores": 1.1909041884820741,
+      "memory": {
+        "resident_mb": 3095,
+        "go_heap_mb": 32,
+        "native_mb": 3063,
+        "goroutines": 971
+      },
+      "degraded": true
+    }
+  ],
+  "knee_panes": {
+    "empty": 192
+  },
+  "note": ""
+}
