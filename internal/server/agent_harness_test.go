@@ -97,7 +97,8 @@ func TestAgentEndsWhenTheShellReturns(t *testing.T) {
 	}
 	h := start(t, t.TempDir(), nil)
 	defer h.stop()
-	created := h.call("session.create", map[string]any{"command": []string{"/bin/zsh", "-f"}})
+	sh, shName := testShell(t)
+	created := h.call("session.create", map[string]any{"command": sh})
 	bid := strs(created["block_ids"])[0]
 	program := func() string {
 		p := h.call("hive.terminal.process", map[string]any{"block_id": bid})
@@ -122,16 +123,16 @@ func TestAgentEndsWhenTheShellReturns(t *testing.T) {
 		s, _ := a["state"].(string)
 		return s
 	}
-	waitUntil("zsh", func() bool { return program() == "zsh" })
+	waitUntil(shName, func() bool { return program() == shName })
 	h.call("hive.terminal.write", map[string]any{"block_id": bid,
 		"args": map[string]any{"data": "HIVE_TEST_SLEEPER=1 " + self + " -test.run=^TestAgentEndsWhenTheShellReturns$\r"}})
-	waitUntil("the agent in front", func() bool { p := program(); return p != "zsh" && p != "" })
+	waitUntil("the agent in front", func() bool { p := program(); return p != shName && p != "" })
 	h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working", "session_id": "s-1"})
 	if s := state(); s != "working" {
 		t.Fatalf("state = %q, want working", s)
 	}
 	h.call("hive.terminal.send_key", map[string]any{"block_id": bid, "args": map[string]any{"keys": []string{"ctrl+c"}}})
-	waitUntil("zsh again", func() bool { return program() == "zsh" })
+	waitUntil(shName+" again", func() bool { return program() == shName })
 	waitUntil("the agent ended", func() bool { return state() == "ended" })
 	// A late report while the shell is in front (a hook finishing after the
 	// agent exited) doesn't bring it back.
@@ -142,7 +143,7 @@ func TestAgentEndsWhenTheShellReturns(t *testing.T) {
 	// The agent in front again, reporting, is back.
 	h.call("hive.terminal.write", map[string]any{"block_id": bid,
 		"args": map[string]any{"data": "HIVE_TEST_SLEEPER=1 " + self + " -test.run=^TestAgentEndsWhenTheShellReturns$\r"}})
-	waitUntil("the agent in front again", func() bool { p := program(); return p != "zsh" && p != "" })
+	waitUntil("the agent in front again", func() bool { p := program(); return p != shName && p != "" })
 	h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "idle", "session_id": "s-1"})
 	if s := state(); s != "idle" {
 		t.Fatalf("after a new report, state = %q, want idle", s)
@@ -185,7 +186,8 @@ func TestAgentEndedByTheShellComesBack(t *testing.T) {
 	claude := helperNamed(t, "claude")
 	h := start(t, t.TempDir(), nil)
 	defer h.stop()
-	created := h.call("session.create", map[string]any{"command": []string{"/bin/zsh", "-f"}})
+	sh, shName := testShell(t)
+	created := h.call("session.create", map[string]any{"command": sh})
 	bid := strs(created["block_ids"])[0]
 	sid, _ := created["session_id"].(string)
 	program := func() string {
@@ -211,7 +213,7 @@ func TestAgentEndedByTheShellComesBack(t *testing.T) {
 			time.Sleep(50 * time.Millisecond)
 		}
 	}
-	waitUntil("zsh", func() bool { return program() == "zsh" })
+	waitUntil(shName, func() bool { return program() == shName })
 	h.call("hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{"data": "HIVE_TEST_SLEEPER=1 " + claude + "\r"}})
 	waitUntil("claude in front", func() bool { return program() == "claude" })
 	h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working", "session_id": "s-1"})
@@ -282,4 +284,17 @@ func TestNestedAgentReportsAreIgnored(t *testing.T) {
 	if out["state"] != "idle" {
 		t.Fatalf("a report from a non-agent was refused: %v", out)
 	}
+}
+
+// testShell is an interactive shell without the user's rc files: zsh where
+// it's installed (macOS), else bash (most Linux).
+func testShell(t *testing.T) ([]string, string) {
+	if _, err := os.Stat("/bin/zsh"); err == nil {
+		return []string{"/bin/zsh", "-f"}, "zsh"
+	}
+	if p, err := exec.LookPath("bash"); err == nil {
+		return []string{p, "--norc", "--noprofile"}, "bash"
+	}
+	t.Skip("no zsh or bash")
+	return nil, ""
 }
