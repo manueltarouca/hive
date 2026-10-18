@@ -109,8 +109,7 @@ func TestResolve(t *testing.T) {
 		}
 	}
 	_, err := Resolve("session", items, "nope")
-	var nf *NotFoundError
-	if !errors.As(err, &nf) {
+	if _, ok := errors.AsType[*NotFoundError](err); !ok {
 		t.Errorf("want not found, got %v", err)
 	}
 	_, err = Resolve("session", items, "4d96d8") // suffix of none... prefix-ish

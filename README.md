@@ -55,7 +55,7 @@ from [Releases](https://github.com/manueltarouca/hive/releases).
 how to check the download, and how to open the app, which isn't signed with
 an Apple Developer ID yet.
 
-To build from source, you need Go 1.26 and Zig **0.16** exactly (Ghostty's
+To build from source, you need Go 1.27 and Zig **0.16** exactly (Ghostty's
 build refuses other versions). The Mac app needs macOS 14 to run, and
 Xcode 27 to build.
 

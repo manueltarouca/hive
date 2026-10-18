@@ -27,7 +27,7 @@ var nouns = []string{
 
 // New returns a name that taken reports as free.
 func New(taken func(string) bool) string {
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		n := strings.ToLower(adjectives[rand.IntN(len(adjectives))] + "-" + nouns[rand.IntN(len(nouns))])
 		if !taken(n) {
 			return n

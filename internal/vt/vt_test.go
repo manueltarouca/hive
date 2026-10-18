@@ -62,7 +62,7 @@ func TestHooksFireForTitlePwdBellAndProgramStatus(t *testing.T) {
 func TestSnapshotRoundTrip(t *testing.T) {
 	term, _ := New(40, 5, Hooks{})
 	defer term.Close()
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		term.Feed([]byte("line\r\n"))
 	}
 	term.Feed([]byte("last line"))
@@ -156,7 +156,7 @@ func TestClipboardWritesAreBounded(t *testing.T) {
 func TestScrollbackLimit(t *testing.T) {
 	fill := func(term *Term) {
 		var b strings.Builder
-		for i := 0; i < 20000; i++ {
+		for i := range 20000 {
 			fmt.Fprintf(&b, "line %05d %s\r\n", i, strings.Repeat("x", 60))
 		}
 		term.Feed([]byte(b.String()))

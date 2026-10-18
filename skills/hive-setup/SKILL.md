@@ -48,7 +48,7 @@ instead.
 | Tool | Version | Notes |
 | --- | --- | --- |
 | git | any | |
-| Go | 1.26+ | `go version` |
+| Go | 1.27+ | `go version` |
 | Zig | **0.16.x exactly** | Ghostty's build refuses other minor versions. The default `brew install zig` is newer, so use `zig@0.16`. |
 | Xcode | 27+ | Only to build the macOS app. |
 

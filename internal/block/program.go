@@ -3,6 +3,7 @@ package block
 import (
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -112,9 +113,9 @@ var segment = regexp.MustCompile(`;|&&|\|\||\n`)
 // env assignments and exec, without quotes.
 func commandIn(script string) string {
 	segs := segment.Split(script, -1)
-	for i := len(segs) - 1; i >= 0; i-- {
-		first := strings.SplitN(segs[i], "|", 2)[0]
-		for _, w := range strings.Fields(first) {
+	for _, seg := range slices.Backward(segs) {
+		first, _, _ := strings.Cut(seg, "|")
+		for w := range strings.FieldsSeq(first) {
 			w = strings.Trim(w, `"'`)
 			if w == "" || w == "exec" || strings.Contains(w, "=") {
 				continue

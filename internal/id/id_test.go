@@ -21,7 +21,7 @@ func TestNewHasKindPrefixAndIsUUIDv7(t *testing.T) {
 
 func TestNewIsMonotonicAndUnique(t *testing.T) {
 	prev := New(Session)
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		next := New(Session)
 		if next <= prev {
 			t.Fatalf("not increasing: %s <= %s", next, prev)

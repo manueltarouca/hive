@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -68,9 +69,7 @@ func TestAgentReportIsValidated(t *testing.T) {
 	}
 	for _, b := range bad {
 		p := map[string]any{"block_id": bid, "harness": "claude", "state": "idle"}
-		for k, v := range b {
-			p[k] = v
-		}
+		maps.Copy(p, b)
 		var e *client.Error
 		if err := h.c.Call(context.Background(), "agent.report", p, nil); !errors.As(err, &e) || e.Code != "bad_request" {
 			t.Errorf("%v: err = %v", b, err)

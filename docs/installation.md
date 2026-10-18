@@ -66,7 +66,7 @@ macOS remembers your choice. Or, from a terminal:
 
 | Tool | Version | Why |
 | --- | --- | --- |
-| Go | 1.26 | The server and CLI. |
+| Go | 1.27 | The server and CLI. |
 | Zig | **0.16** exactly | Builds libghostty-vt, Ghostty's terminal engine. Ghostty refuses other minor versions. |
 | Xcode | 27 or later | The macOS app. Releases are built with Xcode 27.1. The Command Line Tools alone can build the server. |
 

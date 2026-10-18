@@ -184,7 +184,7 @@ func TestAttachSlowClientGetsResync(t *testing.T) {
 	c.nextJSON()
 	// Flood output without reading the socket.
 	big := strings.Repeat("x", 4000) + "\r"
-	for i := 0; i < 3000; i++ {
+	for range 3000 {
 		h.call("hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{"data": big}})
 	}
 	deadline := time.Now().Add(10 * time.Second)

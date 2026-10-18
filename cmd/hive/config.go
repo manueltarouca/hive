@@ -101,7 +101,7 @@ func setKeys(path string) map[string]bool {
 	if err != nil {
 		return set
 	}
-	for _, raw := range strings.Split(string(b), "\n") {
+	for raw := range strings.SplitSeq(string(b), "\n") {
 		s := strings.TrimSpace(raw)
 		if s == "" || s[0] == '#' {
 			continue

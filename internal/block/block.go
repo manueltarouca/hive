@@ -378,8 +378,7 @@ func (b *Block) waitLoop() {
 	code := 0
 	payload := map[string]any{}
 	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
+		if ee, ok := errors.AsType[*exec.ExitError](err); ok {
 			code = ee.ExitCode()
 			if ws, ok := ee.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
 				payload["signal"] = ws.Signal().String()

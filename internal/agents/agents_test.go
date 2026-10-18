@@ -63,7 +63,7 @@ func TestInstallClaudeIsIdempotentAndPreserves(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
 	os.WriteFile(path, []byte(`{"model":"opus","hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`), 0o600)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if _, err := InstallClaude(dir, "/usr/local/bin/hive", false); err != nil {
 			t.Fatal(err)
 		}

@@ -21,9 +21,7 @@ func TestFlushAndViewsUnderStatusTraffic(t *testing.T) {
 	sid, bid := created["session_id"].(string), strs(created["block_ids"])[0]
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := 0; ; i++ {
 			select {
 			case <-stop:
@@ -35,7 +33,7 @@ func TestFlushAndViewsUnderStatusTraffic(t *testing.T) {
 			h.c.Call(context.Background(), "hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{"data": seq}}, nil)
 			h.c.Call(context.Background(), "agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working"}, nil)
 		}
-	}()
+	})
 	deadline := time.Now().Add(1500 * time.Millisecond)
 	for time.Now().Before(deadline) {
 		h.call("server.flush", nil)
@@ -72,7 +70,7 @@ func TestWaitAfterBlockClosed(t *testing.T) {
 	split := h.call("session.new_split", map[string]any{"session_id": sid, "block_id": strs(created["block_ids"])[0],
 		"layout": map[string]any{"command": []string{"sh", "-c", "exit 5"}}})
 	bid := strs(split["block_ids"])[0]
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		var e *client.Error
 		if err := h.c.Call(context.Background(), "hive.terminal.size", map[string]any{"block_id": bid}, nil); errors.As(err, &e) {
 			break

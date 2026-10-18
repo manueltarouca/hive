@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -107,11 +108,9 @@ var Keys = []Key{
 
 func oneOf(apply func(*Config, string), allowed ...string) func(*Config, string) error {
 	return func(c *Config, v string) error {
-		for _, a := range allowed {
-			if v == a {
-				apply(c, v)
-				return nil
-			}
+		if slices.Contains(allowed, v) {
+			apply(c, v)
+			return nil
 		}
 		return fmt.Errorf("must be %s", strings.Join(allowed, ", "))
 	}
@@ -158,11 +157,11 @@ func line(raw string) (k, v string, hasEq, skip bool) {
 	if s == "" || s[0] == '#' {
 		return "", "", false, true
 	}
-	i := strings.IndexByte(s, '=')
-	if i < 0 {
+	before, after, ok := strings.Cut(s, "=")
+	if !ok {
 		return s, "", false, false
 	}
-	k, v = strings.TrimSpace(s[:i]), strings.TrimSpace(s[i+1:])
+	k, v = strings.TrimSpace(before), strings.TrimSpace(after)
 	if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
 		v = v[1 : len(v)-1]
 	}

@@ -45,7 +45,7 @@ func TestScopesAndSince(t *testing.T) {
 func TestSlowSubscriberIsCut(t *testing.T) {
 	b := New(100)
 	s := b.Subscribe(Filter{All: true}, Live, 2)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		b.Server("tick", nil)
 	}
 	n := 0
@@ -71,7 +71,7 @@ func drain(s *Sub) []Event {
 
 func TestSinceOlderThanRingIsAGap(t *testing.T) {
 	b := New(3)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		b.Server("tick", nil)
 	}
 	s := b.Subscribe(Filter{All: true}, 2, 16)

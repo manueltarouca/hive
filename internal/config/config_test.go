@@ -245,7 +245,7 @@ func TestConcurrentSetsKeepBothEdits(t *testing.T) {
 	done := make(chan error, 2)
 	go func() { done <- Set(path, "theme", "night") }()
 	go func() { done <- Set(path, "bell", "none") }()
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := <-done; err != nil {
 			t.Fatal(err)
 		}

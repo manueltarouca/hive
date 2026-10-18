@@ -209,8 +209,8 @@ func schema(t reflect.Type, seen map[reflect.Type]bool) map[string]any {
 		defer delete(seen, t)
 		props := map[string]any{}
 		required := []string{}
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
+		for f := range t.Fields() {
+			f := f
 			name := jsonName(f)
 			if name == "" {
 				continue
