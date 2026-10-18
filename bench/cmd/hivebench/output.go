@@ -299,9 +299,12 @@ func (r *reader) loop(ctx context.Context, send func(any) error) {
 	}
 }
 
+// start begins a measurement, from zero: the soak measures interval by
+// interval, and samples kept from the last one grew its own heap.
 func (r *reader) start() {
 	r.mu.Lock()
 	r.on, r.since = true, time.Now()
+	r.lat, r.bytes, r.resyncs, r.frames = nil, 0, 0, 0
 	r.mu.Unlock()
 }
 

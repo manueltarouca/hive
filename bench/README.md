@@ -48,6 +48,8 @@ settings, and needs `/tmp/hivebench` (above) as the pane's program.
 | `resize` | resizes a second (10 to 1,000, one caller), alternating sizes, a pane streaming 1 MB/s to an attach client | resize or output p99 above 50 ms, a resync, or the terminal not at the size last asked for |
 | `clients` | attach clients (1 to 256), each subscribed to 4 panes streaming 256 KB/s | latency p99 above 50 ms, a resync, or a client short of bytes |
 | `soak` | time: steady load (8 busy panes, 2 clients, an events subscriber, agent reports, titles) with churn (a window opened and closed every 10 s, a client reconnecting every 30 s) | Go heap growing over 10 MB an hour, goroutines or open files growing, or an interval's latency p99 above 50 ms |
+| `churn` | windows opened and closed, in batches | resident memory per closed window above 16 KB |
+| `bench/app-soak.sh` | time: the real app on a throwaway server, 4 busy panes, titles, window churn | none: app RSS growth per hour |
 | `bench/app-storm.sh` | the real Hive.app (release) on a throwaway server, a pane storming one OSC kind | none: app CPU and memory growth; `SAMPLE=1` samples its stacks |
 | app `feed` | content (plain, SGR colour, unicode, a full-screen TUI) × chunk size | none: µs per KB parsed |
 | app `frame` | grid 80x24 to 500x150, every row or one row changed | frame + encode p99 above 8 ms (half a 60 Hz frame) |
@@ -171,3 +173,21 @@ A note on titles: updating a pane's title in place from the event,
 instead of the coalesced view reload, measured worse in the app (0.22 vs
 0.12 cores at 10 titles a second, A/B under the same load), so the reload
 stays.
+
+**2026-10-18, soak and churn** (same machine, on battery, alongside work).
+- App, 30 min (`app-soak.sh`): RSS 96–110 MB, fitted -14 MB an hour after
+  warm-up (flat), CPU 0.07–0.15 cores without a trend. Not covered: drawing
+  (the window was behind others).
+- Server, 40 min: goroutines (67–69) and open files (22–23) flat, latency
+  p99 0.4–0.7 ms, no resyncs. The first run flagged heap growth; most of it
+  was the probe (its reader kept every latency sample across intervals,
+  fixed). The rerun still drifts: heap by quarter 13.6, 13.8, 17.1,
+  18.3 MB; RSS 249 to 293 MB. The heap profile diff (`--heap`) shows only
+  in-flight frames (`server.frame`, the client's reads), no retained
+  structure; the likely source is the reconnecting client, whose snapshots
+  of 8 full panes (~96 MB) every 30 s go through the heap and return to the
+  OS lazily. Not proven: a 2+ hour soak on a quiet machine would settle it.
+- Churn: 3,000 windows opened (with output) and closed. Memory levels off:
+  heap flat at 5.2–5.8 MB from 900 windows, RSS flat at 34 MB from 1,500;
+  the growth before that is the event bus's replay ring filling. Native
+  memory flat: libghostty frees closed terminals. Goroutines and files flat.

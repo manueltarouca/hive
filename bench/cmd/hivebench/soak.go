@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"time"
 
 	"github.com/manueltarouca/hive/internal/client"
@@ -67,6 +69,7 @@ func soakProbe(args []string) error {
 	rate := fs.Int("rate", 100<<10, "bytes a second each pane writes")
 	limit := fs.Duration("limit", 50*time.Millisecond, "an interval's latency p99 above this is degraded")
 	out := fs.String("out", "bench/results", "where results go")
+	heapProf := fs.String("heap", "", "write heap profiles after the warm-up and at the end here (prefix), for pprof -diff_base")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -148,6 +151,7 @@ func soakProbe(args []string) error {
 		}
 	}()
 	start := time.Now()
+	wroteBase := false
 	tick := time.NewTicker(*every)
 	defer tick.Stop()
 	steady.start()
@@ -162,9 +166,16 @@ func soakProbe(args []string) error {
 		res.Samples = append(res.Samples, s)
 		fmt.Printf("%5.1f min | rss %6.0f MB | heap %6.1f MB | goroutines %4d | files %4d | latency p99 %6.1f ms | resyncs %d\n",
 			s.Minute, s.ResidentMB, s.HeapMB, s.Goroutines, s.OpenFiles, s.Latency.P99, s.Resyncs)
+		if *heapProf != "" && s.Minute >= *warmup && !wroteBase {
+			writeHeap(*heapProf + ".base.pprof")
+			wroteBase = true
+		}
 		if s.Latency.P99 > float64(*limit)/float64(time.Millisecond) && !res.Degraded {
 			res.Degraded, res.Why = true, fmt.Sprintf("latency p99 %.1f ms at minute %.1f", s.Latency.P99, s.Minute)
 		}
+	}
+	if *heapProf != "" {
+		writeHeap(*heapProf + ".end.pprof")
 	}
 	var x, rss, heap, gor, files []float64
 	for _, s := range res.Samples {
@@ -197,4 +208,12 @@ func soakProbe(args []string) error {
 		fmt.Println("result:", name)
 	}
 	return err
+}
+
+func writeHeap(path string) {
+	runtime.GC()
+	if f, err := os.Create(path); err == nil {
+		_ = pprof.Lookup("heap").WriteTo(f, 0)
+		f.Close()
+	}
 }

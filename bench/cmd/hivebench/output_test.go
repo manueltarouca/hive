@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestScanStampsAcrossFrames(t *testing.T) {
@@ -37,5 +38,16 @@ func TestSlopeIsPerHour(t *testing.T) {
 	}
 	if s := slope([]float64{0, 1, 2}, []float64{5, 5, 5}); s != 0 {
 		t.Fatalf("flat slope = %v", s)
+	}
+}
+
+// Each measurement starts from zero, or the soak's intervals pile up.
+func TestReaderStartResets(t *testing.T) {
+	r := &reader{tails: map[string][]byte{}}
+	r.start()
+	r.lat, r.bytes, r.resyncs, r.frames = make([]time.Duration, 5), 10, 1, 3
+	r.start()
+	if len(r.lat) != 0 || r.bytes != 0 || r.resyncs != 0 || r.frames != 0 {
+		t.Fatalf("after start: %d samples, %d bytes, %d resyncs, %d frames", len(r.lat), r.bytes, r.resyncs, r.frames)
 	}
 }
