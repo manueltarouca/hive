@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -113,12 +114,37 @@ type attachConn struct {
 	mu   sync.Mutex
 	subs map[string]*attachSub
 	evs  *events.Sub
+
+	// A client busy on our side is alive: handling one of its messages (a
+	// pty write can block while the program isn't reading) or writing a
+	// big frame to it. Neither lets a pong through in time.
+	busy, writing atomic.Bool
 }
 
 type attachSub struct {
 	b    *block.Block
 	sub  *block.Sub
 	done chan struct{}
+}
+
+// A remote client can vanish without closing (sleep, a network change):
+// the server pings each attached client and drops one that doesn't answer,
+// so its subscriptions and size authority don't linger. Config shortens
+// these in tests.
+const (
+	attachPingEvery = 20 * time.Second
+	attachPongWait  = 15 * time.Second
+)
+
+func (s *Server) pingTimes() (every, wait time.Duration) {
+	every, wait = s.cfg.attachPingEvery, s.cfg.attachPongWait
+	if every == 0 {
+		every = attachPingEvery
+	}
+	if wait == 0 {
+		wait = attachPongWait
+	}
+	return every, wait
 }
 
 func (s *Server) handleAttach(w http.ResponseWriter, r *http.Request) {
@@ -136,12 +162,23 @@ func (s *Server) handleAttach(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	c := &attachConn{s: s, ws: ws, ctx: ctx, cancel: cancel, out: make(chan outMsg, 256), subs: map[string]*attachSub{}}
 	defer c.close()
+	// Shutdown ends attached clients: http.Server.Shutdown leaves
+	// connections it handed over (WebSockets) alone.
+	s.attachMu.Lock()
+	s.attaches[c] = struct{}{}
+	s.attachMu.Unlock()
+	defer func() {
+		s.attachMu.Lock()
+		delete(s.attaches, c)
+		s.attachMu.Unlock()
+	}()
 	go c.writeLoop()
 
 	if err := c.handshake(); err != nil {
 		c.sendErr(api.BadRequest("%v", err))
 		return
 	}
+	go c.keepalive()
 	for {
 		_, data, err := ws.Read(ctx)
 		if err != nil {
@@ -152,8 +189,44 @@ func (s *Server) handleAttach(w http.ResponseWriter, r *http.Request) {
 			c.sendErr(api.BadRequest("message: %v", err))
 			continue
 		}
+		c.busy.Store(true)
+		if f := c.s.cfg.beforeAttachMessage; f != nil {
+			f(m.Type)
+		}
 		c.handle(m)
+		c.busy.Store(false)
 	}
+}
+
+// keepalive pings until the connection ends; a ping not answered in time
+// ends it. The pong arrives through Read, which handleAttach keeps calling.
+func (c *attachConn) keepalive() {
+	every, wait := c.s.pingTimes()
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-t.C:
+			pctx, cancel := context.WithTimeout(c.ctx, wait)
+			err := c.ws.Ping(pctx)
+			cancel()
+			if err != nil && c.ctx.Err() == nil && !c.busy.Load() && !c.writing.Load() {
+				c.s.log.Info("attach client stopped answering", "client", c.clientName(), "err", err)
+				c.cancel()
+				c.ws.CloseNow()
+				return
+			}
+		}
+	}
+}
+
+func (c *attachConn) clientName() string {
+	if c.client == nil {
+		return ""
+	}
+	return c.client.ID
 }
 
 func (c *attachConn) handshake() error {
@@ -213,12 +286,14 @@ func (c *attachConn) writeLoop() {
 			return
 		case m := <-c.out:
 			wctx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
+			c.writing.Store(true)
 			var err error
 			if m.binary != nil {
 				err = c.ws.Write(wctx, websocket.MessageBinary, m.binary)
 			} else {
 				err = c.ws.Write(wctx, websocket.MessageText, m.text)
 			}
+			c.writing.Store(false)
 			cancel()
 			if err != nil {
 				c.cancel()

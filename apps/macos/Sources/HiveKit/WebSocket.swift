@@ -125,9 +125,9 @@ enum WebSocketHandshake {
         Data(Insecure.SHA1.hash(data: Data((key + guid).utf8))).base64EncodedString()
     }
 
-    static func request(path: String, key: String) -> Data {
+    static func request(path: String, host: String = "hive", key: String) -> Data {
         // No Sec-WebSocket-Extensions: the parser doesn't do compression.
-        Data(("GET \(path) HTTP/1.1\r\nHost: hive\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+        Data(("GET \(path) HTTP/1.1\r\nHost: \(host)\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
             + "Sec-WebSocket-Key: \(key)\r\nSec-WebSocket-Version: 13\r\n\r\n").utf8)
     }
 
@@ -142,6 +142,11 @@ enum WebSocketHandshake {
         let head = String(decoding: data[data.startIndex..<end.lowerBound], as: UTF8.self)
         let lines = head.components(separatedBy: "\r\n")
         guard let status = lines.first, status.hasPrefix("HTTP/1.1 101") else {
+            // A refusal says why in its body ({"error":{"message":…}}).
+            let body = Data(data[end.upperBound...])
+            if let j = try? JSON.parse(body), let m = j["error"]["message"].string {
+                throw WebSocketError.handshake(m)
+            }
             throw WebSocketError.handshake(lines.first ?? "no status")
         }
         let want = accept(for: key)

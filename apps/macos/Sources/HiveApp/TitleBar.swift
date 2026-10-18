@@ -39,10 +39,15 @@ struct TitleBar: View {
     }
 }
 
-/// "1 blocked · 2 done in other sessions".
+/// "1 blocked and 2 done in other sessions".
 func attentionHelp(_ a: Attention) -> String {
+    attentionCounts(a) + " in other sessions"
+}
+
+/// "1 blocked", "2 done", or "1 blocked and 2 done".
+func attentionCounts(_ a: Attention) -> String {
     [a.blocked > 0 ? "\(a.blocked) blocked" : nil, a.done > 0 ? "\(a.done) done" : nil]
-        .compactMap { $0 }.joined(separator: " · ") + " in other sessions"
+        .compactMap { $0 }.joined(separator: " and ")
 }
 
 /// Agents in other sessions that need the user. Click to go to the one
@@ -67,7 +72,7 @@ struct AttentionBadge: View {
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .help(attentionHelp(a) + " · click to go there")
+            .help(attentionHelp(a) + ". Click to go to the one that needs you most.")
             .padding(.leading, -6)
         }
     }
@@ -83,13 +88,18 @@ struct SessionChip: View {
         let s = model.style
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: "laptopcomputer").font(.system(size: 13, weight: .regular))
+                Image(systemName: model.remote ? "globe" : "laptopcomputer").font(.system(size: 13, weight: .regular))
                     .foregroundStyle(s.secondary.swiftUI)
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(model.sessionLabel.isEmpty ? "hive" : model.sessionLabel)
                         .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(s.text.swiftUI)
-                    Text(model.host).font(.system(size: 10)).foregroundStyle(s.secondary.swiftUI)
+                    // The host; while it isn't connected, a sentence saying
+                    // why in its place (the full reason on hover).
+                    Text(model.trouble ? model.status : model.host).font(.system(size: 10))
+                        .foregroundStyle(model.trouble ? s.blocked.swiftUI : s.secondary.swiftUI)
+                        .truncationMode(.tail).frame(maxWidth: 220, alignment: .leading)
+                        .help(model.trouble ? model.statusDetail ?? model.status : "")
                 }
                 .lineLimit(1)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
@@ -133,7 +143,6 @@ struct TabPill: View {
 
     var body: some View {
         let s = model.style
-        let info = window.focused.flatMap { model.blocks[$0] }
         let parts = window.titleParts(model.blocks)
         let status = model.status(of: window)
         HStack(spacing: 7) {

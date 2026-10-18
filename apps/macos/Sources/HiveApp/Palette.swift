@@ -14,6 +14,10 @@ struct PaletteItem: Identifiable {
     var symbol: String? = nil
     var checked = false
     var section: String = ""
+    /// The section header's icon (a host's: laptop or globe).
+    var sectionSymbol: String? = nil
+    /// A tooltip: the full reason behind a short row.
+    var help: String = ""
     var action: () -> Void
 }
 
@@ -24,7 +28,11 @@ final class PalettePanel {
     private var panel: NSPanel?
     private var monitor: Any?
 
+    /// token: a chip before the field naming what's being entered ("Add
+    /// Host"), in place of the magnifying glass. query: what the field
+    /// starts with.
     func show(over window: NSWindow, at origin: CGPoint? = nil, width: CGFloat, placeholder: String, style: Style,
+              token: String? = nil, query: String = "",
               items: @escaping (String) -> [PaletteItem], onCreate: ((String) -> Void)? = nil) {
         close()
         let p = KeyPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: 360),
@@ -34,9 +42,11 @@ final class PalettePanel {
         p.hasShadow = true
         p.level = .floating
         p.acceptsMouseMovedEvents = true // hover picks rows
+        // Test runs capture a window behind the user's: keep it showing.
+        if ProcessInfo.processInfo.environment["HIVE_DRAW_COVERED"] == "1" { p.hidesOnDeactivate = false }
         // The panel fits the card: a taller clear panel would catch hovers
         // and clicks meant for the window below and swallow them.
-        let view = PaletteView(placeholder: placeholder, style: style, items: items, onCreate: onCreate,
+        let view = PaletteView(placeholder: placeholder, style: style, token: token, initialQuery: query, items: items, onCreate: onCreate,
                                onHeight: { [weak p] h in
                                    guard let p, h > 0, abs(p.frame.height - h) > 0.5 else { return }
                                    p.setFrame(NSRect(x: p.frame.minX, y: p.frame.maxY - h, width: p.frame.width, height: h), display: true)
@@ -80,6 +90,8 @@ final class KeyPanel: NSPanel {
 struct PaletteView: View {
     let placeholder: String
     let style: Style
+    var token: String? = nil
+    var initialQuery = ""
     let items: (String) -> [PaletteItem]
     let onCreate: ((String) -> Void)?
     var onHeight: (CGFloat) -> Void = { _ in }
@@ -96,7 +108,13 @@ struct PaletteView: View {
         let total = rows.count + (creating ? 1 : 0)
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(style.secondary.swiftUI)
+                if let token {
+                    Text(token).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(style.text.swiftUI)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(style.text.swiftUI.opacity(0.1)))
+                } else {
+                    Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(style.secondary.swiftUI)
+                }
                 // The placeholder is drawn by hand: macOS ignores prompt colors.
                 TextField("", text: $query)
                     .textFieldStyle(.plain)
@@ -118,11 +136,15 @@ struct PaletteView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { i, item in
                             if !item.section.isEmpty, i == 0 || rows[i - 1].section != item.section {
-                                Text(item.section).font(.system(size: 10.5, weight: .semibold))
-                                    .foregroundStyle(style.secondary.swiftUI)
-                                    .padding(.horizontal, 10).padding(.top, i == 0 ? 2 : 8).padding(.bottom, 2)
+                                HStack(spacing: 5) {
+                                    if let sym = item.sectionSymbol { Image(systemName: sym).font(.system(size: 10)) }
+                                    Text(item.section).font(.system(size: 10.5, weight: .semibold))
+                                        .lineLimit(1).truncationMode(.middle)
+                                }
+                                .foregroundStyle(style.secondary.swiftUI)
+                                .padding(.horizontal, 10).padding(.top, i == 0 ? 2 : 8).padding(.bottom, 2)
                             }
-                            row(item, selected: i == selected).id(i)
+                            row(item, selected: i == selected).id(i).help(item.help)
                                 .onTapGesture { item.action(); dismiss() }
                                 .onContinuousHover { phase in
                                     // The pointer picks the row it moves onto; rows
@@ -151,7 +173,7 @@ struct PaletteView: View {
         .background(GeometryReader { g in Color.clear.preference(key: CardHeight.self, value: g.size.height) })
         .onPreferenceChange(CardHeight.self) { onHeight($0) }
         .frame(maxHeight: .infinity, alignment: .top)
-        .onAppear { focused = true }
+        .onAppear { if query.isEmpty { query = initialQuery }; focused = true }
         .onChange(of: query) { _, _ in selected = 0 }
         .onKeyPress(.downArrow) { selected = min(selected + 1, max(0, total - 1)); return .handled }
         .onKeyPress(.upArrow) { selected = max(selected - 1, 0); return .handled }

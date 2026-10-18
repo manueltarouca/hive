@@ -78,6 +78,8 @@ struct WindowInfo: Identifiable, Equatable {
 
 struct SessionInfo: Identifiable, Equatable {
     let id: String
+    /// The host it's on: HostConnection.localID, or a saved host's label.
+    var host: String = HostConnection.localID
     var label: String
     var blocks: Int
     var agents: Int
@@ -87,6 +89,7 @@ struct AgentInfo: Identifiable, Equatable {
     var id: String { blockID }
     let blockID: String
     let sessionID: String
+    var host: String = HostConnection.localID
     var sessionLabel: String
     var harness: String
     var state: String
@@ -110,6 +113,8 @@ struct BlockInfo: Equatable {
     var agentState: String?
     var exited = false
     var exitCode = 0
+    /// The account's home on the block's machine, for ~ (nil: this Mac's).
+    var home: String? = nil
 
     /// The program as people call it: "Node", "Neovim", "Claude Code".
     var program: String { programInfo.name }
@@ -123,8 +128,8 @@ struct BlockInfo: Equatable {
 
     var shortDir: String {
         guard var d = cwd, !d.isEmpty else { return "" }
-        let home = NSHomeDirectory()
-        if d.hasPrefix(home) { d = "~" + d.dropFirst(home.count) }
+        let home = self.home ?? NSHomeDirectory()
+        if d.hasPrefix(home + "/") || d == home { d = "~" + d.dropFirst(home.count) }
         return d
     }
 
@@ -145,9 +150,42 @@ final class AppModel: ObservableObject {
     static let version = Bundle.main.object(forInfoDictionaryKey: "HiveVersion") as? String ?? "0.0.0-dev"
 
     let vt = DispatchQueue(label: "hive.vt", qos: .userInteractive)
-    /// Replaced on every reconnect.
-    private(set) var client: HiveClient
-    private(set) var engine: Engine
+    /// The servers: this Mac's first, then remote hosts.
+    private(set) var hosts: [HostConnection] = []
+    /// hosts.json as last read (AppModel+Hosts).
+    var hostsStamp: Date?
+    var hostsTimer: Timer?
+    /// The session to come back to at launch. Its host may connect later
+    /// (a remote one): it wins when it appears, until the user picks one.
+    var restoreSession = AppModel.defaults.string(forKey: "lastSession")
+    var hostsStampPath: String?
+    /// The hosts the switcher lists: label, and why it isn't connected.
+    @Published private(set) var hostRows: [HostRow] = []
+    struct HostRow: Equatable {
+        let id: String
+        let name: String       // This Mac, or the server's address
+        let label: String      // as `hive hosts` knows it
+        let problem: String?   // a sentence naming the host, while not connected
+        let detail: String?    // the reason in full
+        var local: Bool { id == HostConnection.localID }
+    }
+    /// Runs once a host has connected (and listed its sessions).
+    var pendingConnected: [String: () -> Void] = [:]
+    func whenConnected(_ h: HostConnection, then: @escaping () -> Void) {
+        if h.connected { then() } else { pendingConnected[h.id] = then }
+    }
+
+    /// The current host has a problem worth showing (connecting at launch
+    /// isn't one).
+    @Published var trouble = false
+
+    /// The current host's problem in full, for the title bar's tooltip.
+    @Published var statusDetail: String?
+    /// The host of the session on screen. Its client and engine are the
+    /// ones panes, input and calls go to.
+    private(set) var current: HostConnection
+    var client: HiveClient { current.client }
+    var engine: Engine { current.engine }
     let socket: String
     /// Preferences: a separate suite for test runs, so they never touch yours.
     static let defaults = ProcessInfo.processInfo.environment["HIVE_DEFAULTS_SUITE"].flatMap { UserDefaults(suiteName: $0) } ?? .standard
@@ -172,8 +210,12 @@ final class AppModel: ObservableObject {
     @Published var sidebar = AppModel.defaults.bool(forKey: "sidebar") {
         didSet { AppModel.defaults.set(sidebar, forKey: "sidebar") }
     }
-    @Published var host = Host.current().localizedName ?? "This Mac"
-    var clientID: String?
+    /// The current host's name, as the title bar shows it.
+    @Published var host = "This Mac"
+    /// The session on screen is on another machine.
+    @Published var remote = false
+    static let macName = Host.current().localizedName ?? "This Mac"
+    var clientID: String? { current.clientID }
 
     /// Frames by block, drawn by the terminal view.
     var frames: [String: PaneFrame] = [:]
@@ -182,12 +224,11 @@ final class AppModel: ObservableObject {
     var onLayout: (() -> Void)?
     private var attached: Set<String> = []
     private var reloadPending = false
-    private var lastAgentStates: [String: String] = [:]
 
     init() {
         socket = AppModel.socketPath()
-        client = HiveClient(socketPath: socket, queue: vt)
-        engine = Engine(client: client)
+        current = HostConnection(id: HostConnection.localID, label: AppModel.macName, endpoint: .unix(path: socket), vt: vt)
+        hosts = [current]
         appearance = settingsStore.fileExists ? settingsStore.settings.theme
             : Appearance(stored: AppModel.defaults.string(forKey: "appearance"))
         settingsStore.$settings.combineLatest(settingsStore.$fileExists).sink { [weak self] s, exists in
@@ -228,9 +269,6 @@ final class AppModel: ObservableObject {
 
     // MARK: connection
 
-    private var reconnectDelay: TimeInterval = 0.5
-    private var closing = false
-
     func start() {
         if settings.notify != "never" {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -238,52 +276,54 @@ final class AppModel: ObservableObject {
         // Only at launch: if the server stops later, it was asked to.
         // Reconnecting must not undo `hive server stop`.
         ensureServer()
-        connect()
+        for h in hosts { wireHost(h); h.connect() }
+        watchHosts()
     }
 
-    /// Connects, or reconnects with a fresh client and engine. Panes are
-    /// attached again and state is re-read, so nothing is stale afterwards.
-    private func connect() {
-        let theme = engine.theme, blink = settings.cursorStyleBlink
-        client = HiveClient(socketPath: socket, queue: vt)
-        engine = Engine(client: client)
-        attached.removeAll()
-        let engine = engine
-        vt.async { [weak self] in
-            engine.theme = theme
-            engine.cursorBlink = blink
-            // Some events were missed: re-read everything.
-            engine.client.onEventsResync = { Task { @MainActor in self?.reloadSessions(); self?.reloadView() } }
-            engine.log = { msg in NSLog("hive: %@", msg) }
-            // One hop to the main thread per batch, not per event.
-            let batch = EventBatch()
-            engine.client.onEvent = { ev in
-                if batch.add(ev) {
-                    Task { @MainActor in
-                        let (events, overflowed) = batch.takeAll()
-                        // Too many to keep: re-read everything instead.
-                        if overflowed { self?.reloadSessions(); self?.reloadView(); self?.reloadAgents(); return }
-                        for e in events { self?.handleEvent(e) }
-                    }
-                }
+    func setHosts(_ next: [HostConnection]) {
+        hosts = next
+        publishHosts()
+    }
+
+    /// Moves to a host's first session (its own, or this Mac's).
+    func select(onHost h: HostConnection) {
+        switchHost(to: h)
+        select(session: h.sessions.first?.id)
+    }
+
+    /// The model hears each host's connection and events.
+    func wireHost(_ h: HostConnection) {
+        h.onConnected = { [weak self] h in
+            guard let self else { return }
+            self.publishHosts()
+            if let then = self.pendingConnected.removeValue(forKey: h.id) { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { then() } }
+            if h === self.current { self.connected = true; self.status = h.status }
+            self.reloadSessions(h, create: h.isLocal)
+            if h === self.current { self.reloadView() }
+        }
+        h.onDisconnected = { [weak self] h in
+            guard let self else { return }
+            // Its sessions stay listed (under its problem) until it's back.
+            self.publishHosts()
+            if h === self.current {
+                self.connected = false
+                self.status = h.status
+                self.attached.removeAll() // the new engine attaches afresh
             }
-            engine.client.onClose = { err in Task { @MainActor in self?.disconnected(err) } }
-            engine.client.onError = { kind, block, err in NSLog("hive error (%@ %@): %@", kind ?? "-", block ?? "-", err.description) }
-            engine.client.connect(name: "Hive.app", version: AppModel.version) { result in
-                Task { @MainActor in
-                    switch result {
-                    case .success(let id):
-                        self?.reconnectDelay = 0.5
-                        self?.clientID = id
-                        self?.connected = true
-                        self?.status = "Connected"
-                        self?.vt.async { engine.client.subscribeEvents(all: true) }
-                        self?.reloadSessions(create: true)
-                    case .failure(let e):
-                        self?.status = "Can't reach the hive server: \(e)"
-                    }
-                }
+        }
+        h.onResync = { [weak self] h in
+            self?.reloadSessions(h)
+            if h === self?.current { self?.reloadView() }
+        }
+        h.onEvents = { [weak self] h, events, overflowed in
+            guard let self else { return }
+            // Too many to keep: re-read everything instead.
+            if overflowed {
+                self.reloadSessions(h)
+                if h === self.current { self.reloadView() }
+                return
             }
+            for e in events { self.handleEvent(e, from: h) }
         }
     }
 
@@ -296,16 +336,6 @@ final class AppModel: ObservableObject {
         p.arguments = ["server", "start"]
         try? p.run()
         p.waitUntilExit()
-    }
-
-    private func disconnected(_ err: Error?) {
-        connected = false
-        status = "Reconnecting…"
-        guard !closing else { return }
-        // Back off: 0.5s, 1s, 2s… up to 10s.
-        let delay = reconnectDelay
-        reconnectDelay = min(reconnectDelay * 2, 10)
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.connect() }
     }
 
     static func canConnect(_ path: String) -> Bool {
@@ -325,45 +355,78 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Calls the current host's server.
     func call(_ method: String, _ params: JSON = [:], then: (@MainActor (JSON) -> Void)? = nil) {
-        let client = client
-        vt.async {
-            client.call(method, params) { result in
-                Task { @MainActor in
-                    switch result {
-                    case .success(let j): then?(j)
-                    case .failure(let e): NSLog("hive %@: %@", method, e.description)
-                    }
-                }
-            }
-        }
+        current.call(method, params, then: then)
     }
+
+    func host(id: String) -> HostConnection? { hosts.first { $0.id == id } }
+
+    /// Every host's sessions and agents, as the sidebar and switcher show
+    /// them: this Mac's first, agents by urgency.
+    func publishHosts() {
+        let rows = hosts.map { HostRow(id: $0.id, name: $0.displayName, label: $0.label, problem: $0.problem, detail: $0.detail) }
+        if rows != hostRows { hostRows = rows }
+        if connected != current.connected { connected = current.connected }
+        if status != current.status { status = current.status }
+        if statusDetail != current.detail { statusDetail = current.detail }
+        let t = !current.connected && current.link != .connecting
+        if trouble != t { trouble = t }
+        let all = hosts.flatMap(\.sessions)
+        if all != sessions { sessions = all }
+        let order = ["blocked": 0, "done": 1, "working": 2, "idle": 3]
+        let list = hosts.flatMap(\.agents).sorted { (order[$0.state] ?? 9) < (order[$1.state] ?? 9) }
+        if list != agents { agents = list }
+    }
+
+    /// Applies a terminal theme to every host's panes.
+    func setTerminalTheme(_ t: Theme) { for h in hosts { h.theme = t } }
+    func setCursorBlink(_ b: Bool?) { for h in hosts { h.cursorBlink = b } }
 
     // MARK: state
 
-    func reloadSessions(create: Bool = false) {
-        call("session.list") { [weak self] j in
-            guard let self else { return }
-            sessions = j["sessions"].array.compactMap { s in
+    /// Re-reads every host's sessions and agents.
+    func reloadSessions() { for h in hosts { reloadSessions(h) } }
+    func reloadAgents() { for h in hosts { reloadAgents(h) } }
+
+    func reloadSessions(_ h: HostConnection, create: Bool = false) {
+        h.call("session.list") { [weak self, weak h] j in
+            guard let self, let h else { return }
+            h.sessions = j["sessions"].array.compactMap { s in
                 guard let id = s["session_id"].string else { return nil }
-                return SessionInfo(id: id, label: s["label"].string ?? "", blocks: s["blocks"].int ?? 0, agents: s["agents"].int ?? 0)
+                return SessionInfo(id: id, host: h.id, label: s["label"].string ?? "", blocks: s["blocks"].int ?? 0, agents: s["agents"].int ?? 0)
             }
-            if sessions.isEmpty, create {
-                call("session.create", ["cwd": .string(NSHomeDirectory())]) { [weak self] _ in self?.reloadSessions() }
+            publishHosts()
+            if let r = restoreSession, h.sessions.contains(where: { $0.id == r }) {
+                restoreSession = nil
+                if currentSession != r { select(session: r, restoring: true) }
                 return
             }
-            if self.currentSession == nil || !self.sessions.contains(where: { $0.id == self.currentSession }) {
-                // Come back to the session you were in.
+            if h.sessions.isEmpty, create {
+                // A first session on this Mac, in its home (servers before
+                // 0.1 took an empty cwd as their own, /).
+                h.call("session.create", ["cwd": .string(NSHomeDirectory())]) { [weak self, weak h] _ in if let h { self?.reloadSessions(h) } }
+                return
+            }
+            // Gone from the list: pick another, unless the session's host is
+            // just away (it comes back to it).
+            if self.current.connected || self.currentSession == nil,
+               self.currentSession == nil || !self.sessions.contains(where: { $0.id == self.currentSession }) {
+                // Come back to the session you were in, wherever it is.
                 let last = AppModel.defaults.string(forKey: "lastSession")
-                select(session: sessions.first { $0.id == last }?.id ?? sessions.first?.id)
+                if let s = sessions.first(where: { $0.id == last }) ?? sessions.first(where: { $0.host == self.current.id }) ?? sessions.first {
+                    select(session: s.id, restoring: true)
+                } else if h === self.current {
+                    select(session: nil, restoring: true)
+                }
             }
         }
-        reloadAgents()
+        reloadAgents(h)
     }
 
-    func reloadAgents() {
-        call("agent.list") { [weak self] j in
-            guard let self else { return }
+    func reloadAgents(_ h: HostConnection) {
+        h.call("agent.list") { [weak self, weak h] j in
+            guard let self, let h else { return }
             let list = j["agents"].array.compactMap { a -> AgentInfo? in
                 let harness = a["agent"]["harness"].string ?? ""
                 // The agent's own status wins over the last hook (an interrupt
@@ -372,18 +435,20 @@ final class AppModel: ObservableObject {
                 let records = a["program_status"].array.map { (app: $0["app"].string ?? "", status: $0["state"].string ?? "") }
                 let state = AgentStatus.effective(hook: a["agent"]["state"].string, harness: harness, records: records) ?? ""
                 if Programs.atShell(a["foreground"]["program"].string ?? a["foreground"]["name"].string) { return nil }
-                return AgentInfo(blockID: a["block_id"].string ?? "", sessionID: a["session_id"].string ?? "",
+                return AgentInfo(blockID: a["block_id"].string ?? "", sessionID: a["session_id"].string ?? "", host: h.id,
                           sessionLabel: a["session_label"].string ?? "", harness: harness,
                           state: state, message: a["agent"]["message"].string ?? "",
                           cwd: a["agent"]["cwd"].string ?? "", title: a["title"].string ?? "",
                           updatedAt: a["agent"]["updated_at"].string.flatMap { ISO8601DateFormatter.hive.date(from: $0) })
             }
-            let order = ["blocked": 0, "done": 1, "working": 2, "idle": 3]
-            agents = list.sorted { (order[$0.state] ?? 9) < (order[$1.state] ?? 9) }
+            h.agents = list
+            publishHosts()
             // A pane's agent can report after the layout loaded (a new Claude
             // says SessionStart once it's up): carry it into the pane, so its
             // icon and name follow without waiting for another reload.
-            for a in list where blocks[a.blockID] != nil {
+            // Only this host's panes are on screen: another host's agents
+            // say nothing about them.
+            for a in list where h === self.current && blocks[a.blockID] != nil {
                 let gone = a.state == "ended" || a.harness.isEmpty || Programs.atShell(blocks[a.blockID]?.foreground)
                 let harness = gone ? nil : a.harness, state = gone ? "ended" : a.state
                 if blocks[a.blockID]?.harness != harness { blocks[a.blockID]?.harness = harness }
@@ -391,42 +456,70 @@ final class AppModel: ObservableObject {
             }
             // A pane whose agent left the list ended (or its shell came back).
             let listed = Set(list.map(\.blockID))
-            for (id, b) in blocks where b.harness != nil && !listed.contains(id) {
+            for (id, b) in blocks where h === self.current && b.harness != nil && !listed.contains(id) {
                 blocks[id]?.harness = nil
                 blocks[id]?.agentState = "ended"
             }
-            let live = Set(list.map(\.blockID))
+            let live = Set(agents.map(\.blockID))
             if seenDone.keys.contains(where: { !live.contains($0) }) { seenDone = seenDone.filter { live.contains($0.key) } }
             markSeen()
-            notifyChanges(list)
+            notifyChanges(list, from: h)
         }
     }
 
-    private func notifyChanges(_ list: [AgentInfo]) {
-        defer { lastAgentStates = Dictionary(uniqueKeysWithValues: list.map { ($0.blockID, $0.state) }) }
+    private func notifyChanges(_ list: [AgentInfo], from h: HostConnection) {
+        defer { h.lastAgentStates = Dictionary(uniqueKeysWithValues: list.map { ($0.blockID, $0.state) }) }
         switch settings.notify {
         case "never": return
         case "always": break
         default: guard !NSApp.isActive else { return } // background
         }
-        for a in list where (a.state == "blocked" || a.state == "done") && lastAgentStates[a.blockID] != a.state {
+        for a in list where (a.state == "blocked" || a.state == "done") && h.lastAgentStates[a.blockID] != a.state {
             let c = UNMutableNotificationContent()
             c.title = "\(Programs.lookup(a.harness).name) \(a.state == "blocked" ? "needs you" : "is done")"
-            c.body = [a.sessionLabel.isEmpty ? nil : a.sessionLabel, a.message.isEmpty ? nil : a.message].compactMap { $0 }.joined(separator: " — ")
-            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "\(a.blockID)-\(a.state)", content: c, trigger: nil))
+            // Where it is goes in the subtitle (a remote host's agents name
+            // the host), what it said in the body.
+            let session = a.sessionLabel.isEmpty ? "a session" : a.sessionLabel
+            c.subtitle = h.isLocal ? a.sessionLabel : "\(session) on \(h.displayName)"
+            c.body = a.message
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "\(h.id)-\(a.blockID)-\(a.state)", content: c, trigger: nil))
         }
     }
 
-    func select(session id: String?) {
+    /// restoring: the app's own choice, which the session to come back to
+    /// can still replace; the user's choice ends that.
+    func select(session id: String?, restoring: Bool = false) {
+        if !restoring { restoreSession = nil }
+        if let id, let s = sessions.first(where: { $0.id == id }), s.host != current.id, let h = host(id: s.host) {
+            switchHost(to: h)
+        }
         currentSession = id
-        if let id { AppModel.defaults.set(id, forKey: "lastSession") }
+        // A fallback doesn't replace the session to come back to.
+        if let id, !restoring || restoreSession == nil { AppModel.defaults.set(id, forKey: "lastSession") }
         reloadView()
+    }
+
+    /// Panes, input and calls go to another host from now on.
+    func switchHost(to h: HostConnection) {
+        guard h !== current else { return }
+        let old = current.engine
+        for b in attached { vt.async { old.detach(block: b) } }
+        attached.removeAll()
+        frames.removeAll()
+        windows = []
+        blocks = [:]
+        current = h
+        host = h.displayName
+        remote = !h.isLocal
+        connected = h.connected
+        status = h.status
     }
 
     func reloadView() {
         guard let sid = currentSession else { windows = []; return }
-        call("session.view", ["session_id": .string(sid)]) { [weak self] j in
-            guard let self, self.currentSession == sid else { return }
+        let h = current
+        h.call("session.view", ["session_id": .string(sid)]) { [weak self] j in
+            guard let self, self.currentSession == sid, self.current === h else { return }
             sessionLabel = j["label"].string ?? ""
             activeWindow = j["active_window_id"].string
             windows = j["windows"].array.map { w in
@@ -450,7 +543,8 @@ final class AppModel: ObservableObject {
                                       cols: b["cols"].int ?? 0, rows: b["rows"].int ?? 0, sizeOwner: b["size_owner"].string,
                                       foreground: foreground, cwd: cwd,
                                       harness: gone ? nil : b["agent"]["harness"].string,
-                                      agentState: agentState, exited: b["exited"].bool ?? false, exitCode: b["exit_code"].int ?? 0)
+                                      agentState: agentState, exited: b["exited"].bool ?? false, exitCode: b["exit_code"].int ?? 0,
+                                      home: h.isLocal ? nil : h.home)
             }
             blocks = info
             // Closed panes leave nothing behind in the bell's rate limit.
@@ -486,8 +580,11 @@ final class AppModel: ObservableObject {
                     }
                     #endif
                     Task { @MainActor [weak self] in
-                        self?.frames[b] = frame
-                        self?.onFrame?(b)
+                        // Not from an engine since replaced (reconnect, or
+                        // another host), nor for a pane since detached.
+                        guard let self, self.engine === engine, self.attached.contains(b) else { return }
+                        self.frames[b] = frame
+                        self.onFrame?(b)
                     }
                 }
             }
@@ -517,43 +614,47 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: reset)
     }
 
-    private func handleEvent(_ ev: JSON) {
+    private func handleEvent(_ ev: JSON, from h: HostConnection) {
+        let here = h === current
         switch ev["type"].string {
         case "session_created", "session_destroyed":
-            reloadSessions()
+            reloadSessions(h)
         case "session_event":
-            if ev["payload"]["event"]["payload"]["name"].string == "child_exited" { scheduleReload() }
-            let sid = ev["payload"]["session_id"].string
+            if ev["payload"]["event"]["payload"]["name"].string == "child_exited", here { scheduleReload() }
+            // Session IDs are unique across hosts, but only this host's
+            // session can be the one on screen.
+            let sid = here ? ev["payload"]["session_id"].string : nil
             let inner = ev["payload"]["event"]
             let type = inner["type"].string
             if type == "block_event" {
                 let name = inner["payload"]["name"].string
-                if name == "agent_changed" { reloadAgents() }
+                if name == "agent_changed" { reloadAgents(h) }
                 if name == "program_status_changed" {
-                    scheduleAgentReload()
+                    scheduleAgentReload(h)
                     if sid == currentSession { scheduleReload() }
                 }
                 if name == "bell", sid == currentSession, let b = inner["payload"]["block_id"].string { bell(block: b) }
-                if name == "clipboard_written" {
+                if name == "clipboard_written", here {
                     programCopied(block: inner["payload"]["block_id"].string ?? "", text: inner["payload"]["payload"]["text"].string ?? "")
                 }
                 if name == "title_changed" || name == "size_changed" || name == "process_changed", sid == currentSession { scheduleReload() }
             } else if sid == currentSession {
                 scheduleReload()
             }
-            if type == "block_closed" || type == "block_created" { reloadSessions() }
+            if type == "block_closed" || type == "block_created" { reloadSessions(h) }
         default: break
         }
     }
 
     /// Coalesces bursts of status reports (progress updates) into one reload.
-    private var agentReloadPending = false
-    private func scheduleAgentReload() {
-        guard !agentReloadPending else { return }
-        agentReloadPending = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-            self?.agentReloadPending = false
-            self?.reloadAgents()
+    private var agentReloadPending: Set<String> = []
+    private func scheduleAgentReload(_ h: HostConnection) {
+        guard !agentReloadPending.contains(h.id) else { return }
+        agentReloadPending.insert(h.id)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak h] in
+            guard let self, let h else { return }
+            self.agentReloadPending.remove(h.id)
+            self.reloadAgents(h)
         }
     }
 
@@ -571,10 +672,22 @@ final class AppModel: ObservableObject {
 
     private var sid: JSON { .string(currentSession ?? "") }
 
+    /// A new session on another host, which becomes the current one.
+    func newSession(onHost id: String) {
+        guard let h = host(id: id) else { return }
+        switchHost(to: h)
+        newSession()
+    }
+
+    /// A new session on the current host, starting in that account's home.
     func newSession(label: String = "") {
-        call("session.create", ["cwd": .string(NSHomeDirectory()), "label": .string(label)]) { [weak self] j in
-            self?.select(session: j["session_id"].string)
-            self?.reloadSessions()
+        let h = current
+        var p: [String: JSON] = ["label": .string(label)]
+        if h.isLocal { p["cwd"] = .string(NSHomeDirectory()) } // older servers: an empty cwd was their /
+        h.call("session.create", .object(p)) { [weak self, weak h] j in
+            guard let self, let h else { return }
+            self.reloadSessions(h)
+            self.select(session: j["session_id"].string)
         }
     }
 
@@ -697,12 +810,15 @@ final class AppModel: ObservableObject {
         call("session.move_window", ["session_id": sid, "window_id": .string(id), "index": .number(Double(index))])
     }
 
-    func newTab() { call("session.new_window", ["session_id": sid, "layout": ["cwd": .string(currentCwd())]]) }
+    func newTab() { userActed(); call("session.new_window", ["session_id": sid, "layout": AppModel.layout(cwd: currentCwd())]) }
+
+    /// A one-block layout, with a cwd only when there is one.
+    static func layout(cwd: JSON) -> JSON { cwd.isNull ? [:] : ["cwd": cwd] }
 
     func split(horizontal: Bool, cols: Int? = nil, rows: Int? = nil) {
         guard let b = focusedBlock else { return }
         var p: [String: JSON] = ["session_id": sid, "block_id": .string(b), "direction": horizontal ? "horizontal" : "vertical",
-                                 "layout": ["cwd": .string(currentCwd())]]
+                                 "layout": AppModel.layout(cwd: currentCwd())]
         if let cols, let rows { p["cols"] = .number(Double(cols)); p["rows"] = .number(Double(rows)) }
         call("session.new_split", .object(p))
     }
@@ -756,33 +872,46 @@ final class AppModel: ObservableObject {
     func renameSession(_ label: String) { call("session.set_label", ["session_id": sid, "label": .string(label)]) }
 
     func jump(to agent: AgentInfo) {
-        if currentSession != agent.sessionID { currentSession = agent.sessionID }
+        if currentSession != agent.sessionID {
+            select(session: agent.sessionID)
+        }
         call("session.focus_block", ["session_id": .string(agent.sessionID), "block_id": .string(agent.blockID)]) { [weak self] _ in
             self?.reloadView()
         }
     }
 
-    /// The directory new panes start in: the focused pane's.
-    private func currentCwd() -> String {
-        if let f = focusedBlock, let d = blocks[f]?.cwd, FileManager.default.fileExists(atPath: d) { return d }
-        return NSHomeDirectory()
+    /// The directory new panes start in: the focused pane's. Nothing (the
+    /// server's home) when it isn't known; on a remote host, never a path
+    /// from this Mac.
+    private func currentCwd() -> JSON {
+        let fallback: JSON = current.isLocal ? .string(NSHomeDirectory()) : .null
+        guard let f = focusedBlock, let d = blocks[f]?.cwd, d.hasPrefix("/") else { return fallback }
+        if current.isLocal, !FileManager.default.fileExists(atPath: d) { return fallback }
+        return .string(d)
     }
 
     // MARK: input and size
 
+    /// The user is working here: the session to come back to at launch
+    /// no longer takes over.
+    private func userActed() { restoreSession = nil }
+
     func key(_ k: KeyInput) {
+        userActed()
         guard let b = focusedBlock else { return }
         let engine = engine
         vt.async { engine.key(block: b, k) }
     }
 
     func text(_ s: String) {
+        userActed()
         guard let b = focusedBlock else { return }
         let engine = engine
         vt.async { engine.text(block: b, s) }
     }
 
     func paste(_ s: String) {
+        userActed()
         guard let b = focusedBlock else { return }
         let engine = engine
         vt.async { engine.paste(block: b, s) }

@@ -8,7 +8,7 @@ final class TestServer {
     let socket: String
     let process = Process()
 
-    init() throws {
+    init(extra: [String] = []) throws {
         dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("hivekit-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         // Unix socket paths are limited to 104 bytes; keep it short.
@@ -16,7 +16,7 @@ final class TestServer {
         let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         process.executableURL = repo.appendingPathComponent("bin/hive")
-        process.arguments = ["server", "run", "--socket", socket, "--state-dir", dir.appendingPathComponent("state").path]
+        process.arguments = ["server", "run", "--socket", socket, "--state-dir", dir.appendingPathComponent("state").path] + extra
         // Its own socket, state and settings, always together: never the
         // user's settings file (the server reads HIVE_CONFIG).
         process.environment = ProcessInfo.processInfo.environment.merging([
@@ -40,6 +40,7 @@ final class Harness: @unchecked Sendable {
     let queue = DispatchQueue(label: "test.vt")
     let client: HiveClient
     init(_ s: TestServer) { client = HiveClient(socketPath: s.socket, queue: queue) }
+    init(endpoint: ServerEndpoint) { client = HiveClient(endpoint: endpoint, queue: queue) }
 
     func connect() async throws -> String {
         try await withCheckedThrowingContinuation { c in

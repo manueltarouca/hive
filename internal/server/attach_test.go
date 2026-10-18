@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -231,6 +232,119 @@ func TestEventsGoOnAfterResync(t *testing.T) {
 		}
 		if time.Now().After(deadline) {
 			t.Fatal("no events after events_resync")
+		}
+	}
+}
+
+// A client that stops answering (a laptop asleep, a network gone) is
+// dropped: pings go unanswered, and it leaves client.list.
+func TestSilentAttachClientDropped(t *testing.T) {
+	h := startCfg(t, t.TempDir(), quickPings)
+	defer h.stop()
+	c := dial(t, h, "goes-silent")
+	defer c.ws.CloseNow()
+	listed := func() bool {
+		for _, x := range h.call("client.list", nil)["clients"].([]any) {
+			if x.(map[string]any)["name"] == "goes-silent" {
+				return true
+			}
+		}
+		return false
+	}
+	if !listed() {
+		t.Fatal("not listed after hello")
+	}
+	// It never reads again, so it never answers a ping.
+	deadline := time.Now().Add(5 * time.Second)
+	for listed() {
+		if time.Now().After(deadline) {
+			t.Fatal("a client that stopped answering pings is still attached")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// A client that keeps reading answers pings and stays.
+func TestAnsweringAttachClientStays(t *testing.T) {
+	h := startCfg(t, t.TempDir(), quickPings)
+	defer h.stop()
+	c := dial(t, h, "keeps-reading")
+	defer c.ws.CloseNow()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			if _, _, err := c.ws.Read(ctx); err != nil {
+				return
+			}
+		}
+	}()
+	time.Sleep(time.Second)
+	for _, x := range h.call("client.list", nil)["clients"].([]any) {
+		if x.(map[string]any)["name"] == "keeps-reading" {
+			return
+		}
+	}
+	t.Fatal("a client answering pings was dropped")
+}
+
+// quickPings pings attached clients every 100 ms, with 200 ms for a pong.
+func quickPings(c *Config) {
+	c.attachPingEvery, c.attachPongWait = 100*time.Millisecond, 200*time.Millisecond
+}
+
+// A client whose input the program isn't reading (stopped, or a big paste
+// into a busy program) is alive: the server is the one blocked, writing to
+// the pty (on Linux; macOS drops what doesn't fit), so the client's pongs
+// wait. It isn't dropped. The hook holds the handler as such a write would.
+func TestBlockedInputDoesNotDropTheClient(t *testing.T) {
+	h := startCfg(t, t.TempDir(), func(c *Config) {
+		quickPings(c)
+		c.beforeAttachMessage = func(typ string) {
+			if typ == "input" {
+				time.Sleep(1500 * time.Millisecond)
+			}
+		}
+	})
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"sleep", "30"}})
+	bid := strs(created["block_ids"])[0]
+	c := dial(t, h, "big-paste")
+	defer c.ws.CloseNow()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		for {
+			if _, _, err := c.ws.Read(ctx); err != nil {
+				return
+			}
+		}
+	}()
+	c.send(map[string]any{"type": "input", "block_id": bid, "data_base64": base64.StdEncoding.EncodeToString([]byte("x"))})
+	select {
+	case <-closed:
+		t.Fatal("a client whose input was blocked on the pty was dropped as silent")
+	case <-time.After(1200 * time.Millisecond): // the handler is still blocked, the connection open
+	}
+}
+
+// Shutdown ends attached clients too (http.Server.Shutdown leaves hijacked
+// connections alone).
+func TestShutdownEndsAttachedClients(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	c := dial(t, h, "to-be-closed")
+	defer c.ws.CloseNow()
+	h.stop()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	for {
+		if _, _, err := c.ws.Read(ctx); err != nil {
+			if ctx.Err() != nil {
+				t.Fatal("still open 3 s after shutdown")
+			}
+			return
 		}
 	}
 }

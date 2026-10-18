@@ -114,9 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .map(\.cursorStyleBlink)
             .removeDuplicates()
             .sink { [weak self] b in
-                guard let self else { return }
-                let engine = self.model.engine
-                self.model.vt.async { engine.cursorBlink = b }
+                self?.model.setCursorBlink(b)
             }
             .store(in: &bag)
         model.contextActions = { [weak self] in self?.paneContextActions() ?? [] }
@@ -151,6 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if what == "palette" { self?.showPalette() } else if what == "picker" { self?.showSessionPicker() }
                 if what == "shortcuts" { self?.toggleShortcuts() }
                 if what == "settings" { self?.showSettings() }
+                if what.hasPrefix("addhost") { self?.showAddHost(address: String(what.dropFirst("addhost".count).drop { $0 == ":" })) }
                 if what == "panemenu", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
                     card.pane.showContextMenuForTesting()
                 }
@@ -203,8 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.backgroundColor = s.windowBottom
         root.apply(s)
         renderer.theme = s.terminal
-        let engine = model.engine
-        model.vt.async { engine.theme = s.terminal }
+        model.setTerminalTheme(s.terminal)
         // s, not model.style: @Published sends before the property changes,
         // so model.style still holds the old theme here.
         panes.restyle(s)
@@ -234,19 +232,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         palette.show(over: window, at: CGPoint(x: TitleBar.leading - 4, y: TitleBar.height), width: 300,
                      placeholder: "Filter or create…", style: model.style, items: { [weak self] q in
             guard let self else { return [] }
-            var rows = self.model.sessions.enumerated().filter { fuzzy($0.element.label, q) }.map { i, s in
-                let need = self.model.attention(session: s.id)
-                let detail = !need.isEmpty
-                    ? [need.blocked > 0 ? "\(need.blocked) blocked" : nil, need.done > 0 ? "\(need.done) done" : nil].compactMap { $0 }.joined(separator: " · ")
-                    : s.agents > 0 ? "\(s.agents) agent\(s.agents == 1 ? "" : "s")" : ""  // no keys switch sessions by number
-                return PaletteItem(key: s.id, title: s.label.isEmpty ? String(s.id.suffix(6)) : s.label,
-                            detail: detail,
-                            symbol: "rectangle.split.2x1", checked: s.id == self.model.currentSession, section: self.model.host) { [weak self] in
-                    self?.model.select(session: s.id)
+            let m = self.model
+            var rows: [PaletteItem] = []
+            // A section per host: this Mac's sessions, then each remote
+            // host's, or why it has none to show.
+            for h in m.hostRows {
+                for s in m.sessions where s.host == h.id && fuzzy(s.label, q) {
+                    let need = m.attention(session: s.id)
+                    let detail = !need.isEmpty
+                        ? attentionCounts(need)
+                        : s.agents > 0 ? "\(s.agents) agent\(s.agents == 1 ? "" : "s")" : ""  // no keys switch sessions by number
+                    rows.append(PaletteItem(key: s.id, title: s.label.isEmpty ? String(s.id.suffix(6)) : s.label, detail: detail,
+                                            symbol: "rectangle.split.2x1", checked: s.id == m.currentSession, section: h.name,
+                                            sectionSymbol: h.local ? "laptopcomputer" : "globe") { [weak self] in
+                        self?.model.select(session: s.id)
+                    })
+                }
+                guard q.isEmpty else { continue }
+                let icon = h.local ? "laptopcomputer" : "globe"
+                if let problem = h.problem {
+                    rows.append(PaletteItem(key: "host:\(h.id)", title: problem, symbol: "exclamationmark.triangle", section: h.name,
+                                            sectionSymbol: icon, help: h.detail ?? "") {})
+                } else if !h.local {
+                    rows.append(PaletteItem(key: "new:\(h.id)", title: "New Session on \(h.name)", symbol: "plus", section: h.name,
+                                            sectionSymbol: icon) { [weak self] in
+                        self?.model.newSession(onHost: h.id)
+                    })
                 }
             }
             if q.isEmpty {
                 rows.append(PaletteItem(title: "New Session", detail: ShortcutsPanel.keys(for: "New Session"), symbol: "plus", section: "") { [weak self] in self?.model.newSession() })
+                rows.append(PaletteItem(title: "Add Remote Host…", symbol: "globe", section: "") { [weak self] in
+                    DispatchQueue.main.async { self?.showAddHost() }
+                })
             }
             return rows
         }, onCreate: { [weak self] name in self?.model.newSession(label: name) })
@@ -318,9 +336,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             PaletteItem(title: "Previous Tab", detail: k("Previous Tab"), symbol: "arrow.left") { m.selectWindow(offset: -1) },
             PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
-        ] + Appearance.allCases.map { a in
+            PaletteItem(title: "Add Remote Host…", symbol: "globe") { [weak self] in DispatchQueue.main.async { self?.showAddHost() } },
+        ] + m.hostRows.filter { !$0.local }.map { h in
+            PaletteItem(title: "Remove Host \(h.name)", symbol: "minus.circle") { m.removeHost(h.label) }
+        } + Appearance.allCases.map { a in
             PaletteItem(title: "Theme: \(a.title)", symbol: a == .night ? "moon" : a == .day ? "sun.max" : "circle.lefthalf.filled",
                         checked: m.appearance == a) { m.setAppearance(a) }
+        }
+    }
+
+    /// Add Host, as an inline prompt: an address, and one row to connect
+    /// to it. hive checks the address and saves the URL it answers at; a
+    /// problem comes back as a row, with the address kept.
+    func showAddHost(address: String = "", problem: String? = nil) {
+        palette.show(over: window, width: 460, placeholder: "box.example.ts.net, or https://…", style: model.style,
+                     token: "Add Host", query: address) { [weak self] q in
+            let a = q.trimmingCharacters(in: .whitespaces)
+            var rows: [PaletteItem] = []
+            if let problem, a == address {
+                rows.append(PaletteItem(key: "problem", title: problem, symbol: "exclamationmark.triangle", help: problem) {})
+            }
+            if !a.isEmpty {
+                rows.append(PaletteItem(key: "connect", title: "Connect to \u{201C}\(a)\u{201D}", detail: "↩", symbol: "globe") { [weak self] in
+                    self?.addHost(a)
+                })
+            }
+            return rows
+        }
+    }
+
+    private func addHost(_ address: String) {
+        let label = model.newHostLabel(for: address)
+        model.addHost(label: label, address: address) { [weak self] err in
+            guard let self else { return }
+            if let err {
+                self.showAddHost(address: address, problem: err)
+            } else if let h = self.model.host(id: HostConnection.remoteID(label)) {
+                // There at once: its sessions show as soon as it connects.
+                self.model.whenConnected(h) { [weak self] in self?.showSessionPicker() }
+            }
         }
     }
 
@@ -366,6 +420,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSMenuItem(title: "About Hive", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""),
             .separator(),
             item("Settings…", ",") { [weak self] in self?.showSettings() },
+            item("Add Remote Host…", "") { [weak self] in self?.showAddHost() },
             .separator(),
             item("Command Palette…", "p", [.command, .shift]) { [weak self] in self?.showPalette() },
             .separator(),

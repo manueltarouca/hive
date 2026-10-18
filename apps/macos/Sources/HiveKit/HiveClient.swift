@@ -49,9 +49,16 @@ public final class HiveClient {
     public var onError: ((String?, String?, HiveError) -> Void)?
     public var onClose: ((Error?) -> Void)?
 
-    public init(socketPath: String, queue: DispatchQueue) {
+    public let endpoint: ServerEndpoint
+
+    public init(endpoint: ServerEndpoint, queue: DispatchQueue) {
         self.queue = queue
-        ws = WebSocketConnection(socketPath: socketPath, queue: queue)
+        self.endpoint = endpoint
+        ws = WebSocketConnection(endpoint: endpoint, queue: queue)
+    }
+
+    public convenience init(socketPath: String, queue: DispatchQueue) {
+        self.init(endpoint: .unix(path: socketPath), queue: queue)
     }
 
     /// Connects and says hello. `ready` runs once the server has welcomed us.

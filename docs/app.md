@@ -50,7 +50,24 @@ third-party notices.
 Click the session name in the title bar, or press ⌘K. Type to filter. Type
 a name that doesn't exist and press return to create it.
 
-The app reopens the session you were last in.
+The app reopens the session you were last in, on whichever machine it is.
+
+## Remote hosts
+
+The app shows sessions on other machines too: hive servers on your
+tailnet. Choose **Add Remote Host…** (in the Hive menu, the session list or
+the command palette) and give it a label and an address, such as
+`https://box.example.ts.net` or a machine name. The server there must let
+you in (see `hive server start --tailscale`).
+
+Each host gets its own section in the session list, with **New Session on
+…**. A session on another machine works as a local one: panes, splits,
+agents and their status, and notifications, which name the host. The title
+bar shows a server icon and the host's name, and, when the host can't be
+reached, why. The app reconnects on its own.
+
+Hosts are the same list as `hive hosts`: one added with the CLI shows up in
+the app, and the other way round. Remove one from the command palette.
 
 ## The sidebar
 

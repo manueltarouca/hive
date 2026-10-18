@@ -70,6 +70,12 @@ type Config struct {
 	beforeSnapshot func(blockID string)
 	// beforeStateSave, when set, runs before state.json is written (tests).
 	beforeStateSave func()
+	// How often attached clients are pinged, and how long a pong may take
+	// (tests; 0: 20 s and 15 s).
+	attachPingEvery, attachPongWait time.Duration
+	// beforeAttachMessage, when set, runs before an attach message is
+	// handled (tests: a handler that blocks, as a pty write can on Linux).
+	beforeAttachMessage func(typ string)
 }
 
 // FlushStats describes one save: how long it took, from waiting for the
@@ -106,6 +112,10 @@ type Client struct {
 
 // Server is a running hive server.
 type Server struct {
+	// Attached clients, ended by Shutdown.
+	attachMu sync.Mutex
+	attaches map[*attachConn]struct{}
+
 	// Remote listeners (guarded by mu) and built-in Tailscale.
 	listeners    []listenerInfo
 	node         *remote.Node
@@ -163,7 +173,7 @@ func New(cfg Config) (*Server, error) {
 	if cfg.ConfigPoll == 0 {
 		cfg.ConfigPoll = 2 * time.Second
 	}
-	s := &Server{
+	s := &Server{attaches: map[*attachConn]struct{}{},
 		cfg: cfg, log: cfg.Logger, reg: api.New(), bus: events.New(4096),
 		store:  persist.New(cfg.StateDir),
 		blocks: map[string]*rec{}, clients: map[string]*Client{}, exits: map[string]exitRec{}, started: time.Now(),
@@ -267,6 +277,12 @@ func (s *Server) Shutdown() {
 				_ = s.srv.Shutdown(ctx)
 				cancel()
 			}
+			s.attachMu.Lock()
+			for c := range s.attaches {
+				c.cancel()
+				c.ws.CloseNow()
+			}
+			s.attachMu.Unlock()
 			_ = os.Remove(s.cfg.Socket)
 			s.stopRemote()
 		}()
@@ -806,7 +822,7 @@ func restorePreamble(was string, at time.Time) []byte {
 	b.WriteString("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[=0;1u")
 	b.WriteString("\r\n\x1b[2m── restored " + at.Local().Format("2006-01-02 15:04"))
 	if was != "" {
-		b.WriteString(" · was: " + was)
+		b.WriteString(" (was " + was + ")")
 	}
 	b.WriteString(" ──\x1b[0m\r\n")
 	return []byte(b.String())

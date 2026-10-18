@@ -147,7 +147,10 @@ final class PaneView: MTKView, NSTextInputClient {
     /// 1 s timeout each, and draw() waited for one on the main thread: hive
     /// behind other windows spent most of its main thread asleep there
     /// (bench/app-storm.sh). Hidden, it doesn't draw; it draws once it shows.
-    private var windowVisible: Bool { window?.occlusionState.contains(.visible) ?? false }
+    private var windowVisible: Bool { PaneView.drawCovered || (window?.occlusionState.contains(.visible) ?? false) }
+    /// Test runs (HIVE_DRAW_COVERED=1) draw while covered, so a window
+    /// behind others can be captured without taking the user's focus.
+    private static let drawCovered = ProcessInfo.processInfo.environment["HIVE_DRAW_COVERED"] == "1"
     private var occlusionObserver: NSObjectProtocol?
 
     override func draw(_ dirtyRect: NSRect) {

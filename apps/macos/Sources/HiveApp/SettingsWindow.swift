@@ -40,7 +40,8 @@ struct SettingsView: View {
 
     /// Writes a server setting into the file and asks the server to read it.
     private func setServer(_ key: String, _ value: String) {
-        store.set(key, value) { model.call("config.reload") } // once the file is written
+        // This Mac's server reads this file, whichever host is on screen.
+        store.set(key, value) { model.host(id: HostConnection.localID)?.call("config.reload") } // once the file is written
     }
 
     var body: some View {
