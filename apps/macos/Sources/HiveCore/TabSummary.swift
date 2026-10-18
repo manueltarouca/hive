@@ -11,7 +11,8 @@ public struct AgentSnapshot: Equatable, Sendable {
 /// What a sidebar row says about a tab. the reference app-style: the tab is the agent.
 /// The title is the tab's label, else the agent's task, else the program.
 /// The second line carries only what matters: the task when the label hides
-/// it, and the state when it isn't idle. A blocked agent shows its reason.
+/// it. A blocked agent shows its reason instead. The state is the row's
+/// badge, so the line never repeats it.
 public struct TabSummary: Equatable, Sendable {
     public var title: String
     public var detail: String?
@@ -34,16 +35,13 @@ public struct TabSummary: Equatable, Sendable {
         var state: String? = urgency[agent.state] != nil ? agent.state : nil
         if state == "done", doneSeen { state = nil }
         let title = label.isEmpty ? agent.task : label
-        var parts: [String] = []
-        if title != agent.task { parts.append(agent.task) }
-        switch state {
-        case "blocked": parts.append(agent.message.isEmpty ? "Needs you" : agent.message)
-        case "working": parts.append("Working")
-        case "done": parts.append("Done")
-        default: break
+        let detail: String?
+        if state == "blocked" {
+            // Why it waits; else which task, when the label hides it.
+            detail = !agent.message.isEmpty ? agent.message : title != agent.task ? "\(agent.task) needs you" : "Needs you"
+        } else {
+            detail = title != agent.task ? agent.task : nil
         }
-        // A blocked agent's reason stands alone when the task is the title.
-        let detail = parts.isEmpty ? nil : parts.joined(separator: " · ")
         return TabSummary(title: title, detail: detail, state: state, isAgent: true)
     }
 }

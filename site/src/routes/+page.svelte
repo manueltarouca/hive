@@ -16,9 +16,9 @@
 </script>
 
 <svelte:head>
-  <title>hive · a terminal multiplexer for agent-heavy work</title>
+  <title>hive: a terminal multiplexer for agent-heavy work</title>
   <meta name="description" content="hive keeps your terminals running, shows which coding agents need you, and brings everything back after a restart." />
-  <meta property="og:title" content="hive · a terminal multiplexer for agent-heavy work" />
+  <meta property="og:title" content="hive: a terminal multiplexer for agent-heavy work" />
   <meta property="og:description" content="hive keeps your terminals running, shows which coding agents need you, and brings everything back after a restart." />
 </svelte:head>
 
@@ -88,7 +88,7 @@
 <pre><code>git clone https://github.com/manueltarouca/hive && cd hive
 make vt build
 ./bin/hive new work</code></pre>
-      <p class="more"><a href={resolve('/docs/[slug]', { slug: 'installation' })}>Installation</a> · <a href={resolve('/docs/[slug]', { slug: 'agents' })}>Agents</a> · <a href={resolve('/docs/[slug]', { slug: 'cli' })}>The CLI</a></p>
+      <p class="more"><a href={resolve('/docs/[slug]', { slug: 'installation' })}>Installation</a> <a href={resolve('/docs/[slug]', { slug: 'agents' })}>Agents</a> <a href={resolve('/docs/[slug]', { slug: 'cli' })}>The CLI</a></p>
     </section>
 
     <footer>
@@ -153,7 +153,7 @@ make vt build
 
   .start pre { margin: 0; padding: 16px 20px; background: var(--card); border: 1px solid var(--rule); border-radius: 12px;
                font-size: 14px; line-height: 1.7; overflow-x: auto; }
-  .more { margin-top: 16px; color: var(--muted); }
+  .more { margin-top: 16px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 22px; }
 
   footer { display: flex; align-items: center; gap: 16px; margin-top: 120px; font: 400 12px/1 var(--mono); }
   footer a { text-decoration: none; }

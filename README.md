@@ -9,11 +9,11 @@
   Sessions that survive restarts, agents you can see, and an API for everything.
   <br><br>
   <a href="#install">Install</a>
-  ·
+  &nbsp;&nbsp;&nbsp;
   <a href="https://manueltarouca.github.io/hive/docs/installation">Docs</a>
-  ·
+  &nbsp;&nbsp;&nbsp;
   <a href="#let-your-agent-set-it-up">Agent setup</a>
-  ·
+  &nbsp;&nbsp;&nbsp;
   <a href="ARCHITECTURE.md">Architecture</a>
 </p>
 

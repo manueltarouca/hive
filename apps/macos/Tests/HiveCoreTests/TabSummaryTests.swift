@@ -11,7 +11,8 @@ import Testing
     @Test func stateIsShownWhenItMatters() {
         let working = TabSummary.make(label: "oracle", program: "Claude Code", dir: "",
                                       agents: [AgentSnapshot(state: "working", task: "Backtest")])
-        #expect(working.detail == "Backtest · Working")
+        // The state is the row's badge; the line names the task the label hides.
+        #expect(working.detail == "Backtest")
         #expect(working.state == "working")
 
         let blocked = TabSummary.make(label: "", program: "Claude Code", dir: "",
@@ -35,7 +36,7 @@ import Testing
             AgentSnapshot(state: "done", task: "C"),
         ])
         #expect(s.state == "blocked")
-        #expect(s.detail == "B · Needs you")
+        #expect(s.detail == "B needs you")
     }
 
     @Test func plainTabsAreOneLine() {
