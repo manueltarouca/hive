@@ -42,7 +42,7 @@ lists every change.
 | Option | Does |
 | --- | --- |
 | `-- CMD…` | Runs a command instead of a shell. No shell parses it. |
-| `--cwd DIR` | Sets the working directory. |
+| `--cwd DIR` | Sets the working directory. Without it, the CLI's own; a block created through the API without one starts in the server account's home. |
 | `--label TEXT` | Labels the new block. |
 | `--split right\|left\|above\|below` | Where the new block goes. |
 | `--ratio PCT` | The new block's share of the split. |

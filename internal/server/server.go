@@ -35,6 +35,7 @@ import (
 	"github.com/manueltarouca/hive/internal/events"
 	"github.com/manueltarouca/hive/internal/id"
 	"github.com/manueltarouca/hive/internal/persist"
+	"github.com/manueltarouca/hive/internal/remote"
 	"github.com/manueltarouca/hive/internal/session"
 	"github.com/manueltarouca/hive/internal/vt"
 )
@@ -63,6 +64,8 @@ type Config struct {
 	ConfigPoll time.Duration
 	// OnFlush, when set, hears about every save (benchmarks).
 	OnFlush func(FlushStats)
+	// Remote, when set, adds listeners beyond the socket.
+	Remote *RemoteConfig
 	// beforeSnapshot, when set, runs before each snapshot is written (tests).
 	beforeSnapshot func(blockID string)
 	// beforeStateSave, when set, runs before state.json is written (tests).
@@ -97,12 +100,18 @@ type Client struct {
 	Kind        string    `json:"kind"`
 	Platform    string    `json:"platform,omitempty"`
 	Version     string    `json:"version,omitempty"`
-	Principal   string    `json:"principal"`
+	Principal   string    `json:"principal" desc:"Who the connection speaks for: peer:UID on the unix socket."`
 	ConnectedAt time.Time `json:"connected_at"`
 }
 
 // Server is a running hive server.
 type Server struct {
+	// Remote listeners (guarded by mu) and built-in Tailscale.
+	listeners    []listenerInfo
+	node         *remote.Node
+	nodeStatus   *remote.NodeStatus
+	removeOnStop []string
+
 	// conf is the settings (guarded by mu), confStamp the file's identity
 	// when it was read.
 	conf      config.Config
@@ -174,7 +183,7 @@ func New(cfg Config) (*Server, error) {
 		go s.watchConfig()
 	}
 	// Built here, not in Serve, so a Shutdown racing a starting Serve sees it.
-	s.srv = &http.Server{Handler: s.handler(), ReadHeaderTimeout: 10 * time.Second}
+	s.srv = &http.Server{Handler: s.handler(), ReadHeaderTimeout: 10 * time.Second, ConnContext: remote.ConnContext}
 	if !cfg.Fresh {
 		if err := s.restore(); err != nil {
 			s.log.Error("restore failed; starting empty", "err", err)
@@ -211,6 +220,12 @@ func (s *Server) Serve() error {
 		return fmt.Errorf("socket permissions: %w", err)
 	}
 	s.ln = ln
+	if err := s.serveRemote(); err != nil {
+		ln.Close()
+		s.srv.Close() // the extra listeners already being served
+		s.stopRemote()
+		return err
+	}
 	go s.persistLoop()
 	go s.stateLoop()
 	s.log.Info("listening", "socket", s.cfg.Socket, "state", s.cfg.StateDir)
@@ -244,8 +259,7 @@ func (s *Server) Shutdown() {
 			s.mu.Unlock()
 			var wg sync.WaitGroup
 			for _, r := range all {
-				wg.Add(1)
-				go func() { defer wg.Done(); r.b.Close() }()
+				wg.Go(func() { r.b.Close() })
 			}
 			wg.Wait()
 			if s.srv != nil {
@@ -254,6 +268,7 @@ func (s *Server) Shutdown() {
 				cancel()
 			}
 			_ = os.Remove(s.cfg.Socket)
+			s.stopRemote()
 		}()
 	})
 }
@@ -271,7 +286,7 @@ type LayoutSpec struct {
 	A         *LayoutSpec `json:"a,omitempty"`
 	B         *LayoutSpec `json:"b,omitempty"`
 	Command   []string    `json:"command,omitempty" desc:"Program and arguments. Default: the login shell."`
-	Cwd       string      `json:"cwd,omitempty"`
+	Cwd       string      `json:"cwd,omitempty" desc:"Absolute directory, or ~/… Default: the server account's home."`
 	Label     string      `json:"label,omitempty"`
 	KeepOpen  bool        `json:"keep_open,omitempty" desc:"Keep the block after its program exits."`
 }
@@ -288,6 +303,16 @@ func (s *Server) env(sessionID, blockID string) []string {
 // startBlock launches a block. Call with s.mu held.
 func (s *Server) startBlock(sessionID, blockID string, st *persist.BlockState, opts block.Options) (*rec, error) {
 	opts.Env = append(opts.Env, s.env(sessionID, blockID)...)
+	if opts.Cwd == "" {
+		// The account's home, not the server's own cwd (the daemon runs
+		// in /): a remote client has no path of its own to give.
+		opts.Cwd = "/"
+		if h, err := os.UserHomeDir(); err == nil {
+			if fi, err := os.Stat(h); err == nil && fi.IsDir() {
+				opts.Cwd = h
+			}
+		}
+	}
 	if opts.Cwd != "" {
 		if fi, err := os.Stat(opts.Cwd); err != nil || !fi.IsDir() {
 			return nil, api.BadRequest("cwd %q is not a directory", opts.Cwd)

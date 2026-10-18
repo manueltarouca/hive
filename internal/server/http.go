@@ -10,6 +10,7 @@ import (
 
 	"github.com/manueltarouca/hive/internal/api"
 	"github.com/manueltarouca/hive/internal/events"
+	"github.com/manueltarouca/hive/internal/remote"
 )
 
 // CallRequest is the body of POST /v1/call.
@@ -29,7 +30,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /v1/call", s.handleCall)
 	mux.HandleFunc("GET /v1/events", s.handleEvents)
 	mux.HandleFunc("GET /v1/attach", s.handleAttach)
-	return noBrowsers(mux)
+	return remote.Authorize(noBrowsers(mux), s.logDenied)
 }
 
 // noBrowsers refuses anything a web page could send. Browsers always send an

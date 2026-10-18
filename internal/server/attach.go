@@ -16,6 +16,7 @@ import (
 	"github.com/manueltarouca/hive/internal/block"
 	"github.com/manueltarouca/hive/internal/events"
 	"github.com/manueltarouca/hive/internal/id"
+	"github.com/manueltarouca/hive/internal/remote"
 )
 
 // The attach protocol, one WebSocket per client:
@@ -167,7 +168,7 @@ func (c *attachConn) handshake() error {
 		return errors.New(`the first message must be {"type":"hello",…}`)
 	}
 	c.client = &Client{ID: id.New(id.Client), Name: m.Name, Kind: m.Kind, Platform: m.Platform,
-		Version: m.Version, Principal: "local", ConnectedAt: time.Now().UTC()}
+		Version: m.Version, Principal: remote.IdentityOf(c.ctx).Principal, ConnectedAt: time.Now().UTC()}
 	if c.client.Kind == "" {
 		c.client.Kind = "app"
 	}
@@ -386,8 +387,7 @@ func (c *attachConn) handle(m attachMsg) {
 }
 
 func asAPI(err error) *api.Error {
-	var e *api.Error
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[*api.Error](err); ok {
 		return e
 	}
 	return api.BadRequest("%v", err)

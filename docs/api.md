@@ -30,7 +30,18 @@ curl --unix-socket "$HIVE_SERVER" http://hive/v1/call \
 ```
 
 The server accepts only JSON, and refuses requests from browsers (any
-`Origin` header), so a web page can't drive your terminals.
+`Origin` or `Sec-Fetch-*` header), so a web page can't drive your terminals.
+
+A server can also listen on your tailnet.
+The API is the same on every listener; only who gets in differs. Every
+request is identified before it reaches a method, and `whoami` says how:
+
+| Principal | Who |
+| --- | --- |
+| `peer:UID` | A local account, on the Unix socket |
+| `tailscale:alice@github` | A person, by their Tailscale login |
+| `tailscale:tag:ci` | A tagged device, which never counts as its owner |
+| `anonymous` | A caller on a plain TCP listener |
 
 A call answers with `{"result": …}`, or with `{"error": {"status", "code",
 "message"}}` and an HTTP status:
@@ -42,6 +53,7 @@ A call answers with `{"result": …}`, or with `{"error": {"status", "code",
 | `method_not_found` | 404 | No such method |
 | `ambiguous` | 409 | A target matched more than one thing |
 | `conflict` | 409 | Another client holds the size, or a label is taken |
+| `forbidden` | 403 | This caller may not use this server |
 
 ## Methods
 
@@ -57,7 +69,7 @@ lists every change.
 | Terminals, as `hive.terminal.NAME` | `format`, `write`, `send_key`, `resize`, `size`, `title`, `pwd`, `process`, `program_status`, `list_dir`, `wait` |
 | Agents | `agent.report`, `agent.list` |
 | Settings | `config.get`, `config.set`, `config.reload` (the server's own settings file; see [Settings](./config)) |
-| Server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `target.resolve`, `client.list` |
+| Server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `target.resolve`, `client.list`, `whoami` |
 
 Terminal methods take the block and their own arguments separately:
 

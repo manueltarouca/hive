@@ -16,6 +16,7 @@ import (
 	"github.com/manueltarouca/hive/internal/id"
 	"github.com/manueltarouca/hive/internal/names"
 	"github.com/manueltarouca/hive/internal/persist"
+	"github.com/manueltarouca/hive/internal/remote"
 	"github.com/manueltarouca/hive/internal/session"
 )
 
@@ -63,10 +64,22 @@ func (s *Server) registerMethods() {
 	// ---- server ----
 	api.Register(r, "server.version", "Return the server's version and where it keeps its state.",
 		func(ctx context.Context, _ empty) (map[string]any, error) {
-			return map[string]any{
+			host, _ := os.Hostname()
+			home, _ := os.UserHomeDir()
+			ls, node := s.remoteInfo()
+			out := map[string]any{
 				"hive_version": Version, "platform": platform(), "pid": os.Getpid(),
 				"started_at": s.started.UTC(), "socket": s.cfg.Socket, "state_dir": s.cfg.StateDir,
-			}, nil
+				"hostname": host, "home": home, "listeners": ls,
+			}
+			if node != nil {
+				out["tailscale"] = node
+			}
+			return out, nil
+		})
+	api.Register(r, "whoami", "Return who this connection speaks for and how it reached the server.",
+		func(ctx context.Context, _ empty) (remote.Identity, error) {
+			return remote.IdentityOf(ctx), nil
 		})
 	api.Register(r, "server.shutdown", "Save every session and stop the server. Sessions are restored at the next start.",
 		func(ctx context.Context, _ empty) (empty, error) {

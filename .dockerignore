@@ -1,0 +1,11 @@
+# The tailnet test image builds hive from source; the Mac's build outputs
+# and caches don't belong in it.
+.git
+bin
+third_party/ghostty
+third_party/ghostty-vt
+apps/macos/.build
+apps/macos/build
+site/node_modules
+site/build
+bench/results

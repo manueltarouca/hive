@@ -313,12 +313,19 @@ func cmdServer(g globals, args []string) error {
 		fresh := fs.Bool("fresh", false, "")
 		sock := fs.String("socket", socketFor(g), "")
 		state := fs.String("state-dir", paths.State(), "")
+		rf := addRemoteFlags(fs)
 		if err := parse(fs, args[1:]); err != nil {
 			return err
 		}
+		rc, err := rf.config(os.Stdin)
+		if err != nil {
+			return err
+		}
+		// Read once; the panes this server starts must never see it.
+		os.Unsetenv("TS_AUTHKEY")
 		exe, _ := os.Executable()
 		srv, err := server.New(server.Config{Socket: *sock, StateDir: *state, Fresh: *fresh, HivePath: exe, ConfigPath: config.Path(),
-			Logger: newLogger()})
+			Logger: newLogger(), Remote: rc})
 		if err != nil {
 			return err
 		}
@@ -327,11 +334,26 @@ func cmdServer(g globals, args []string) error {
 		go func() { <-sig; srv.Shutdown() }()
 		return srv.Serve()
 	case "start":
-		_, err := connect(g)
-		if err == nil {
-			fmt.Println("server running on", socketFor(g))
+		fs := flags("server start")
+		rf := addRemoteFlags(fs)
+		if err := parse(fs, args[1:]); err != nil {
+			return err
 		}
-		return err
+		if _, err := rf.config(strings.NewReader("")); err != nil {
+			return err // the checks run makes, before a daemon starts
+		}
+		if rf.given() && client.New(socketFor(g)).Ping() {
+			return fmt.Errorf("a server is already running on %s, and its options apply only when it starts: `hive server stop`, then start it again", socketFor(g))
+		}
+		extra, env, err := rf.daemonArgs(os.Stdin)
+		if err != nil {
+			return err
+		}
+		if _, err := connectWith(g, extra, env); err != nil {
+			return err
+		}
+		fmt.Println("server running on", socketFor(g))
+		return nil
 	case "stop":
 		c := client.New(socketFor(g))
 		if !c.Ping() {

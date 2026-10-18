@@ -61,8 +61,7 @@ func run(argv []string) int {
 	if err == nil {
 		return exitOK
 	}
-	var ee exitError
-	if errors.As(err, &ee) {
+	if ee, ok := errors.AsType[exitError](err); ok {
 		return ee.code
 	}
 	fmt.Fprintln(os.Stderr, "Error:", err)
@@ -138,7 +137,11 @@ func socketFor(g globals) string {
 }
 
 // connect returns a client, starting a server first if none is running.
-func connect(g globals) (*client.Client, error) {
+func connect(g globals) (*client.Client, error) { return connectWith(g, nil, nil) }
+
+// connectWith starts the server, when it must, with these extra arguments
+// and environment.
+func connectWith(g globals, extra, env []string) (*client.Client, error) {
 	sock := socketFor(g)
 	c := client.New(sock)
 	if c.Ping() {
@@ -149,13 +152,13 @@ func connect(g globals) (*client.Client, error) {
 	if g.explicitServer || !strings.HasPrefix(sock, "/") {
 		return nil, &client.UnreachableError{Err: fmt.Errorf("no server on %s", sock)}
 	}
-	if err := startDaemon(sock); err != nil {
+	if err := startDaemon(sock, extra, env); err != nil {
 		return nil, &client.UnreachableError{Err: err}
 	}
 	return c, nil
 }
 
-func startDaemon(sock string) error {
+func startDaemon(sock string, extra, env []string) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -169,7 +172,8 @@ func startDaemon(sock string) error {
 		return err
 	}
 	defer logf.Close()
-	cmd := exec.Command(exe, "server", "run", "--socket", sock)
+	cmd := exec.Command(exe, append([]string{"server", "run", "--socket", sock}, extra...)...)
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stdout, cmd.Stderr = logf, logf
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Dir = "/"
