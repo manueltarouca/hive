@@ -1,0 +1,77 @@
+{
+  "scenario": "churn",
+  "meta": {
+    "when": "2026-10-18T22:11:34Z",
+    "machine": "m7g.xlarge",
+    "cpu": "Neoverse-V1",
+    "cores": 4,
+    "memory_gb": 15.298763275146484,
+    "os": "Ubuntu 24.04.5 LTS (7.0.0-1014-aws)",
+    "go": "go1.27.2",
+    "commit": "4a6d228+dirty",
+    "power": "n/a",
+    "load_before": "0.72 1.18 1.96",
+    "load_after": "0.00 0.02 0.20",
+    "pty_max": 4096,
+    "pty_in_use": 1,
+    "open_files_limit": "1024",
+    "gomaxprocs": 4,
+    "fit_for_baseline": true
+  },
+  "params": {
+    "batches": 5,
+    "per": 200
+  },
+  "steps": [
+    {
+      "windows_closed": 0,
+      "resident_mb": 27,
+      "go_heap_mb": 0.8080825805664062,
+      "native_mb": 20,
+      "goroutines": 12,
+      "open_files": 13
+    },
+    {
+      "windows_closed": 200,
+      "resident_mb": 30,
+      "go_heap_mb": 2.2329864501953125,
+      "native_mb": 19,
+      "goroutines": 12,
+      "open_files": 13
+    },
+    {
+      "windows_closed": 400,
+      "resident_mb": 32,
+      "go_heap_mb": 3.4424896240234375,
+      "native_mb": 21,
+      "goroutines": 12,
+      "open_files": 13
+    },
+    {
+      "windows_closed": 600,
+      "resident_mb": 33,
+      "go_heap_mb": 4.6177520751953125,
+      "native_mb": 18,
+      "goroutines": 12,
+      "open_files": 13
+    },
+    {
+      "windows_closed": 800,
+      "resident_mb": 34,
+      "go_heap_mb": 4.736763000488281,
+      "native_mb": 19,
+      "goroutines": 12,
+      "open_files": 13
+    },
+    {
+      "windows_closed": 1000,
+      "resident_mb": 34,
+      "go_heap_mb": 4.915931701660156,
+      "native_mb": 19,
+      "goroutines": 12,
+      "open_files": 13
+    }
+  ],
+  "resident_kb_per_window": 5.12,
+  "degraded": false
+}

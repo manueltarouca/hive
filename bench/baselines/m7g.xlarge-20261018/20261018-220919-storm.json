@@ -1,0 +1,618 @@
+{
+  "scenario": "storm",
+  "meta": {
+    "when": "2026-10-18T22:05:17Z",
+    "machine": "m7g.xlarge",
+    "cpu": "Neoverse-V1",
+    "cores": 4,
+    "memory_gb": 15.298763275146484,
+    "os": "Ubuntu 24.04.5 LTS (7.0.0-1014-aws)",
+    "go": "go1.27.2",
+    "commit": "4a6d228+dirty",
+    "power": "n/a",
+    "load_before": "0.89 3.01 2.74",
+    "load_after": "0.16 1.51 2.19",
+    "pty_max": 4096,
+    "pty_in_use": 0,
+    "open_files_limit": "1024",
+    "gomaxprocs": 4,
+    "fit_for_baseline": true
+  },
+  "params": {
+    "limit_ms": 50,
+    "panes": 1,
+    "rates": [
+      100,
+      1000,
+      10000,
+      100000
+    ],
+    "secs": 6
+  },
+  "steps": [
+    {
+      "kind": "title",
+      "panes": 1,
+      "osc_per_s_per_pane": 100,
+      "events_delivered_ratio": 0.9998053807173716,
+      "events_per_s": 99.98053807173716,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.17,
+        "p99_ms": 0.31,
+        "max_ms": 0.45
+      },
+      "saves": 6,
+      "cpu_cores": 0.034961527821385285,
+      "go_heap_growth_mb": 0.03406524658203125,
+      "memory": {
+        "resident_mb": 30,
+        "go_heap_mb": 15,
+        "native_mb": 15,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "title",
+      "panes": 1,
+      "osc_per_s_per_pane": 1000,
+      "events_delivered_ratio": 0.999810760818246,
+      "events_per_s": 999.8107608182461,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.17,
+        "p99_ms": 0.24,
+        "max_ms": 0.26
+      },
+      "saves": 6,
+      "cpu_cores": 0.05662511561457538,
+      "go_heap_growth_mb": 2.4612197875976562,
+      "memory": {
+        "resident_mb": 43,
+        "go_heap_mb": 23,
+        "native_mb": 20,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "title",
+      "panes": 1,
+      "osc_per_s_per_pane": 10000,
+      "events_delivered_ratio": 0.9998335650385408,
+      "events_per_s": 9998.335650385408,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.2,
+        "p99_ms": 0.34,
+        "max_ms": 0.44
+      },
+      "saves": 6,
+      "cpu_cores": 0.2179508859809839,
+      "go_heap_growth_mb": -0.7775497436523438,
+      "memory": {
+        "resident_mb": 43,
+        "go_heap_mb": 27,
+        "native_mb": 16,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "title",
+      "panes": 1,
+      "osc_per_s_per_pane": 100000,
+      "events_delivered_ratio": 1.0001585022961477,
+      "events_per_s": 100015.85022961476,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.23,
+        "p99_ms": 1.33,
+        "max_ms": 1.93
+      },
+      "saves": 6,
+      "cpu_cores": 1.782544383876171,
+      "go_heap_growth_mb": -0.39855194091796875,
+      "memory": {
+        "resident_mb": 45,
+        "go_heap_mb": 31,
+        "native_mb": 14,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "pwd",
+      "panes": 1,
+      "osc_per_s_per_pane": 100,
+      "events_delivered_ratio": 0.9999264952366808,
+      "events_per_s": 99.99264952366808,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.17,
+        "p99_ms": 0.24,
+        "max_ms": 0.59
+      },
+      "saves": 6,
+      "cpu_cores": 0.03525940807503584,
+      "go_heap_growth_mb": 0.01242828369140625,
+      "memory": {
+        "resident_mb": 32,
+        "go_heap_mb": 31,
+        "native_mb": 1,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "pwd",
+      "panes": 1,
+      "osc_per_s_per_pane": 1000,
+      "events_delivered_ratio": 0.9999162355170764,
+      "events_per_s": 999.9162355170764,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.18,
+        "p99_ms": 0.23,
+        "max_ms": 0.26
+      },
+      "saves": 6,
+      "cpu_cores": 0.057905815809617574,
+      "go_heap_growth_mb": 2.5338363647460938,
+      "memory": {
+        "resident_mb": 45,
+        "go_heap_mb": 31,
+        "native_mb": 14,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "pwd",
+      "panes": 1,
+      "osc_per_s_per_pane": 10000,
+      "events_delivered_ratio": 0.9998577927257851,
+      "events_per_s": 9998.577927257851,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.21,
+        "p99_ms": 0.39,
+        "max_ms": 0.51
+      },
+      "saves": 6,
+      "cpu_cores": 0.22017285203235423,
+      "go_heap_growth_mb": -0.78509521484375,
+      "memory": {
+        "resident_mb": 44,
+        "go_heap_mb": 31,
+        "native_mb": 13,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "pwd",
+      "panes": 1,
+      "osc_per_s_per_pane": 100000,
+      "events_delivered_ratio": 1.000190575391261,
+      "events_per_s": 100019.05753912611,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.24,
+        "p99_ms": 1.09,
+        "max_ms": 1.43
+      },
+      "saves": 6,
+      "cpu_cores": 1.8256227407128176,
+      "go_heap_growth_mb": -0.8746795654296875,
+      "memory": {
+        "resident_mb": 44,
+        "go_heap_mb": 31,
+        "native_mb": 13,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "status",
+      "panes": 1,
+      "osc_per_s_per_pane": 100,
+      "events_delivered_ratio": 0.999926979165765,
+      "events_per_s": 99.9926979165765,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.16,
+        "p99_ms": 0.22,
+        "max_ms": 0.71
+      },
+      "saves": 6,
+      "cpu_cores": 0.034170837968024746,
+      "go_heap_growth_mb": 0.05068206787109375,
+      "memory": {
+        "resident_mb": 33,
+        "go_heap_mb": 31,
+        "native_mb": 2,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "status",
+      "panes": 1,
+      "osc_per_s_per_pane": 1000,
+      "events_delivered_ratio": 0.9999606075518261,
+      "events_per_s": 999.9606075518261,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.18,
+        "p99_ms": 0.25,
+        "max_ms": 0.34
+      },
+      "saves": 6,
+      "cpu_cores": 0.06331433912825771,
+      "go_heap_growth_mb": 2.727874755859375,
+      "memory": {
+        "resident_mb": 43,
+        "go_heap_mb": 31,
+        "native_mb": 12,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "status",
+      "panes": 1,
+      "osc_per_s_per_pane": 10000,
+      "events_delivered_ratio": 0.9998856794040263,
+      "events_per_s": 9998.856794040263,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.21,
+        "p99_ms": 0.51,
+        "max_ms": 1
+      },
+      "saves": 6,
+      "cpu_cores": 0.24749570290880218,
+      "go_heap_growth_mb": -0.7889328002929688,
+      "memory": {
+        "resident_mb": 47,
+        "go_heap_mb": 31,
+        "native_mb": 16,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "status",
+      "panes": 1,
+      "osc_per_s_per_pane": 100000,
+      "events_delivered_ratio": 1.000026886027206,
+      "events_per_s": 100002.68860272059,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.3,
+        "p99_ms": 3.22,
+        "max_ms": 4.41
+      },
+      "saves": 6,
+      "cpu_cores": 2.104437720655361,
+      "go_heap_growth_mb": -0.55450439453125,
+      "memory": {
+        "resident_mb": 44,
+        "go_heap_mb": 31,
+        "native_mb": 13,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "bell",
+      "panes": 1,
+      "osc_per_s_per_pane": 100,
+      "events_delivered_ratio": 0.9998850670444359,
+      "events_per_s": 99.9885067044436,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.15,
+        "p99_ms": 0.23,
+        "max_ms": 0.51
+      },
+      "saves": 6,
+      "cpu_cores": 0.031366394553183956,
+      "go_heap_growth_mb": -0.5160140991210938,
+      "memory": {
+        "resident_mb": 32,
+        "go_heap_mb": 31,
+        "native_mb": 1,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "bell",
+      "panes": 1,
+      "osc_per_s_per_pane": 1000,
+      "events_delivered_ratio": 0.9999587227038855,
+      "events_per_s": 999.9587227038855,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.16,
+        "p99_ms": 0.24,
+        "max_ms": 0.27
+      },
+      "saves": 6,
+      "cpu_cores": 0.051248384517935494,
+      "go_heap_growth_mb": 0.8648147583007812,
+      "memory": {
+        "resident_mb": 36,
+        "go_heap_mb": 31,
+        "native_mb": 5,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "bell",
+      "panes": 1,
+      "osc_per_s_per_pane": 10000,
+      "events_delivered_ratio": 0.9999682413419778,
+      "events_per_s": 9999.682413419778,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.19,
+        "p99_ms": 0.25,
+        "max_ms": 1.13
+      },
+      "saves": 6,
+      "cpu_cores": 0.1844073099519717,
+      "go_heap_growth_mb": -0.9034805297851562,
+      "memory": {
+        "resident_mb": 39,
+        "go_heap_mb": 31,
+        "native_mb": 8,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "bell",
+      "panes": 1,
+      "osc_per_s_per_pane": 100000,
+      "events_delivered_ratio": 0.9999229782661379,
+      "events_per_s": 99992.29782661378,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.23,
+        "p99_ms": 0.94,
+        "max_ms": 1.43
+      },
+      "saves": 6,
+      "cpu_cores": 1.4602178561590484,
+      "go_heap_growth_mb": -0.8785781860351562,
+      "memory": {
+        "resident_mb": 37,
+        "go_heap_mb": 31,
+        "native_mb": 6,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "clipboard",
+      "panes": 1,
+      "osc_per_s_per_pane": 100,
+      "events_delivered_ratio": 0.999963955465922,
+      "events_per_s": 99.9963955465922,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.16,
+        "p99_ms": 0.24,
+        "max_ms": 0.36
+      },
+      "saves": 6,
+      "cpu_cores": 0.03434909519157291,
+      "go_heap_growth_mb": -0.3445587158203125,
+      "memory": {
+        "resident_mb": 33,
+        "go_heap_mb": 31,
+        "native_mb": 2,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "clipboard",
+      "panes": 1,
+      "osc_per_s_per_pane": 1000,
+      "events_delivered_ratio": 0.9998705890826864,
+      "events_per_s": 999.8705890826865,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.18,
+        "p99_ms": 0.24,
+        "max_ms": 0.27
+      },
+      "saves": 6,
+      "cpu_cores": 0.05692029960510281,
+      "go_heap_growth_mb": 1.4829254150390625,
+      "memory": {
+        "resident_mb": 37,
+        "go_heap_mb": 31,
+        "native_mb": 6,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "clipboard",
+      "panes": 1,
+      "osc_per_s_per_pane": 10000,
+      "events_delivered_ratio": 0.9997881568870136,
+      "events_per_s": 9997.881568870136,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.21,
+        "p99_ms": 0.29,
+        "max_ms": 0.35
+      },
+      "saves": 6,
+      "cpu_cores": 0.203538872555372,
+      "go_heap_growth_mb": -0.816741943359375,
+      "memory": {
+        "resident_mb": 42,
+        "go_heap_mb": 31,
+        "native_mb": 11,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "clipboard",
+      "panes": 1,
+      "osc_per_s_per_pane": 100000,
+      "events_delivered_ratio": 0.9999018441355195,
+      "events_per_s": 99990.18441355195,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.24,
+        "p99_ms": 1.13,
+        "max_ms": 1.73
+      },
+      "saves": 6,
+      "cpu_cores": 1.671445088423839,
+      "go_heap_growth_mb": -0.943084716796875,
+      "memory": {
+        "resident_mb": 43,
+        "go_heap_mb": 31,
+        "native_mb": 12,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "notify",
+      "panes": 1,
+      "osc_per_s_per_pane": 100,
+      "events_delivered_ratio": 0.9998035427696937,
+      "events_per_s": 99.98035427696938,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.16,
+        "p99_ms": 0.22,
+        "max_ms": 0.25
+      },
+      "saves": 6,
+      "cpu_cores": 0.033755700478838,
+      "go_heap_growth_mb": -0.34637451171875,
+      "memory": {
+        "resident_mb": 32,
+        "go_heap_mb": 31,
+        "native_mb": 1,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "notify",
+      "panes": 1,
+      "osc_per_s_per_pane": 1000,
+      "events_delivered_ratio": 0.9997835915094385,
+      "events_per_s": 999.7835915094386,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.18,
+        "p99_ms": 0.26,
+        "max_ms": 0.29
+      },
+      "saves": 6,
+      "cpu_cores": 0.055583468661762996,
+      "go_heap_growth_mb": 1.4248733520507812,
+      "memory": {
+        "resident_mb": 37,
+        "go_heap_mb": 31,
+        "native_mb": 6,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "notify",
+      "panes": 1,
+      "osc_per_s_per_pane": 10000,
+      "events_delivered_ratio": 0.9998969831135722,
+      "events_per_s": 9998.969831135722,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.2,
+        "p99_ms": 0.28,
+        "max_ms": 0.36
+      },
+      "saves": 6,
+      "cpu_cores": 0.20323056166330825,
+      "go_heap_growth_mb": -0.871429443359375,
+      "memory": {
+        "resident_mb": 41,
+        "go_heap_mb": 31,
+        "native_mb": 10,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "kind": "notify",
+      "panes": 1,
+      "osc_per_s_per_pane": 100000,
+      "events_delivered_ratio": 0.9999371207873774,
+      "events_per_s": 99993.71207873774,
+      "subscriber_resyncs": 0,
+      "api_session_list": {
+        "n": 300,
+        "p50_ms": 0.24,
+        "p99_ms": 0.93,
+        "max_ms": 2.45
+      },
+      "saves": 6,
+      "cpu_cores": 1.6406656630809977,
+      "go_heap_growth_mb": -1.1187896728515625,
+      "memory": {
+        "resident_mb": 40,
+        "go_heap_mb": 31,
+        "native_mb": 9,
+        "goroutines": 12
+      },
+      "degraded": false
+    }
+  ],
+  "knee_osc_per_s_per_pane": {
+    "bell": 100000,
+    "clipboard": 100000,
+    "notify": 100000,
+    "pwd": 100000,
+    "status": 100000,
+    "title": 100000
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "scenario": "clients",
+  "meta": {
+    "when": "2026-10-18T22:10:42Z",
+    "machine": "m7g.xlarge",
+    "cpu": "Neoverse-V1",
+    "cores": 4,
+    "memory_gb": 15.298763275146484,
+    "os": "Ubuntu 24.04.5 LTS (7.0.0-1014-aws)",
+    "go": "go1.27.2",
+    "commit": "4a6d228+dirty",
+    "power": "n/a",
+    "load_before": "0.35 1.24 2.04",
+    "load_after": "0.72 1.18 1.96",
+    "pty_max": 4096,
+    "pty_in_use": 0,
+    "open_files_limit": "1024",
+    "gomaxprocs": 4,
+    "fit_for_baseline": true
+  },
+  "params": {
+    "limit_ms": 50,
+    "panes": 4,
+    "rate_bytes_per_s": 262144,
+    "secs": 6,
+    "steps": [
+      1,
+      4,
+      16,
+      64,
+      256
+    ]
+  },
+  "steps": [
+    {
+      "clients": 1,
+      "panes": 4,
+      "latency_all_clients": {
+        "n": 2400,
+        "p50_ms": 0.13,
+        "p99_ms": 4.56,
+        "max_ms": 6.39
+      },
+      "min_delivered_ratio": 1.040501745075068,
+      "resyncs": 0,
+      "cpu_cores": 0.07945752704848007,
+      "memory": {
+        "resident_mb": 93,
+        "go_heap_mb": 11,
+        "native_mb": 82,
+        "goroutines": 34
+      },
+      "degraded": false
+    },
+    {
+      "clients": 4,
+      "panes": 4,
+      "latency_all_clients": {
+        "n": 9600,
+        "p50_ms": 0.17,
+        "p99_ms": 4.64,
+        "max_ms": 10.08
+      },
+      "min_delivered_ratio": 1.0405812639445369,
+      "resyncs": 0,
+      "cpu_cores": 0.14887706013224394,
+      "memory": {
+        "resident_mb": 93,
+        "go_heap_mb": 11,
+        "native_mb": 82,
+        "goroutines": 55
+      },
+      "degraded": false
+    },
+    {
+      "clients": 16,
+      "panes": 4,
+      "latency_all_clients": {
+        "n": 38400,
+        "p50_ms": 0.27,
+        "p99_ms": 1.43,
+        "max_ms": 6.55
+      },
+      "min_delivered_ratio": 1.0403586724497635,
+      "resyncs": 0,
+      "cpu_cores": 0.3381454721366747,
+      "memory": {
+        "resident_mb": 100,
+        "go_heap_mb": 14,
+        "native_mb": 86,
+        "goroutines": 139
+      },
+      "degraded": false
+    },
+    {
+      "clients": 64,
+      "panes": 4,
+      "latency_all_clients": {
+        "n": 153603,
+        "p50_ms": 0.55,
+        "p99_ms": 2.62,
+        "max_ms": 10.07
+      },
+      "min_delivered_ratio": 1.0402842930750351,
+      "resyncs": 0,
+      "cpu_cores": 0.9860444532617626,
+      "memory": {
+        "resident_mb": 124,
+        "go_heap_mb": 40,
+        "native_mb": 84,
+        "goroutines": 475
+      },
+      "degraded": false
+    },
+    {
+      "clients": 256,
+      "panes": 4,
+      "latency_all_clients": {
+        "n": 612946,
+        "p50_ms": 10.72,
+        "p99_ms": 51.64,
+        "max_ms": 131.52
+      },
+      "min_delivered_ratio": 1.0376696315909104,
+      "resyncs": 0,
+      "cpu_cores": 2.98067008438319,
+      "memory": {
+        "resident_mb": 244,
+        "go_heap_mb": 173,
+        "native_mb": 71,
+        "goroutines": 1819
+      },
+      "degraded": true,
+      "why": "latency"
+    }
+  ],
+  "knee_clients": 64
+}

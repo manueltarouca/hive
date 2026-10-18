@@ -1,0 +1,270 @@
+{
+  "scenario": "resize",
+  "meta": {
+    "when": "2026-10-18T22:09:19Z",
+    "machine": "m7g.xlarge",
+    "cpu": "Neoverse-V1",
+    "cores": 4,
+    "memory_gb": 15.298763275146484,
+    "os": "Ubuntu 24.04.5 LTS (7.0.0-1014-aws)",
+    "go": "go1.27.2",
+    "commit": "4a6d228+dirty",
+    "power": "n/a",
+    "load_before": "0.16 1.51 2.19",
+    "load_after": "0.35 1.24 2.04",
+    "pty_max": 4096,
+    "pty_in_use": 0,
+    "open_files_limit": "1024",
+    "gomaxprocs": 4,
+    "fit_for_baseline": true
+  },
+  "params": {
+    "limit_ms": 50,
+    "rate_bytes_per_s": 1048576,
+    "secs": 6,
+    "steps": [
+      10,
+      60,
+      250,
+      1000
+    ]
+  },
+  "steps": [
+    {
+      "scrollback": "empty",
+      "resizes_per_s": 10,
+      "resizes_per_s_achieved": 9.983728881411226,
+      "scrollback_rows": 23329,
+      "resize_call": {
+        "n": 60,
+        "p50_ms": 9.09,
+        "p99_ms": 12.21,
+        "max_ms": 12.21
+      },
+      "output_latency": {
+        "n": 601,
+        "p50_ms": 0.16,
+        "p99_ms": 9.87,
+        "max_ms": 10.32
+      },
+      "delivered_ratio": 1.0140627574764842,
+      "resyncs": 0,
+      "final_size_ok": true,
+      "cpu_cores": 0.13892352702358152,
+      "memory": {
+        "resident_mb": 66,
+        "go_heap_mb": 19,
+        "native_mb": 47,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "scrollback": "empty",
+      "resizes_per_s": 60,
+      "resizes_per_s_achieved": 59.900360771503514,
+      "scrollback_rows": 23150,
+      "resize_call": {
+        "n": 360,
+        "p50_ms": 9.02,
+        "p99_ms": 12.04,
+        "max_ms": 12.29
+      },
+      "output_latency": {
+        "n": 601,
+        "p50_ms": 0.27,
+        "p99_ms": 9.52,
+        "max_ms": 9.87
+      },
+      "delivered_ratio": 1.0141286579129096,
+      "resyncs": 0,
+      "final_size_ok": true,
+      "cpu_cores": 0.5797271444034142,
+      "memory": {
+        "resident_mb": 70,
+        "go_heap_mb": 23,
+        "native_mb": 47,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "scrollback": "empty",
+      "resizes_per_s": 250,
+      "resizes_per_s_achieved": 120.76905957687845,
+      "scrollback_rows": 23173,
+      "resize_call": {
+        "n": 725,
+        "p50_ms": 8.27,
+        "p99_ms": 11.86,
+        "max_ms": 12.28
+      },
+      "output_latency": {
+        "n": 600,
+        "p50_ms": 4.06,
+        "p99_ms": 10.75,
+        "max_ms": 11.63
+      },
+      "delivered_ratio": 1.0150275779730793,
+      "resyncs": 0,
+      "final_size_ok": true,
+      "cpu_cores": 1.0604132950681664,
+      "memory": {
+        "resident_mb": 70,
+        "go_heap_mb": 23,
+        "native_mb": 47,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "scrollback": "empty",
+      "resizes_per_s": 1000,
+      "resizes_per_s_achieved": 121.18602410651002,
+      "scrollback_rows": 26141,
+      "resize_call": {
+        "n": 728,
+        "p50_ms": 8.41,
+        "p99_ms": 13.12,
+        "max_ms": 13.76
+      },
+      "output_latency": {
+        "n": 600,
+        "p50_ms": 3.94,
+        "p99_ms": 12.02,
+        "max_ms": 13.32
+      },
+      "delivered_ratio": 1.0143347918674646,
+      "resyncs": 0,
+      "final_size_ok": true,
+      "cpu_cores": 1.061196821961224,
+      "memory": {
+        "resident_mb": 78,
+        "go_heap_mb": 27,
+        "native_mb": 51,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "scrollback": "full (12 MB written first)",
+      "resizes_per_s": 10,
+      "resizes_per_s_achieved": 9.984306856185277,
+      "scrollback_rows": 23722,
+      "resize_call": {
+        "n": 60,
+        "p50_ms": 8.7,
+        "p99_ms": 12.37,
+        "max_ms": 12.37
+      },
+      "output_latency": {
+        "n": 601,
+        "p50_ms": 0.15,
+        "p99_ms": 6.85,
+        "max_ms": 7.51
+      },
+      "delivered_ratio": 1.0168734155205523,
+      "resyncs": 0,
+      "final_size_ok": true,
+      "cpu_cores": 0.13941599745096417,
+      "memory": {
+        "resident_mb": 74,
+        "go_heap_mb": 27,
+        "native_mb": 47,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "scrollback": "full (12 MB written first)",
+      "resizes_per_s": 60,
+      "resizes_per_s_achieved": 59.89611870731639,
+      "scrollback_rows": 27070,
+      "resize_call": {
+        "n": 360,
+        "p50_ms": 8.89,
+        "p99_ms": 12.8,
+        "max_ms": 13.19
+      },
+      "output_latency": {
+        "n": 600,
+        "p50_ms": 0.48,
+        "p99_ms": 10.83,
+        "max_ms": 11.86
+      },
+      "delivered_ratio": 1.0163799338647679,
+      "resyncs": 0,
+      "final_size_ok": true,
+      "cpu_cores": 0.5813676990936212,
+      "memory": {
+        "resident_mb": 86,
+        "go_heap_mb": 35,
+        "native_mb": 51,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "scrollback": "full (12 MB written first)",
+      "resizes_per_s": 250,
+      "resizes_per_s_achieved": 120.17374846385805,
+      "scrollback_rows": 22554,
+      "resize_call": {
+        "n": 722,
+        "p50_ms": 8.58,
+        "p99_ms": 11.96,
+        "max_ms": 12.21
+      },
+      "output_latency": {
+        "n": 600,
+        "p50_ms": 4.17,
+        "p99_ms": 11.42,
+        "max_ms": 12.67
+      },
+      "delivered_ratio": 1.0158390875031944,
+      "resyncs": 0,
+      "final_size_ok": true,
+      "cpu_cores": 1.063341083098621,
+      "memory": {
+        "resident_mb": 79,
+        "go_heap_mb": 35,
+        "native_mb": 44,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "scrollback": "full (12 MB written first)",
+      "resizes_per_s": 1000,
+      "resizes_per_s_achieved": 121.41350334066665,
+      "scrollback_rows": 23198,
+      "resize_call": {
+        "n": 729,
+        "p50_ms": 8.29,
+        "p99_ms": 12.1,
+        "max_ms": 12.44
+      },
+      "output_latency": {
+        "n": 601,
+        "p50_ms": 4,
+        "p99_ms": 10.63,
+        "max_ms": 11.87
+      },
+      "delivered_ratio": 1.017639290220461,
+      "resyncs": 0,
+      "final_size_ok": true,
+      "cpu_cores": 1.0614301095351373,
+      "memory": {
+        "resident_mb": 82,
+        "go_heap_mb": 35,
+        "native_mb": 47,
+        "goroutines": 16
+      },
+      "degraded": false
+    }
+  ],
+  "knee_resizes_per_s": {
+    "empty": 1000,
+    "full (12 MB written first)": 1000
+  }
+}

@@ -1,0 +1,550 @@
+{
+  "scenario": "flush",
+  "meta": {
+    "when": "2026-10-18T21:55:42Z",
+    "machine": "m7g.xlarge",
+    "cpu": "Neoverse-V1",
+    "cores": 4,
+    "memory_gb": 15.298763275146484,
+    "os": "Ubuntu 24.04.5 LTS (7.0.0-1014-aws)",
+    "go": "go1.27.2",
+    "commit": "4a6d228+dirty",
+    "power": "n/a",
+    "load_before": "0.72 1.55 0.98",
+    "load_after": "12.03 8.00 3.72",
+    "pty_max": 4096,
+    "pty_in_use": 0,
+    "open_files_limit": "1024",
+    "gomaxprocs": 4,
+    "fit_for_baseline": true
+  },
+  "params": {
+    "limit_ms": 50,
+    "rate_bytes_per_s": 102400,
+    "secs": 8,
+    "steps": "1 8 32 64 128 192 256"
+  },
+  "steps": [
+    {
+      "panes": 1,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 400,
+        "p50_ms": 0.31,
+        "p99_ms": 0.69,
+        "max_ms": 1.09
+      },
+      "save": {
+        "n": 475,
+        "p50_ms": 3.33,
+        "p99_ms": 8.81,
+        "max_ms": 10.91
+      },
+      "save_wait": {
+        "n": 475,
+        "p50_ms": 0,
+        "p99_ms": 3.57,
+        "max_ms": 6.2
+      },
+      "state_save_wait": {
+        "n": 400,
+        "p50_ms": 0,
+        "p99_ms": 2.49,
+        "max_ms": 3.8
+      },
+      "state_save_io": {
+        "n": 400,
+        "p50_ms": 3.29,
+        "p99_ms": 4.48,
+        "max_ms": 6.39
+      },
+      "snapshots_per_save_max": 1,
+      "cpu_cores": 0.07211771724773285,
+      "memory": {
+        "resident_mb": 43,
+        "go_heap_mb": 7,
+        "native_mb": 36,
+        "goroutines": 15
+      },
+      "degraded": false
+    },
+    {
+      "panes": 8,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 400,
+        "p50_ms": 0.4,
+        "p99_ms": 3.71,
+        "max_ms": 4.41
+      },
+      "save": {
+        "n": 460,
+        "p50_ms": 3.79,
+        "p99_ms": 77.18,
+        "max_ms": 109.04
+      },
+      "save_wait": {
+        "n": 460,
+        "p50_ms": 0,
+        "p99_ms": 7.52,
+        "max_ms": 45.01
+      },
+      "state_save_wait": {
+        "n": 395,
+        "p50_ms": 0,
+        "p99_ms": 3.63,
+        "max_ms": 6.11
+      },
+      "state_save_io": {
+        "n": 395,
+        "p50_ms": 3.49,
+        "p99_ms": 51.73,
+        "max_ms": 77.18
+      },
+      "snapshots_per_save_max": 8,
+      "cpu_cores": 0.2554166718602815,
+      "memory": {
+        "resident_mb": 126,
+        "go_heap_mb": 10,
+        "native_mb": 116,
+        "goroutines": 50
+      },
+      "degraded": false
+    },
+    {
+      "panes": 32,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 400,
+        "p50_ms": 0.41,
+        "p99_ms": 1.22,
+        "max_ms": 1.81
+      },
+      "save": {
+        "n": 255,
+        "p50_ms": 4.63,
+        "p99_ms": 624.69,
+        "max_ms": 745.77
+      },
+      "save_wait": {
+        "n": 255,
+        "p50_ms": 0,
+        "p99_ms": 44.22,
+        "max_ms": 45.93
+      },
+      "state_save_wait": {
+        "n": 231,
+        "p50_ms": 0,
+        "p99_ms": 3.47,
+        "max_ms": 13.36
+      },
+      "state_save_io": {
+        "n": 231,
+        "p50_ms": 4.43,
+        "p99_ms": 120.48,
+        "max_ms": 123.21
+      },
+      "snapshots_per_save_max": 32,
+      "cpu_cores": 0.4301013087061195,
+      "memory": {
+        "resident_mb": 428,
+        "go_heap_mb": 11,
+        "native_mb": 417,
+        "goroutines": 170
+      },
+      "degraded": false
+    },
+    {
+      "panes": 64,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 400,
+        "p50_ms": 0.41,
+        "p99_ms": 1.34,
+        "max_ms": 2.04
+      },
+      "save": {
+        "n": 187,
+        "p50_ms": 15.04,
+        "p99_ms": 1195.12,
+        "max_ms": 1426.2
+      },
+      "save_wait": {
+        "n": 187,
+        "p50_ms": 0,
+        "p99_ms": 44.99,
+        "max_ms": 50.55
+      },
+      "state_save_wait": {
+        "n": 175,
+        "p50_ms": 0,
+        "p99_ms": 2.82,
+        "max_ms": 3.08
+      },
+      "state_save_io": {
+        "n": 175,
+        "p50_ms": 6.54,
+        "p99_ms": 122.7,
+        "max_ms": 160.68
+      },
+      "snapshots_per_save_max": 64,
+      "cpu_cores": 0.6111671962418367,
+      "memory": {
+        "resident_mb": 772,
+        "go_heap_mb": 13,
+        "native_mb": 759,
+        "goroutines": 330
+      },
+      "degraded": false
+    },
+    {
+      "panes": 128,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 400,
+        "p50_ms": 0.5,
+        "p99_ms": 3.53,
+        "max_ms": 5.91
+      },
+      "save": {
+        "n": 155,
+        "p50_ms": 56.89,
+        "p99_ms": 2018.72,
+        "max_ms": 2848.77
+      },
+      "save_wait": {
+        "n": 155,
+        "p50_ms": 0,
+        "p99_ms": 43.15,
+        "max_ms": 44.35
+      },
+      "state_save_wait": {
+        "n": 149,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 1.82
+      },
+      "state_save_io": {
+        "n": 149,
+        "p50_ms": 54.4,
+        "p99_ms": 130.79,
+        "max_ms": 131.54
+      },
+      "snapshots_per_save_max": 128,
+      "cpu_cores": 0.9790512145543196,
+      "memory": {
+        "resident_mb": 1575,
+        "go_heap_mb": 23,
+        "native_mb": 1552,
+        "goroutines": 650
+      },
+      "degraded": false
+    },
+    {
+      "panes": 192,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 399,
+        "p50_ms": 2.32,
+        "p99_ms": 30.3,
+        "max_ms": 35.29
+      },
+      "save": {
+        "n": 287,
+        "p50_ms": 16.06,
+        "p99_ms": 2018.82,
+        "max_ms": 4680.94
+      },
+      "save_wait": {
+        "n": 287,
+        "p50_ms": 0,
+        "p99_ms": 8.76,
+        "max_ms": 647.61
+      },
+      "state_save_wait": {
+        "n": 283,
+        "p50_ms": 0,
+        "p99_ms": 3.73,
+        "max_ms": 8.76
+      },
+      "state_save_io": {
+        "n": 283,
+        "p50_ms": 15.91,
+        "p99_ms": 102.89,
+        "max_ms": 128.07
+      },
+      "snapshots_per_save_max": 192,
+      "cpu_cores": 1.3847175887619871,
+      "memory": {
+        "resident_mb": 2692,
+        "go_heap_mb": 30,
+        "native_mb": 2662,
+        "goroutines": 970
+      },
+      "degraded": false
+    },
+    {
+      "panes": 256,
+      "scrollback": "empty",
+      "agent_report": {
+        "n": 92,
+        "p50_ms": 83.67,
+        "p99_ms": 193.54,
+        "max_ms": 193.54
+      },
+      "save": {
+        "n": 85,
+        "p50_ms": 84.83,
+        "p99_ms": 22012.32,
+        "max_ms": 22012.32
+      },
+      "save_wait": {
+        "n": 85,
+        "p50_ms": 0,
+        "p99_ms": 8759.17,
+        "max_ms": 8759.17
+      },
+      "state_save_wait": {
+        "n": 83,
+        "p50_ms": 0,
+        "p99_ms": 0.13,
+        "max_ms": 0.13
+      },
+      "state_save_io": {
+        "n": 83,
+        "p50_ms": 83.48,
+        "p99_ms": 232.22,
+        "max_ms": 232.22
+      },
+      "snapshots_per_save_max": 256,
+      "cpu_cores": 1.217666536231788,
+      "memory": {
+        "resident_mb": 4135,
+        "go_heap_mb": 32,
+        "native_mb": 4103,
+        "goroutines": 1290
+      },
+      "degraded": true
+    },
+    {
+      "panes": 1,
+      "scrollback": "full (12 MB written first)",
+      "agent_report": {
+        "n": 400,
+        "p50_ms": 0.33,
+        "p99_ms": 0.44,
+        "max_ms": 1.23
+      },
+      "save": {
+        "n": 474,
+        "p50_ms": 1.52,
+        "p99_ms": 9.45,
+        "max_ms": 10.18
+      },
+      "save_wait": {
+        "n": 474,
+        "p50_ms": 0,
+        "p99_ms": 4.43,
+        "max_ms": 5.41
+      },
+      "state_save_wait": {
+        "n": 400,
+        "p50_ms": 0,
+        "p99_ms": 3.97,
+        "max_ms": 5.41
+      },
+      "state_save_io": {
+        "n": 400,
+        "p50_ms": 1.49,
+        "p99_ms": 5.07,
+        "max_ms": 5.87
+      },
+      "snapshots_per_save_max": 1,
+      "cpu_cores": 0.08958142663365275,
+      "memory": {
+        "resident_mb": 101,
+        "go_heap_mb": 55,
+        "native_mb": 46,
+        "goroutines": 15
+      },
+      "degraded": false
+    },
+    {
+      "panes": 8,
+      "scrollback": "full (12 MB written first)",
+      "agent_report": {
+        "n": 400,
+        "p50_ms": 0.4,
+        "p99_ms": 4.7,
+        "max_ms": 6.99
+      },
+      "save": {
+        "n": 323,
+        "p50_ms": 1.77,
+        "p99_ms": 180.3,
+        "max_ms": 182.66
+      },
+      "save_wait": {
+        "n": 323,
+        "p50_ms": 0,
+        "p99_ms": 42.93,
+        "max_ms": 46.19
+      },
+      "state_save_wait": {
+        "n": 291,
+        "p50_ms": 0,
+        "p99_ms": 19.25,
+        "max_ms": 27.27
+      },
+      "state_save_io": {
+        "n": 291,
+        "p50_ms": 1.7,
+        "p99_ms": 90.35,
+        "max_ms": 97.97
+      },
+      "snapshots_per_save_max": 8,
+      "cpu_cores": 0.21684999785417353,
+      "memory": {
+        "resident_mb": 211,
+        "go_heap_mb": 54,
+        "native_mb": 157,
+        "goroutines": 50
+      },
+      "degraded": false
+    },
+    {
+      "panes": 32,
+      "scrollback": "full (12 MB written first)",
+      "agent_report": {
+        "n": 390,
+        "p50_ms": 0.42,
+        "p99_ms": 42.01,
+        "max_ms": 48.51
+      },
+      "save": {
+        "n": 191,
+        "p50_ms": 10.05,
+        "p99_ms": 1242.65,
+        "max_ms": 1363
+      },
+      "save_wait": {
+        "n": 191,
+        "p50_ms": 0,
+        "p99_ms": 136.57,
+        "max_ms": 583.56
+      },
+      "state_save_wait": {
+        "n": 183,
+        "p50_ms": 0,
+        "p99_ms": 21.45,
+        "max_ms": 32.06
+      },
+      "state_save_io": {
+        "n": 183,
+        "p50_ms": 8.96,
+        "p99_ms": 138.38,
+        "max_ms": 138.68
+      },
+      "snapshots_per_save_max": 32,
+      "cpu_cores": 0.5422282480235038,
+      "memory": {
+        "resident_mb": 591,
+        "go_heap_mb": 53,
+        "native_mb": 538,
+        "goroutines": 170
+      },
+      "degraded": false
+    },
+    {
+      "panes": 64,
+      "scrollback": "full (12 MB written first)",
+      "agent_report": {
+        "n": 302,
+        "p50_ms": 0.43,
+        "p99_ms": 80.25,
+        "max_ms": 86.1
+      },
+      "save": {
+        "n": 178,
+        "p50_ms": 17.77,
+        "p99_ms": 4237.15,
+        "max_ms": 4531.97
+      },
+      "save_wait": {
+        "n": 178,
+        "p50_ms": 0,
+        "p99_ms": 1278.41,
+        "max_ms": 3219.07
+      },
+      "state_save_wait": {
+        "n": 173,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 2.15
+      },
+      "state_save_io": {
+        "n": 173,
+        "p50_ms": 17.51,
+        "p99_ms": 137.97,
+        "max_ms": 138.22
+      },
+      "snapshots_per_save_max": 64,
+      "cpu_cores": 0.9571516624577728,
+      "memory": {
+        "resident_mb": 1096,
+        "go_heap_mb": 50,
+        "native_mb": 1046,
+        "goroutines": 330
+      },
+      "degraded": true
+    },
+    {
+      "panes": 128,
+      "scrollback": "full (12 MB written first)",
+      "agent_report": {
+        "n": 129,
+        "p50_ms": 56.65,
+        "p99_ms": 139.48,
+        "max_ms": 160.16
+      },
+      "save": {
+        "n": 122,
+        "p50_ms": 38.03,
+        "p99_ms": 11490.61,
+        "max_ms": 12544.98
+      },
+      "save_wait": {
+        "n": 122,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 8299.05
+      },
+      "state_save_wait": {
+        "n": 120,
+        "p50_ms": 0,
+        "p99_ms": 0,
+        "max_ms": 0
+      },
+      "state_save_io": {
+        "n": 120,
+        "p50_ms": 37.92,
+        "p99_ms": 180.93,
+        "max_ms": 195.6
+      },
+      "snapshots_per_save_max": 128,
+      "cpu_cores": 1.2549342963592882,
+      "memory": {
+        "resident_mb": 2109,
+        "go_heap_mb": 45,
+        "native_mb": 2064,
+        "goroutines": 650
+      },
+      "degraded": true
+    }
+  ],
+  "knee_panes": {
+    "empty": 192,
+    "full (12 MB written first)": 32
+  },
+  "note": ""
+}

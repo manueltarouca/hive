@@ -1,0 +1,201 @@
+{
+  "scenario": "output",
+  "meta": {
+    "when": "2026-10-18T22:03:26Z",
+    "machine": "m7g.xlarge",
+    "cpu": "Neoverse-V1",
+    "cores": 4,
+    "memory_gb": 15.298763275146484,
+    "os": "Ubuntu 24.04.5 LTS (7.0.0-1014-aws)",
+    "go": "go1.27.2",
+    "commit": "4a6d228+dirty",
+    "power": "n/a",
+    "load_before": "0.99 3.93 2.97",
+    "load_after": "1.74 3.45 2.87",
+    "pty_max": 4096,
+    "pty_in_use": 0,
+    "open_files_limit": "1024",
+    "gomaxprocs": 4,
+    "fit_for_baseline": true
+  },
+  "params": {
+    "limit_ms": 50,
+    "panes": 1,
+    "rates": [
+      65536,
+      262144,
+      1048576,
+      4194304,
+      16777216,
+      67108864,
+      134217728
+    ],
+    "secs": 6
+  },
+  "steps": [
+    {
+      "panes": 1,
+      "rate_bytes_per_s_per_pane": 65536,
+      "latency": {
+        "n": 600,
+        "p50_ms": 0.09,
+        "p99_ms": 0.16,
+        "max_ms": 0.2
+      },
+      "offered_mb_per_s": 0.0625,
+      "delivered_mb_per_s": 0.07066205269283492,
+      "delivered_ratio": 1.1305928430853587,
+      "resyncs": 0,
+      "bytes_per_frame": 578.90625,
+      "cpu_cores": 0.0176433651097414,
+      "memory": {
+        "resident_mb": 37,
+        "go_heap_mb": 7,
+        "native_mb": 30,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "panes": 1,
+      "rate_bytes_per_s_per_pane": 262144,
+      "latency": {
+        "n": 600,
+        "p50_ms": 0.1,
+        "p99_ms": 0.21,
+        "max_ms": 0.51
+      },
+      "offered_mb_per_s": 0.25,
+      "delivered_mb_per_s": 0.26015927434609526,
+      "delivered_ratio": 1.040637097384381,
+      "resyncs": 0,
+      "bytes_per_frame": 1358.3286307053943,
+      "cpu_cores": 0.02573291614500392,
+      "memory": {
+        "resident_mb": 47,
+        "go_heap_mb": 7,
+        "native_mb": 40,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "panes": 1,
+      "rate_bytes_per_s_per_pane": 1048576,
+      "latency": {
+        "n": 600,
+        "p50_ms": 0.15,
+        "p99_ms": 0.33,
+        "max_ms": 0.42
+      },
+      "offered_mb_per_s": 1,
+      "delivered_mb_per_s": 1.0154967695754074,
+      "delivered_ratio": 1.0154967695754074,
+      "resyncs": 0,
+      "bytes_per_frame": 3003.9492242595206,
+      "cpu_cores": 0.0478606476567723,
+      "memory": {
+        "resident_mb": 48,
+        "go_heap_mb": 7,
+        "native_mb": 41,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "panes": 1,
+      "rate_bytes_per_s_per_pane": 4194304,
+      "latency": {
+        "n": 600,
+        "p50_ms": 0.25,
+        "p99_ms": 0.53,
+        "max_ms": 1.12
+      },
+      "offered_mb_per_s": 4,
+      "delivered_mb_per_s": 4.05539139212885,
+      "delivered_ratio": 1.0138478480322124,
+      "resyncs": 0,
+      "bytes_per_frame": 3935.0920727945713,
+      "cpu_cores": 0.1286684908594643,
+      "memory": {
+        "resident_mb": 48,
+        "go_heap_mb": 7,
+        "native_mb": 41,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "panes": 1,
+      "rate_bytes_per_s_per_pane": 16777216,
+      "latency": {
+        "n": 600,
+        "p50_ms": 0.32,
+        "p99_ms": 0.96,
+        "max_ms": 1.45
+      },
+      "offered_mb_per_s": 16,
+      "delivered_mb_per_s": 16.186571638885813,
+      "delivered_ratio": 1.0116607274303633,
+      "resyncs": 0,
+      "bytes_per_frame": 4160.902071332271,
+      "cpu_cores": 0.45469265633420985,
+      "memory": {
+        "resident_mb": 49,
+        "go_heap_mb": 7,
+        "native_mb": 42,
+        "goroutines": 16
+      },
+      "degraded": false
+    },
+    {
+      "panes": 1,
+      "rate_bytes_per_s_per_pane": 67108864,
+      "latency": {
+        "n": 497,
+        "p50_ms": 0.44,
+        "p99_ms": 4.31,
+        "max_ms": 13.84
+      },
+      "offered_mb_per_s": 64,
+      "delivered_mb_per_s": 53.94266636053655,
+      "delivered_ratio": 0.8428541618833836,
+      "resyncs": 7,
+      "bytes_per_frame": 4802.429442644291,
+      "cpu_cores": 1.4663823741064015,
+      "memory": {
+        "resident_mb": 75,
+        "go_heap_mb": 31,
+        "native_mb": 44,
+        "goroutines": 16
+      },
+      "degraded": true,
+      "why": "7 resyncs"
+    },
+    {
+      "panes": 1,
+      "rate_bytes_per_s_per_pane": 134217728,
+      "latency": {
+        "n": 260,
+        "p50_ms": 0.51,
+        "p99_ms": 5.14,
+        "max_ms": 16.28
+      },
+      "offered_mb_per_s": 128,
+      "delivered_mb_per_s": 56.10480752551592,
+      "delivered_ratio": 0.43831880879309315,
+      "resyncs": 8,
+      "bytes_per_frame": 5314.871968202828,
+      "cpu_cores": 1.4668377927319172,
+      "memory": {
+        "resident_mb": 102,
+        "go_heap_mb": 31,
+        "native_mb": 71,
+        "goroutines": 16
+      },
+      "degraded": true,
+      "why": "8 resyncs"
+    }
+  ],
+  "knee_rate_bytes_per_s_per_pane": 16777216
+}

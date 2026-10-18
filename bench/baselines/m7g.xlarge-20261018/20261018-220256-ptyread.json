@@ -1,0 +1,123 @@
+{
+  "scenario": "ptyread",
+  "meta": {
+    "when": "2026-10-18T22:02:04Z",
+    "machine": "m7g.xlarge",
+    "cpu": "Neoverse-V1",
+    "cores": 4,
+    "memory_gb": 15.298763275146484,
+    "os": "Ubuntu 24.04.5 LTS (7.0.0-1014-aws)",
+    "go": "go1.27.2",
+    "commit": "4a6d228+dirty",
+    "power": "n/a",
+    "load_before": "0.98 4.84 3.15",
+    "load_after": "1.64 4.35 3.07",
+    "pty_max": 4096,
+    "pty_in_use": 0,
+    "open_files_limit": "1024",
+    "gomaxprocs": 4,
+    "fit_for_baseline": true
+  },
+  "params": {
+    "rate_bytes_per_s": 102400,
+    "secs": 6,
+    "steps": [
+      1,
+      8,
+      32,
+      64,
+      128,
+      192,
+      256
+    ]
+  },
+  "steps": [
+    {
+      "panes": 1,
+      "offered_mb_per_s": 0.09765625,
+      "read_mb_per_s": 0.10230948334460098,
+      "reads_per_s": 154.14334500978168,
+      "bytes_per_read": 695.9708108108108,
+      "cpu_cores": 0.008520044263416343,
+      "cpu_us_per_read": 55.273513513513514,
+      "cpu_ms_per_mb": 83.27717025721799,
+      "memory": {
+        "resident_mb": 37,
+        "go_heap_mb": 7,
+        "native_mb": 30,
+        "goroutines": 12
+      },
+      "degraded": false
+    },
+    {
+      "panes": 8,
+      "offered_mb_per_s": 0.78125,
+      "read_mb_per_s": 0.8185779854548512,
+      "reads_per_s": 1172.2885769185182,
+      "bytes_per_read": 732.1927779357407,
+      "cpu_cores": 0.06479169300621662,
+      "cpu_us_per_read": 55.26940574353142,
+      "cpu_ms_per_mb": 79.15152148907897,
+      "memory": {
+        "resident_mb": 104,
+        "go_heap_mb": 10,
+        "native_mb": 94,
+        "goroutines": 47
+      },
+      "degraded": false
+    },
+    {
+      "panes": 32,
+      "offered_mb_per_s": 3.125,
+      "read_mb_per_s": 3.2743755764814946,
+      "reads_per_s": 4116.294542745661,
+      "bytes_per_read": 834.1073771155559,
+      "cpu_cores": 0.22092258476586868,
+      "cpu_us_per_read": 53.67025670094745,
+      "cpu_ms_per_mb": 67.4701418959589,
+      "memory": {
+        "resident_mb": 324,
+        "go_heap_mb": 11,
+        "native_mb": 313,
+        "goroutines": 167
+      },
+      "degraded": false
+    },
+    {
+      "panes": 64,
+      "offered_mb_per_s": 6.25,
+      "read_mb_per_s": 6.550099322466234,
+      "reads_per_s": 7807.341935157628,
+      "bytes_per_read": 879.7202689721422,
+      "cpu_cores": 0.4095898742466026,
+      "cpu_us_per_read": 52.46214110363967,
+      "cpu_ms_per_mb": 62.53185701196122,
+      "memory": {
+        "resident_mb": 623,
+        "go_heap_mb": 14,
+        "native_mb": 609,
+        "goroutines": 327
+      },
+      "degraded": false
+    },
+    {
+      "panes": 128,
+      "offered_mb_per_s": 12.5,
+      "read_mb_per_s": 13.10171671936637,
+      "reads_per_s": 14702.786182281481,
+      "bytes_per_read": 934.3906345643746,
+      "cpu_cores": 0.7875877130410852,
+      "cpu_us_per_read": 53.56724251286586,
+      "cpu_ms_per_mb": 60.113321781481375,
+      "memory": {
+        "resident_mb": 1230,
+        "go_heap_mb": 17,
+        "native_mb": 1213,
+        "goroutines": 647
+      },
+      "degraded": false
+    }
+  ],
+  "knee_panes": 128,
+  "note": "stopped before 192 panes (max 128, pty budget 4064). "
+}

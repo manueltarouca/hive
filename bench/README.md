@@ -224,3 +224,10 @@ run). The first knee anywhere in the suite, and both causes are the machine:
 - Snapshot saves are slower than on the Mac at any size (p99 65 ms at 8
   panes, against ~6 ms): no F_BARRIERFSYNC on Linux, so a full fsync on a
   network disk. Reports don't wait for them.
+
+**Baselines.** `bench/baselines/<machine>-<date>/` holds a full
+`baseline.sh` run, every result fit (quiet, load settled before each
+scenario). Compare a rerun's numbers against the same machine's.
+- `m7g.xlarge-20261018`: Linux, Go 1.27.2, the tree of 640feeb (its
+  results say 4a6d228+dirty: the VM's copy predated the commits). Knees:
+  flush 192 panes empty, 32 full (CPU, then disk); ptyread 128.
