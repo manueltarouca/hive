@@ -159,10 +159,27 @@ self_code=$(docker exec -u alice srv curl -s --max-time 10 -o /dev/null -w '%{ht
   -H 'content-type: application/json' -d '{"method":"whoami"}' http://$srv_ip:4483/v1/call || true)
 check "a local account via the tailnet address" "$self_code" "403"
 
+echo "== the CLI over the tailnet"
+# hive_cli NODE ARGS...: the hive CLI on a node, its own settings dir.
+hive_cli() { n=$1; shift; docker exec -e HIVE_CONFIG=/tmp/cli/config -e HIVE_SERVER=/tmp/cli/none.sock "$n" hive "$@" 2>&1; }
+check "alice: hive -S URL whoami" "$(hive_cli alice -S http://$srv_ip:4483 whoami | cut -d' ' -f1-3)" "tailscale:alice via tailnet"
+check "alice: a bare host (https:443, https:4483, then http:4483)" "$(hive_cli alice -S $srv_ip whoami | cut -d' ' -f1-3)" "tailscale:alice via tailnet"
+hive_cli alice hosts add srv http://$srv_ip:4483 >/dev/null
+hive_cli alice -S srv new from-alice -- cat >/dev/null
+check "alice: a saved host, new + ls" "$(hive_cli alice -S srv ls | grep -c from-alice)" "1"
+check "bob: refused, and told why" "$(hive_cli bob -S http://$srv_ip:4483 ls | grep -o 'tailscale:bob may not use this server')" "tailscale:bob may not use this server"
+bob_exit=$(docker exec -e HIVE_CONFIG=/tmp/cli/config -e HIVE_SERVER=/tmp/cli/none.sock bob hive -S http://$srv_ip:4483 ls >/dev/null 2>&1 && echo 0 || echo $?)
+check "bob: exit status 5 (refused)" "$bob_exit" "5"
+check "nothing started locally" "$(docker exec alice sh -c 'test -e /tmp/cli/none.sock && echo started || echo no')" "no"
+
 echo "== tailnet-serve:// (Serve's header)"
 check "alice, the owner" "$(call alice http://$srv_ip srv.hive.test)" "200 tailscale:alice"
 check "bob"              "$(call bob http://$srv_ip srv.hive.test)"   "403 forbidden"
 check "ci (Serve doesn't name tagged devices)" "$(call ci http://$srv_ip srv.hive.test)" "403 forbidden"
+# Serve matches requests by the node's name; these containers don't use
+# MagicDNS, so alice learns it from /etc/hosts.
+docker exec alice sh -c "echo '$srv_ip srv.hive.test' >> /etc/hosts"
+check "alice: hive -S http://srv.hive.test whoami, through Serve" "$(hive_cli alice -S http://srv.hive.test whoami | cut -d, -f1)" "tailscale:alice via tailnet-serve"
 
 echo "== --tailnet-allow-identified"
 hive_up --tailnet-allow-identified
@@ -184,6 +201,7 @@ check "bob"              "$(call bob http://$ts_ip:4483)"   "403 forbidden"
 check "ci"               "$(call ci http://$ts_ip:4483)"    "403 forbidden"
 st=$(docker exec tsn hive -S /tmp/local.sock server status | jq -r '.tailscale.state')
 check "server status shows the node" "$st" "Running"
+check "alice: hive -S URL whoami, built in" "$(hive_cli alice -S http://$ts_ip:4483 whoami | cut -d' ' -f1-3)" "tailscale:alice via tailscale"
 
 echo "== the key stays out of the panes"
 docker exec tsn hive -S /tmp/local.sock new keycheck -- sh -c 'env > /tmp/pane-env; sleep 30' >/dev/null

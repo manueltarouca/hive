@@ -26,6 +26,7 @@ const (
 	exitUsage       = 2
 	exitTarget      = 3
 	exitUnreachable = 4
+	exitForbidden   = 5
 	exitInterrupted = 130
 )
 
@@ -75,6 +76,8 @@ func run(argv []string) int {
 		return exitUnreachable
 	case errors.As(err, &ce) && (ce.Code == "not_found" || ce.Code == "ambiguous"):
 		return exitTarget
+	case errors.As(err, &ce) && ce.Code == "forbidden":
+		return exitForbidden
 	case errors.Is(err, context.Canceled):
 		return exitInterrupted
 	}
@@ -142,11 +145,17 @@ func connect(g globals) (*client.Client, error) { return connectWith(g, nil, nil
 // connectWith starts the server, when it must, with these extra arguments
 // and environment.
 func connectWith(g globals, extra, env []string) (*client.Client, error) {
-	sock := socketFor(g)
-	c := client.New(sock)
+	c, err := clientFor(g)
+	if err != nil {
+		return nil, err
+	}
+	if c.Remote() {
+		return c, nil // the first call says whether it answers: one round trip, not two
+	}
 	if c.Ping() {
 		return c, nil
 	}
+	sock := c.Socket
 	// Any command starts a personal server, unless a server was
 	// named explicitly.
 	if g.explicitServer || !strings.HasPrefix(sock, "/") {

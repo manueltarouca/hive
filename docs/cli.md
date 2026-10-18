@@ -83,6 +83,46 @@ lists every change.
 
 Every command takes `--json` for output a script can parse.
 
+## Remote servers
+
+Any command runs against another machine's server with `-S`. The server
+there must listen on your tailnet (`hive server start --tailscale`, or
+`--extra-listen tailnet://:4483`), and let you in: by default only the
+Tailscale user who owns that machine.
+
+```sh
+hive -S https://box.example.ts.net ls
+hive hosts add box https://box.example.ts.net
+hive -S box new build -- make
+hive -S box whoami
+```
+
+| Command | Does |
+| --- | --- |
+| `hive hosts [ls]` | The servers you've named |
+| `hive hosts add LABEL URL` | Name one. The app shows the same list. |
+| `hive hosts rm LABEL` | Forget it |
+| `hive whoami` | Who the server thinks you are, and how you reached it |
+| `hive client ls` | The apps connected to a server, and as whom |
+
+`-S` takes:
+
+| Value | Means |
+| --- | --- |
+| `/PATH`, `./PATH`, `~/PATH` | A Unix socket on this machine |
+| `https://HOST`, `http://HOST:PORT` | A remote server |
+| `LABEL` | A host saved with `hive hosts add` |
+| `HOST` | A remote server, tried at `https://HOST`, then `https://HOST:4483`, then `http://HOST:4483` |
+
+`HIVE_SERVER` is always a socket path: hive sets it in every terminal.
+
+Hosts are kept in `hosts.json`, next to the settings file. A bare host is
+saved as the URL it answered at. A command never starts a server on another
+machine. A block created there without `--cwd` starts in that account's
+home; `--cwd` is an absolute or `~` path on that machine. `config` edits this
+machine's settings; for a remote server's, use `hive -S HOST api call
+config.set`.
+
 ## Exit status
 
 | Status | Meaning |
@@ -92,6 +132,7 @@ Every command takes `--json` for output a script can parse.
 | 2 | The command line was wrong |
 | 3 | A target was not found or matched more than one thing |
 | 4 | The server could not be reached |
+| 5 | The server refused you |
 | 130 | It was interrupted |
 
 `wait` and `run --wait` exit with the program's own status.

@@ -72,12 +72,23 @@ API
   api describe METHOD        a method's arguments and result
   api call METHOD [JSON|@FILE|-]
 
+Remote servers
+  hosts [ls]                 the servers you've named
+  hosts add LABEL URL        name one: hive -S LABEL ls
+  hosts rm LABEL             forget it
+  whoami                     who the server thinks you are, and how
+  client ls                  who is connected, and as whom
+
 Server
   server run [--fresh]       run in the foreground
   server start | stop | status
+        listen on a tailnet: --tailscale, --extra-listen tailnet://:4483,
+        --extra-listen tailnet-serve:///PATH; see hive server run --help
   version
 
 Targets: -s/--session -w/--window -b/--block -S/--server, --json.
+  -S: a socket path, https://HOST or http://HOST:PORT, a saved host's
+  label, or a host name.
 A target is an ID, a label, a position from 1, or the end of an ID.
 Inside a hive terminal, HIVE_SESSION and HIVE_BLOCK are the defaults.
 `
@@ -142,6 +153,12 @@ func dispatch(g globals, args []string) error {
 			return cmdInspect(g, "block")
 		}
 		return usagef("usage: hive block inspect")
+	case "hosts":
+		return cmdHosts(g, rest)
+	case "whoami":
+		return cmdWhoami(g)
+	case "client":
+		return cmdClient(g, rest)
 	case "agents":
 		return cmdAgents(g)
 	case "agent":
@@ -308,6 +325,12 @@ func cmdServer(g globals, args []string) error {
 		return usagef("usage: hive server run|start|stop|status")
 	}
 	switch args[0] {
+	case "run", "start":
+		if remoteTarget(g) {
+			return usagef("server %s runs this machine's server; on %s, run it there", args[0], g.server)
+		}
+	}
+	switch args[0] {
 	case "run":
 		fs := flags("server run")
 		fresh := fs.Bool("fresh", false, "")
@@ -355,7 +378,10 @@ func cmdServer(g globals, args []string) error {
 		fmt.Println("server running on", socketFor(g))
 		return nil
 	case "stop":
-		c := client.New(socketFor(g))
+		c, err := clientFor(g)
+		if err != nil {
+			return err
+		}
 		if !c.Ping() {
 			fmt.Println("no server running")
 			return nil
@@ -367,12 +393,19 @@ func cmdServer(g globals, args []string) error {
 		for c.Ping() && time.Now().Before(deadline) {
 			time.Sleep(50 * time.Millisecond)
 		}
-		fmt.Println("server stopped; sessions will be restored at the next start")
+		where := ""
+		if c.Remote() {
+			where = " on " + c.String()
+		}
+		fmt.Printf("server%s stopped; sessions will be restored at the next start\n", where)
 		return nil
 	case "status":
-		c := client.New(socketFor(g))
+		c, err := clientFor(g)
+		if err != nil {
+			return err
+		}
 		if !c.Ping() {
-			fmt.Println("no server running on", socketFor(g))
+			fmt.Println("no server running on", c)
 			return exitError{exitUnreachable}
 		}
 		raw, err := c.CallRaw(context.Background(), "server.version", nil)
@@ -459,10 +492,11 @@ func cmdNew(g globals, args []string) error {
 	if err != nil {
 		return err
 	}
-	if *cwd == "" {
-		*cwd, _ = os.Getwd()
+	dir, err := x.cwd(*cwd)
+	if err != nil {
+		return err
 	}
-	raw, err := x.c.CallRaw(x.ctx, "session.create", map[string]any{"label": label, "cwd": absPath(*cwd), "command": command})
+	raw, err := x.c.CallRaw(x.ctx, "session.create", map[string]any{"label": label, "cwd": dir, "command": command})
 	if err != nil {
 		return err
 	}
@@ -475,6 +509,22 @@ func cmdNew(g globals, args []string) error {
 	_ = json.Unmarshal(raw, &out)
 	fmt.Println(out.SessionID)
 	return nil
+}
+
+// cwd is where a new block starts: --cwd, else this shell's directory. A
+// remote server gets --cwd as given, an absolute or ~ path on that machine,
+// and nothing otherwise: its own home.
+func (x *cx) cwd(flag string) (string, error) {
+	if x.c.Remote() {
+		if flag != "" && !strings.HasPrefix(flag, "/") && !strings.HasPrefix(flag, "~") {
+			return "", usagef("--cwd %s: on another machine's server, give an absolute or ~ path", flag)
+		}
+		return flag, nil
+	}
+	if flag == "" {
+		flag, _ = os.Getwd()
+	}
+	return absPath(flag), nil
 }
 
 func absPath(p string) string {
@@ -532,10 +582,11 @@ func cmdRunSplit(g globals, args []string, split bool) error {
 	if err != nil {
 		return err
 	}
-	if *cwd == "" {
-		*cwd, _ = os.Getwd()
+	dir, err := x.cwd(*cwd)
+	if err != nil {
+		return err
 	}
-	layout := map[string]any{"command": command, "cwd": absPath(*cwd), "label": *label, "keep_open": *keep || *wait}
+	layout := map[string]any{"command": command, "cwd": dir, "label": *label, "keep_open": *keep || *wait}
 	var raw json.RawMessage
 	if split {
 		sid, bid, err := x.blockID()

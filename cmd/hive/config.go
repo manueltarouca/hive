@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/manueltarouca/hive/internal/client"
 	"github.com/manueltarouca/hive/internal/config"
 )
 
@@ -17,6 +16,9 @@ import (
 func cmdConfig(g globals, args []string) error {
 	if len(args) == 0 {
 		return usagef("usage: hive config path|check|show [--json]|set KEY VALUE|default|reload")
+	}
+	if args[0] != "reload" && remoteTarget(g) {
+		return usagef("config %s edits this machine's settings file; for %s's, use hive -S %s api call config.get or config.set", args[0], g.server, g.server)
 	}
 	path := config.Path()
 	switch args[0] {
@@ -82,7 +84,10 @@ func cmdConfig(g globals, args []string) error {
 		}
 		return nil
 	case "reload":
-		c := client.New(socketFor(g))
+		c, err := clientFor(g)
+		if err != nil {
+			return err
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		var out map[string]any
