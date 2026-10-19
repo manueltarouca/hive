@@ -26,6 +26,8 @@ shell, and the restored line says what it was running.
 | --- | --- |
 | `~/.local/state/hive/state.json` | Sessions, layouts, and what each block was doing |
 | `~/.local/state/hive/blocks/` | A snapshot of each terminal: screen, scrollback, modes |
+| `~/.local/state/hive/server.lock` | Held by the running server: a second server on the same directory won't start |
+| `~/.local/state/hive/server-id` | This install's ID, for clients telling servers apart |
 
 `HIVE_STATE_DIR` or `XDG_STATE_HOME` moves it.
 

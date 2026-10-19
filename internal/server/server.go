@@ -11,6 +11,8 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -143,6 +145,10 @@ type Server struct {
 	// after the block is gone still gets the status.
 	exits   map[string]exitRec
 	started time.Time
+	// serverID names this install (its state directory) for clients telling servers apart.
+	serverID string
+	// unlockState lets go of the state directory, at the end of Shutdown.
+	unlockState func()
 
 	dirty    chan struct{}
 	flushReq chan chan error
@@ -173,13 +179,20 @@ func New(cfg Config) (*Server, error) {
 	if cfg.ConfigPoll == 0 {
 		cfg.ConfigPoll = 2 * time.Second
 	}
-	s := &Server{attaches: map[*attachConn]struct{}{},
+	// First: a second server on this state directory would restore the same
+	// sessions, start their programs again, and write over this one's state.
+	unlock, err := lockStateDir(cfg.StateDir)
+	if err != nil {
+		return nil, err
+	}
+	s := &Server{attaches: map[*attachConn]struct{}{}, unlockState: unlock,
 		cfg: cfg, log: cfg.Logger, reg: api.New(), bus: events.New(4096),
 		store:  persist.New(cfg.StateDir),
 		blocks: map[string]*rec{}, clients: map[string]*Client{}, exits: map[string]exitRec{}, started: time.Now(),
 		dirty: make(chan struct{}, 1), flushReq: make(chan chan error), stateSave: make(chan struct{}, 1),
 		quit: make(chan struct{}), stopped: make(chan struct{}),
 	}
+	s.serverID = loadServerID(cfg.StateDir, s.log)
 	s.conf, s.confDiags, s.confStamp = s.readConfig()
 	for _, d := range s.confDiags {
 		s.log.Warn("config", "path", cfg.ConfigPath, "problem", d.String())
@@ -254,6 +267,7 @@ func (s *Server) Shutdown() {
 		close(s.quit)
 		go func() {
 			defer close(s.stopped)
+			defer s.unlockState()
 			if err := s.flush(true); err != nil {
 				s.log.Error("final save failed", "err", err)
 			}
@@ -1015,3 +1029,64 @@ func copyJSON(v any) (json.RawMessage, error) {
 }
 
 func platform() string { return runtime.GOOS + "_" + runtime.GOARCH }
+
+// loadServerID reads the state directory's server-id, making one the first
+// time. Without a writable state directory it lasts until the server stops.
+func loadServerID(dir string, log *slog.Logger) string {
+	p := filepath.Join(dir, "server-id")
+	if b, err := os.ReadFile(p); err == nil {
+		if v := strings.TrimSpace(string(b)); len(v) >= 16 {
+			return v
+		}
+	}
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return ""
+	}
+	v := hex.EncodeToString(buf)
+	if err := os.MkdirAll(dir, 0o700); err == nil {
+		err = os.WriteFile(p, []byte(v+"\n"), 0o600)
+		if err != nil {
+			log.Warn("server-id not saved", "err", err)
+		}
+	}
+	return v
+}
+
+// stateLockWait is how long a new server waits for the state directory.
+var stateLockWait = 3 * time.Second
+
+// lockStateDir holds the state directory for this server, or says which
+// server already does.
+func lockStateDir(dir string) (func(), error) {
+	if dir == "" {
+		return func() {}, nil
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	p := filepath.Join(dir, "server.lock")
+	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	// A server stopping lets go as it exits: `hive server stop` then start
+	// may come a moment before that.
+	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	for end := time.Now().Add(stateLockWait); err != nil && time.Now().Before(end); {
+		time.Sleep(50 * time.Millisecond)
+		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	}
+	if err != nil {
+		b, _ := os.ReadFile(p)
+		f.Close()
+		who := strings.TrimSpace(string(b))
+		if who == "" {
+			who = "unknown"
+		}
+		return nil, fmt.Errorf("another hive server (pid %s) uses %s: stop it first, or give this one its own HIVE_STATE_DIR", who, dir)
+	}
+	_ = f.Truncate(0)
+	_, _ = f.WriteAt([]byte(fmt.Sprintf("%d\n", os.Getpid())), 0)
+	return func() { syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
+}

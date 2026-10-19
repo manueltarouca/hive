@@ -84,6 +84,7 @@ type attachMsg struct {
 	CellH   uint32          `json:"cell_height_px,omitempty"`
 	Base64  string          `json:"data_base64,omitempty"`
 	Take    bool            `json:"take,omitempty"`
+	Release bool            `json:"release,omitempty"`
 	ID      int64           `json:"id,omitempty"`
 	Method  string          `json:"method,omitempty"`
 	Params  json.RawMessage `json:"params,omitempty"`
@@ -398,7 +399,7 @@ func (c *attachConn) handle(m attachMsg) {
 		}
 	case "resize":
 		args, _ := json.Marshal(map[string]any{"cols": m.Cols, "rows": m.Rows, "client_id": c.client.ID, "take": m.Take,
-			"cell_width_px": m.CellW, "cell_height_px": m.CellH})
+			"release": m.Release, "cell_width_px": m.CellW, "cell_height_px": m.CellH})
 		raw, _ := json.Marshal(blockCall{BlockID: m.BlockID, Args: args})
 		if _, err := c.s.reg.Call(c.ctx, terminalPrefix+"resize", raw); err != nil {
 			c.sendErrFor(m, asAPI(err))

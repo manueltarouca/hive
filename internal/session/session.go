@@ -29,6 +29,8 @@ type Window struct {
 	Root   *Node  `json:"layout"`
 	Focus  string `json:"focused_block_id,omitempty"`
 	Zoomed bool   `json:"zoomed,omitempty"`
+	// Pinned tabs come first in every client's tab bar.
+	Pinned bool `json:"pinned,omitempty"`
 }
 
 // Node is a split or a block. Direction "horizontal" places A left of B,

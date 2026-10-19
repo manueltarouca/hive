@@ -251,3 +251,24 @@ func TestSizeDoesNotWaitForASnapshot(t *testing.T) {
 		t.Fatalf("after resize: %dx%d", c, r)
 	}
 }
+
+// Screen: what's on screen only, not the scrollback above it.
+func TestFormatScreenOnly(t *testing.T) {
+	term, err := New(20, 3, Hooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer term.Close()
+	term.Feed([]byte("old1\r\nold2\r\nold3\r\nnew1\r\nnew2"))
+	all, _ := term.Format(FormatOpts{Trim: true})
+	if !strings.Contains(all, "old1") {
+		t.Fatalf("whole: %q", all)
+	}
+	out, err := term.Format(FormatOpts{Trim: true, Screen: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "old1") || strings.Contains(out, "old2") || !strings.Contains(out, "new2") {
+		t.Fatalf("screen: %q", out)
+	}
+}

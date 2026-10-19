@@ -393,3 +393,64 @@ func TestMoveWindowReorders(t *testing.T) {
 		t.Fatal("a negative index should fail")
 	}
 }
+
+// tail: only the screen's last lines that show something, for a tab's
+// preview, without sending the whole scrollback.
+func TestFormatTail(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c", "printf 'one\\ntwo\\n\\nthree\\n\\n\\n'; exec cat"}})
+	sid := created["session_id"].(string)
+	b := strs(created["block_ids"])[0]
+	h.waitScreen(sid, b, "three")
+	out := h.call("hive.terminal.format", map[string]any{"block_id": b, "args": map[string]any{"trim": true, "tail": 2}})
+	if got := out["content"]; got != "two\nthree" {
+		t.Fatalf("tail 2 = %q", got)
+	}
+	out = h.call("hive.terminal.format", map[string]any{"block_id": b, "args": map[string]any{"tail": 1}})
+	if got := out["content"]; got != "three" {
+		t.Fatalf("tail 1 untrimmed = %q", got)
+	}
+}
+
+// server_id: one per state directory, the same after a restart, so a
+// client can tell two machines with the same hostname and paths apart.
+func TestServerID(t *testing.T) {
+	dir := t.TempDir()
+	h := start(t, dir, nil)
+	id, _ := h.call("server.version", nil)["server_id"].(string)
+	h.stop()
+	if len(id) < 16 {
+		t.Fatalf("server_id = %q", id)
+	}
+	h = start(t, dir, nil)
+	again, _ := h.call("server.version", nil)["server_id"].(string)
+	h.stop()
+	if again != id {
+		t.Fatalf("after a restart: %q, was %q", again, id)
+	}
+	h = start(t, t.TempDir(), nil)
+	other, _ := h.call("server.version", nil)["server_id"].(string)
+	h.stop()
+	if other == id {
+		t.Fatal("two state directories share a server_id")
+	}
+}
+
+// One server per state directory: a second one there would restore the
+// same sessions, start their programs again and write over the first's
+// state.
+func TestOneServerPerStateDir(t *testing.T) {
+	defer func(w time.Duration) { stateLockWait = w }(stateLockWait)
+	stateLockWait = 200 * time.Millisecond
+	dir := t.TempDir()
+	h := start(t, dir, nil)
+	_, err := New(Config{Socket: filepath.Join(t.TempDir(), "other.sock"), StateDir: dir})
+	if err == nil || !strings.Contains(err.Error(), "another hive server") || !strings.Contains(err.Error(), fmt.Sprint(os.Getpid())) {
+		t.Fatalf("second server on %s: %v", dir, err)
+	}
+	h.stop()
+	// Stopped, it lets go.
+	h = start(t, dir, nil)
+	h.stop()
+}

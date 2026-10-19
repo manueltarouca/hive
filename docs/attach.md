@@ -48,7 +48,7 @@ height in pixels.
 | `subscribe`, `unsubscribe` | Start or stop mirroring a block |
 | `input` | Type `data`, or `data_base64` |
 | `key` | Press a named key |
-| `resize` | Ask for a size. `take: true` claims it from another client. |
+| `resize` | Ask for a size. `take: true` claims it from another client; `release: true` sets it and gives the claim up, so the client in use takes the pane up again. Without `take`, only the holder may release, or anyone while nobody holds it. |
 | `call` | Call any API method, with an `id` |
 | `events` | Stream events on this connection, with `since` |
 

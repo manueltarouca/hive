@@ -70,7 +70,7 @@ func (s *Server) registerMethods() {
 			out := map[string]any{
 				"hive_version": Version, "platform": platform(), "pid": os.Getpid(),
 				"started_at": s.started.UTC(), "socket": s.cfg.Socket, "state_dir": s.cfg.StateDir,
-				"hostname": host, "home": home, "listeners": ls,
+				"hostname": host, "home": home, "listeners": ls, "server_id": s.serverID,
 			}
 			if node != nil {
 				out["tailscale"] = node
@@ -408,6 +408,23 @@ func (s *Server) registerMethods() {
 				}
 				w.Label = in.Label
 				s.bus.Session(ss.ID, "window_label_changed", map[string]any{"window_id": w.ID, "label": in.Label})
+				return nil
+			})
+		})
+
+	api.Register(r, "session.pin_window", "Pin or unpin a window: pinned tabs come first in every client.",
+		func(ctx context.Context, in struct {
+			SessionID string `json:"session_id" required:"true"`
+			WindowID  string `json:"window_id" required:"true"`
+			Pinned    bool   `json:"pinned" required:"true"`
+		}) (revisionOut, error) {
+			return s.withSession(in.SessionID, func(ss *session.Session) error {
+				w := ss.Window(in.WindowID)
+				if w == nil {
+					return api.NotFound("no window %s", in.WindowID)
+				}
+				w.Pinned = in.Pinned
+				s.bus.Session(ss.ID, "window_pinned", map[string]any{"window_id": w.ID, "pinned": in.Pinned})
 				return nil
 			})
 		})
@@ -819,17 +836,28 @@ func args[T any](raw json.RawMessage) (T, error) {
 }
 
 func (s *Server) registerTerminalMethods() {
-	s.terminal("format", "Return the screen and scrollback as text or VT sequences. args: {format: text|vt, trim, unwrap}",
+	s.terminal("format", "Return the screen and scrollback as text or VT sequences. args: {format: text|vt, trim, unwrap, tail: the last N lines that show something, as text}",
 		func(r *rec, raw json.RawMessage) (any, error) {
 			a, err := args[struct {
 				Format string `json:"format"`
 				Trim   bool   `json:"trim"`
 				Unwrap bool   `json:"unwrap"`
+				Tail   int    `json:"tail"`
 			}](raw)
 			if err != nil {
 				return nil, err
 			}
-			out, err := r.b.Format(a.Format, a.Trim, a.Unwrap)
+			if a.Tail < 0 || (a.Tail > 0 && a.Format == "vt") {
+				return nil, api.BadRequest("tail takes a count of text lines")
+			}
+			var out string
+			if a.Tail > 0 {
+				// The last lines are on screen: the scrollback is left unread.
+				out, err = r.b.FormatScreen(true)
+				out = tailLines(out, a.Tail)
+			} else {
+				out, err = r.b.Format(a.Format, a.Trim, a.Unwrap)
+			}
 			if err != nil {
 				return nil, api.BadRequest("%v", err)
 			}
@@ -885,7 +913,7 @@ func (s *Server) registerTerminalMethods() {
 			}
 			return map[string]any{"sent": len(a.Keys)}, nil
 		})
-	s.terminal("resize", "Request a size for the terminal. args: {cols, rows, client_id, take}. Only the client with size authority may resize, unless take is set.",
+	s.terminal("resize", "Request a size for the terminal. args: {cols, rows, client_id, take, release}. Only the client with size authority may resize, unless take is set; release sets the size and gives up authority.",
 		func(r *rec, raw json.RawMessage) (any, error) {
 			a, err := args[struct {
 				Cols     uint16 `json:"cols"`
@@ -894,6 +922,7 @@ func (s *Server) registerTerminalMethods() {
 				CellH    uint32 `json:"cell_height_px"`
 				ClientID string `json:"client_id"`
 				Take     bool   `json:"take"`
+				Release  bool   `json:"release"`
 			}](raw)
 			if err != nil {
 				return nil, err
@@ -909,6 +938,12 @@ func (s *Server) registerTerminalMethods() {
 				return nil, api.Conflict("client %s has size authority; pass take to override", r.owner)
 			}
 			r.owner = who
+			if a.Release {
+				// Given back: the size set, and nobody holding it, so the
+				// client in use takes it up again without taking it from anyone.
+				r.owner = ""
+				who = ""
+			}
 			s.mu.Unlock()
 			if err := r.b.ResizePx(a.Cols, a.Rows, a.CellW, a.CellH); err != nil {
 				return nil, api.BadRequest("%v", err)
@@ -1200,4 +1235,17 @@ func sideFor(direction, side string) string {
 		return "right"
 	}
 	return "left"
+}
+
+// tailLines is text's last n lines that show something, their trailing
+// spaces dropped.
+func tailLines(text string, n int) string {
+	var keep []string
+	lines := strings.Split(text, "\n")
+	for i := len(lines) - 1; i >= 0 && len(keep) < n; i-- {
+		if l := strings.TrimRight(lines[i], " \t\r"); l != "" {
+			keep = append([]string{l}, keep...)
+		}
+	}
+	return strings.Join(keep, "\n")
 }

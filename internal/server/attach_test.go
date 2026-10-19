@@ -174,6 +174,39 @@ func TestAttachSizeAuthorityAndCalls(t *testing.T) {
 	}
 }
 
+// Giving a size back: the holder sets the size it found and lets go, so
+// the device in use picks the pane up again on its own.
+func TestAttachResizeRelease(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	bid := strs(created["block_ids"])[0]
+	a, b := dial(t, h, "mac"), dial(t, h, "phone")
+	defer a.ws.CloseNow()
+	defer b.ws.CloseNow()
+	a.send(map[string]any{"type": "resize", "block_id": bid, "cols": 100, "rows": 30})
+	a.send(map[string]any{"type": "call", "id": 1, "method": "server.version"})
+	a.nextJSON()
+	// Someone else's pane can't be released.
+	b.send(map[string]any{"type": "resize", "block_id": bid, "cols": 50, "rows": 20, "release": true})
+	if m := b.nextJSON(); m["type"] != "error" {
+		t.Fatalf("a release of the mac's pane = %v", m)
+	}
+	b.send(map[string]any{"type": "resize", "block_id": bid, "cols": 50, "rows": 20, "take": true})
+	b.send(map[string]any{"type": "resize", "block_id": bid, "cols": 100, "rows": 30, "release": true})
+	b.send(map[string]any{"type": "call", "id": 2, "method": "hive.terminal.size", "params": map[string]any{"block_id": bid}})
+	res := b.nextJSON()["result"].(map[string]any)
+	if res["cols"].(float64) != 100 || res["size_owner"] != "" {
+		t.Fatalf("after release = %v, want 100 columns and no owner", res)
+	}
+	// Nobody holds it: the mac sizes it without taking.
+	a.send(map[string]any{"type": "resize", "block_id": bid, "cols": 120, "rows": 30})
+	a.send(map[string]any{"type": "call", "id": 3, "method": "hive.terminal.size", "params": map[string]any{"block_id": bid}})
+	if res := a.nextJSON()["result"].(map[string]any); res["cols"].(float64) != 120 || res["size_owner"] != a.id {
+		t.Fatalf("the mac after the release = %v", res)
+	}
+}
+
 func TestAttachSlowClientGetsResync(t *testing.T) {
 	h := start(t, t.TempDir(), nil)
 	defer h.stop()
@@ -346,5 +379,35 @@ func TestShutdownEndsAttachedClients(t *testing.T) {
 			}
 			return
 		}
+	}
+}
+
+// A pinned tab is pinned for every client: the flag lives with the session,
+// in session.view and across a restart.
+func TestPinWindow(t *testing.T) {
+	dir := t.TempDir()
+	h := start(t, dir, nil)
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	sid := created["session_id"].(string)
+	view := h.call("session.view", map[string]any{"session_id": sid})
+	wid := view["windows"].([]any)[0].(map[string]any)["window_id"].(string)
+	h.call("session.pin_window", map[string]any{"session_id": sid, "window_id": wid, "pinned": true})
+	view = h.call("session.view", map[string]any{"session_id": sid})
+	if p, _ := view["windows"].([]any)[0].(map[string]any)["pinned"].(bool); !p {
+		t.Fatalf("not pinned: %v", view["windows"])
+	}
+	h.call("session.pin_window", map[string]any{"session_id": sid, "window_id": wid, "pinned": false})
+	view = h.call("session.view", map[string]any{"session_id": sid})
+	if p, _ := view["windows"].([]any)[0].(map[string]any)["pinned"].(bool); p {
+		t.Fatalf("still pinned: %v", view["windows"])
+	}
+	// Kept with the session: pinned again, then a restart.
+	h.call("session.pin_window", map[string]any{"session_id": sid, "window_id": wid, "pinned": true})
+	h.stop()
+	h = start(t, dir, nil)
+	defer h.stop()
+	view = h.call("session.view", map[string]any{"session_id": sid})
+	if p, _ := view["windows"].([]any)[0].(map[string]any)["pinned"].(bool); !p {
+		t.Fatalf("not pinned after a restart: %v", view["windows"])
 	}
 }

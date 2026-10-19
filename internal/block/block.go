@@ -524,6 +524,11 @@ func (b *Block) Format(format string, trim, unwrap bool) (string, error) {
 	return b.term.Format(vt.FormatOpts{Format: format, Trim: trim, Unwrap: unwrap})
 }
 
+// FormatScreen renders what's on screen as text, without the scrollback.
+func (b *Block) FormatScreen(trim bool) (string, error) {
+	return b.term.Format(vt.FormatOpts{Trim: trim, Screen: true})
+}
+
 // Title and Pwd return what the program last reported.
 func (b *Block) Title() string { return b.term.Title() }
 func (b *Block) Pwd() string   { return b.term.Pwd() }

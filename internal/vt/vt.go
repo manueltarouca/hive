@@ -63,6 +63,7 @@ type FormatOpts struct {
 	Format string // text (default) or vt
 	Trim   bool
 	Unwrap bool
+	Screen bool // the active screen only, without the scrollback
 }
 
 // Term is a libghostty terminal that is safe for concurrent use.
@@ -366,12 +367,25 @@ func (v *Term) Format(o FormatOpts) (string, error) {
 		return "", fmt.Errorf("unknown format %q", o.Format)
 	}
 	var out string
+	cols, rows := v.Size()
 	err := v.do(func(t *ghostty.Terminal) error {
-		f, err := ghostty.NewFormatter(t,
+		opts := []ghostty.FormatterOption{
 			ghostty.WithFormatterFormat(format),
 			ghostty.WithFormatterTrim(o.Trim),
 			ghostty.WithFormatterUnwrap(o.Unwrap),
-		)
+		}
+		if o.Screen && cols > 0 && rows > 0 {
+			start, err := t.GridRef(ghostty.Point{Tag: ghostty.PointTagActive, X: 0, Y: 0})
+			if err != nil {
+				return err
+			}
+			end, err := t.GridRef(ghostty.Point{Tag: ghostty.PointTagActive, X: cols - 1, Y: uint32(rows - 1)})
+			if err != nil {
+				return err
+			}
+			opts = append(opts, ghostty.WithFormatterSelection(&ghostty.Selection{Start: *start, End: *end}))
+		}
+		f, err := ghostty.NewFormatter(t, opts...)
 		if err != nil {
 			return err
 		}
