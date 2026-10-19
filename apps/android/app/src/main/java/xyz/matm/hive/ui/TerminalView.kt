@@ -36,7 +36,7 @@ import kotlin.math.min
  * bring up the keyboard; vertical drags scroll.
  */
 /** A face of the terminal font, with text-style symbol fonts before the system's (whose fallback is colour emoji). */
-private fun withFallbacks(ctx: Context, file: String): Typeface {
+internal fun withFallbacks(ctx: Context, file: String): Typeface {
     fun family(f: String) = android.graphics.fonts.FontFamily.Builder(android.graphics.fonts.Font.Builder(ctx.assets, f).build()).build()
     return Typeface.CustomFallbackBuilder(family(file))
         .addCustomFallback(family("NotoSansSymbols2-Regular.ttf"))

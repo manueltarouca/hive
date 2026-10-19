@@ -82,7 +82,13 @@ fun HiveTheme(choice: String = "system", content: @Composable () -> Unit) {
     val dark = when (choice) { "night" -> true; "day" -> false; else -> isSystemInDarkTheme() }
     val p = if (dark) NightPalette else DayPalette
     val assets = LocalContext.current.assets
-    val mono = androidx.compose.runtime.remember { FontFamily(Font("JetBrainsMonoNerdFont-Regular.ttf", assets)) }
+    val ctx = LocalContext.current
+    // The terminal's font with its symbol fallbacks, so previews, keys and
+    // addresses draw ⏵ ❯ ⏺ as the pane does, not as boxes.
+    val mono = androidx.compose.runtime.remember {
+        runCatching { FontFamily(androidx.compose.ui.text.font.Typeface(withFallbacks(ctx, "JetBrainsMonoNerdFont-Regular.ttf"))) }
+            .getOrElse { FontFamily(Font("JetBrainsMonoNerdFont-Regular.ttf", assets)) }
+    }
     CompositionLocalProvider(LocalPalette provides p, LocalMono provides mono, content = content)
 }
 
