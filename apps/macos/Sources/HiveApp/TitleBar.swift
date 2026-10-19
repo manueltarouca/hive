@@ -219,6 +219,9 @@ struct BarButton: View {
 /// from its empty parts.
 final class TitleBarHost<V: View>: NSHostingView<V> {
     override var mouseDownCanMoveWindow: Bool { true }
+    // Hidden (the sidebar, closed), it must not take clicks from the panes
+    // under it: NSHostingView answers hit tests even then.
+    override func hitTest(_ point: NSPoint) -> NSView? { isHidden ? nil : super.hitTest(point) }
 }
 
 /// A problem with the settings file, or a write that failed: a small warning

@@ -43,5 +43,9 @@ struct HostAway: View {
 }
 
 /// Its host view: hidden, and so letting every event through, while the
-/// host is connected.
-final class HostAwayHost: NSHostingView<HostAway> {}
+/// host is connected. A hidden NSHostingView still answers hit tests: it
+/// took the release of every click in the panes (programs saw a press and
+/// never a release).
+final class HostAwayHost: NSHostingView<HostAway> {
+    override func hitTest(_ point: NSPoint) -> NSView? { isHidden ? nil : super.hitTest(point) }
+}

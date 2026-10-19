@@ -168,6 +168,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     // A dead key waiting for the next key, as ~ on a Portuguese layout.
                     card.pane.setMarkedText("~", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
                 }
+                if what == "click", let self, let b = self.model.focusedBlock, let card = self.panes.card(b), let w = self.window {
+                    // A plain click through the window's own dispatch (hit
+                    // testing included), HIVE_CLICK_X points into the pane:
+                    // a program tracking the mouse must see press and release.
+                    let p = card.pane
+                    let at = p.convert(NSPoint(x: p.bounds.minX + (Double(ProcessInfo.processInfo.environment["HIVE_CLICK_X"] ?? "40") ?? 40), y: p.bounds.minY + 40), to: nil)
+                    for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                        if let e = NSEvent.mouseEvent(with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                      windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                            w.sendEvent(e)
+                        }
+                    }
+                }
                 if what == "select", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
                     // The mouse path, driven by hand: press, drag along row 1.
                     let p = card.pane, cw = Double(p.renderer.fonts.cellWidth), ch = Double(p.renderer.fonts.cellHeight)
