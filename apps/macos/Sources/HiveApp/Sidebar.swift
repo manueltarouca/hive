@@ -23,13 +23,16 @@ struct AgentSidebar: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(model.windows.enumerated()), id: \.element.id) { i, w in
+                    ForEach(model.shownWindows, id: \.window.id) { t in
+                        let i = t.index, w = t.window
                         TabRow(model: model, window: w, index: i)
                             .onDrag {
                                 dragging = w.id
                                 return NSItemProvider(object: w.id as NSString)
                             }
-                            .onDrop(of: [.text], delegate: TabDrop(model: model, target: i, dragging: $dragging))
+                            // Moves use the session's order; pins stay first wherever it lands.
+                            .onDrop(of: [.text], delegate: TabDrop(model: model, target: model.windows.firstIndex { $0.id == w.id } ?? i,
+                                                                   dragging: $dragging))
                     }
                 }
                 .padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 12)
@@ -57,7 +60,11 @@ struct TabDrop: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         defer { dragging = nil }
-        guard let id = dragging, let from = model.windows.firstIndex(where: { $0.id == id }), from != target else { return false }
+        guard let id = dragging, let from = model.windows.firstIndex(where: { $0.id == id }), from != target,
+              model.windows.indices.contains(target) else { return false }
+        // Dropped among the pins, it's pinned; among the rest, unpinned.
+        let w = model.windows[from], onto = model.windows[target]
+        if w.pinned != onto.pinned { model.pinTab(w, onto.pinned) }
         model.moveWindow(id, to: target)
         return true
     }
@@ -104,6 +111,10 @@ struct TabRow: View {
                     badge: blocked ? "blocked" : nil)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
+                    if window.pinned {
+                        Image(systemName: "pin.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(s.accent.swiftUI)
+                            .accessibilityLabel("Pinned")
+                    }
                     Text(sum.title).font(.system(size: 12.5, weight: active ? .semibold : .medium))
                         .foregroundStyle(s.text.swiftUI.opacity(active ? 1 : 0.86)).lineLimit(1)
                     Spacer(minLength: 4)
@@ -132,6 +143,9 @@ struct TabRow: View {
         .contentShape(Rectangle())
         .onTapGesture { model.selectWindow(index: index) }
         .onHover { hover = $0 }
+        .contextMenu {
+            Button(window.pinned ? "Unpin Tab" : "Pin Tab") { model.pinTab(window, !window.pinned) }
+        }
         .help(info?.shortDir ?? "")
     }
 }

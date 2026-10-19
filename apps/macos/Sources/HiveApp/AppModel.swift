@@ -68,6 +68,8 @@ struct WindowInfo: Identifiable, Equatable {
     var layout: Layout?
     var focused: String?
     var zoomed: Bool
+    /// Pinned: first in every client's tabs.
+    var pinned = false
 
     /// A tab's title: its label, else its focused block's.
     func titleParts(_ blocks: [String: BlockInfo]) -> (primary: String, secondary: String) {
@@ -543,7 +545,7 @@ final class AppModel: ObservableObject {
             activeWindow = j["active_window_id"].string
             windows = j["windows"].array.map { w in
                 WindowInfo(id: w["window_id"].string ?? "", label: w["label"].string ?? "", layout: Layout(w["layout"]),
-                           focused: w["focused_block_id"].string, zoomed: w["zoomed"].bool ?? false)
+                           focused: w["focused_block_id"].string, zoomed: w["zoomed"].bool ?? false, pinned: w["pinned"].bool ?? false)
             }
             var info: [String: BlockInfo] = [:]
             for (bid, b) in j["blocks"].object {
@@ -638,6 +640,10 @@ final class AppModel: ObservableObject {
         switch ev["type"].string {
         case "session_created", "session_destroyed":
             reloadSessions(h)
+        case "client_left", "client_joined":
+            // The holder of a pane's size may have gone: its panes are free
+            // again, and the reload takes them up here.
+            if here { scheduleReload() }
         case "session_event":
             if ev["payload"]["event"]["payload"]["name"].string == "child_exited", here { scheduleReload() }
             // Session IDs are unique across hosts, but only this host's
@@ -708,6 +714,17 @@ final class AppModel: ObservableObject {
             self.reloadSessions(h)
             self.select(session: j["session_id"].string)
         }
+    }
+
+    /// Tabs as shown: pinned first, then the rest, each in the session's
+    /// order. index is the place shown: ⌘1–9 and next/previous follow it.
+    var shownWindows: [(index: Int, window: WindowInfo)] {
+        TabOrder.shown(pinned: windows.map(\.pinned)).enumerated().map { (index: $0.offset, window: windows[$0.element]) }
+    }
+
+    /// Pins or unpins a tab, for every client (session.pin_window).
+    func pinTab(_ w: WindowInfo, _ pinned: Bool) {
+        call("session.pin_window", ["session_id": sid, "window_id": .string(w.id), "pinned": .bool(pinned)])
     }
 
     func renameTab(_ label: String) {
@@ -879,13 +896,20 @@ final class AppModel: ObservableObject {
         call("session.resize_pane", ["session_id": sid, "block_id": .string(b), "direction": .string(direction), "amount": 0.04])
     }
 
+    /// index: the tab's place as shown (pinned first).
     func selectWindow(index: Int) {
-        guard windows.indices.contains(index) else { return }
-        call("session.focus_window", ["session_id": sid, "window_id": .string(windows[index].id)])
+        let shown = shownWindows
+        guard shown.indices.contains(index) else { return }
+        call("session.focus_window", ["session_id": sid, "window_id": .string(shown[index].window.id)])
     }
 
     func selectWindow(offset: Int) {
-        call(offset > 0 ? "session.focus_next_window" : "session.focus_previous_window", ["session_id": sid])
+        let shown = shownWindows
+        guard !shown.isEmpty, let at = shown.firstIndex(where: { $0.window.id == active?.id }) else {
+            call(offset > 0 ? "session.focus_next_window" : "session.focus_previous_window", ["session_id": sid])
+            return
+        }
+        selectWindow(index: TabOrder.step(from: at, by: offset, count: shown.count))
     }
 
     func renameSession(_ label: String) { call("session.set_label", ["session_id": sid, "label": .string(label)]) }
@@ -915,8 +939,18 @@ final class AppModel: ObservableObject {
     /// no longer takes over.
     private func userActed() { restoreSession = nil }
 
+    /// Whether another device holds a pane's size.
+    func heldElsewhere(_ block: String) -> Bool {
+        guard let o = blocks[block]?.sizeOwner, !o.isEmpty, o != "cli" else { return false }
+        return o != clientID
+    }
+
+    /// The user typed, clicked or scrolled here: the panes take their size back (Panes.claimSizes).
+    var onUserInput: (() -> Void)?
+
     func key(_ k: KeyInput) {
         userActed()
+        onUserInput?()
         guard let b = focusedBlock else { return }
         let engine = engine
         vt.async { engine.key(block: b, k) }
@@ -924,6 +958,7 @@ final class AppModel: ObservableObject {
 
     func text(_ s: String) {
         userActed()
+        onUserInput?()
         guard let b = focusedBlock else { return }
         let engine = engine
         vt.async { engine.text(block: b, s) }
@@ -931,6 +966,7 @@ final class AppModel: ObservableObject {
 
     func paste(_ s: String) {
         userActed()
+        onUserInput?()
         guard let b = focusedBlock else { return }
         let engine = engine
         vt.async { engine.paste(block: b, s) }
@@ -1015,6 +1051,7 @@ final class AppModel: ObservableObject {
     func pointer(block: String, _ action: Mirror.PointerAction, button: Mirror.PointerButton?, mods: KeyMods,
                  x: Double, y: Double, geometry: PointerGeometry, col: Int, row: Int,
                  repeatInterval: TimeInterval, repeatDistance: Double) {
+        if action == .press { onUserInput?() }
         let engine = engine
         vt.async {
             engine.pointer(block: block, action, button: button, mods: mods, x: x, y: y, geometry: geometry,
@@ -1023,6 +1060,7 @@ final class AppModel: ObservableObject {
     }
 
     func wheel(block: String, rows: Int, shift: Bool, x: Double, y: Double, geometry: PointerGeometry) {
+        onUserInput?()
         let engine = engine
         vt.async { engine.wheel(block: block, rows: rows, shift: shift, x: x, y: y, geometry: geometry) }
     }
@@ -1032,13 +1070,15 @@ final class AppModel: ObservableObject {
         vt.async { engine.scroll(block: block, rows: rows) }
     }
 
-    /// Takes size authority for the visible panes at their pixel sizes. Done
-    /// on key focus and interaction, not mere visibility, so two clients
-    /// showing one session don't fight.
-    func claimSizes(_ sizes: [String: (cols: Int, rows: Int)], cellWidth: Int, cellHeight: Int) {
+    /// Takes size authority for the visible panes at their pixel sizes.
+    /// interactive: the user acted here (input, focus, the window); only then
+    /// is a pane another device holds taken back (SizeClaim).
+    func claimSizes(_ sizes: [String: (cols: Int, rows: Int)], cellWidth: Int, cellHeight: Int, interactive: Bool) {
         let client = client
         for (b, s) in sizes where s.cols > 1 && s.rows > 1 {
-            if let info = blocks[b], info.cols == s.cols, info.rows == s.rows, info.sizeOwner == clientID { continue }
+            let info = blocks[b]
+            guard SizeClaim.should(owner: info?.sizeOwner, me: clientID, interactive: interactive,
+                                   sameSize: info?.cols == s.cols && info?.rows == s.rows) else { continue }
             vt.async {
                 client.resize(block: b, cols: UInt16(s.cols), rows: UInt16(s.rows),
                               cellWidth: UInt16(cellWidth), cellHeight: UInt16(cellHeight), take: true)

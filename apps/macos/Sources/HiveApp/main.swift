@@ -51,6 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let shortcuts = ShortcutsPanel()
     let settingsWindow = SettingsWindow()
     let shareHostsWindow = ShareHostsWindow()
+    #if DEBUG
+    var debugSignal: DispatchSourceSignal?
+    #endif
     var bag: Set<AnyCancellable> = []
     var appearanceObserver: NSKeyValueObservation?
     var appearanceItems: [(Appearance, NSMenuItem)] = []
@@ -127,7 +130,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.contextActions = { [weak self] in self?.paneContextActions() ?? [] }
         model.onLayout = { [weak self] in
             self?.panes.sync()
-            self?.panes.claimSizes()
+            self?.panes.claimSizes()  // not interactive: a reload doesn't take another device's panes
+        }
+        // Only when another device holds a pane on screen: otherwise there's nothing to take back.
+        model.onUserInput = { [weak self] in
+            guard let self, self.model.visibleBlocks.contains(where: { self.model.heldElsewhere($0.0) }) else { return }
+            self.panes.claimSizes(interactive: true)
         }
         model.$style.sink { [weak self] s in self?.applyStyle(s) }.store(in: &bag)
         model.$sidebar.dropFirst().sink { [weak self] _ in
@@ -135,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self?.root.needsLayout = true
                 self?.root.layoutSubtreeIfNeeded()
                 self?.panes.sync()
-                self?.panes.claimSizes()
+                self?.panes.claimSizes(interactive: true)  // the user toggled the sidebar
             }
         }.store(in: &bag)
         buildMenu()
@@ -148,6 +156,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         model.start()
         NSApp.activate(ignoringOtherApps: true)
+        #if DEBUG
+        // For the e2e: SIGUSR1 stands in for "you typed in a pane here" (the
+        // size goes to the device in use). Debug builds only.
+        signal(SIGUSR1, SIG_IGN)
+        let usr1 = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
+        usr1.setEventHandler { [weak self] in self?.panes.claimSizes(force: true, interactive: true) }
+        usr1.resume()
+        debugSignal = usr1
+        #endif
         #if DEBUG
         // For the screenshot loop: open an overlay once connected. Debug
         // builds only: one of these logs selected terminal text.
@@ -236,7 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) {
         model.markSeen()
-        panes.claimSizes()
+        panes.claimSizes(interactive: true)  // back to this window: its panes are yours again
         panes.sync()
     }
 

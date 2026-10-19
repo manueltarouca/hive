@@ -19,6 +19,10 @@ swift build -c "$config" --product Hive
 bin="$(swift build -c "$config" --show-bin-path)"
 
 app="${HIVE_BUNDLE_OUT:-$here/build}/Hive.app"
+# A test bundle (HIVE_BUNDLE_OUT) gets its own ID, so scripts can address it
+# (activate, quit) without touching the Hive.app you use.
+bundle_id=xyz.matm.hive
+[ -n "${HIVE_BUNDLE_OUT:-}" ] && bundle_id=xyz.matm.hive.dev
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin/Hive" "$app/Contents/MacOS/Hive"
@@ -43,7 +47,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleIdentifier</key><string>xyz.matm.hive</string>
+  <key>CFBundleIdentifier</key><string>$bundle_id</string>
   <key>CFBundleName</key><string>Hive</string>
   <key>CFBundleDisplayName</key><string>Hive</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>

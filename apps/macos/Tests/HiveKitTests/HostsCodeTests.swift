@@ -20,4 +20,14 @@ final class HostsCodeTests: XCTestCase {
         // A plain listener is no address for a phone: anyone could pose as it.
         XCTAssertEqual(HostsCode.thisMac(listeners: [("plain", "0.0.0.0:9000")], tailscaleURLs: []), nil)
     }
+
+    /// This Mac goes in the code under its own name: never "-2" for clashing
+    /// with itself, only with a saved host of the same label.
+    func testThisMacsLabel() {
+        XCTAssertEqual(HostsCode.label(forThisMac: "studio", saved: []), "studio")
+        XCTAssertEqual(HostsCode.label(forThisMac: "Studio.local", saved: ["hive-vm"]), "studio")
+        XCTAssertEqual(HostsCode.label(forThisMac: "studio", saved: ["studio"]), "studio-mac")
+        XCTAssertEqual(HostsCode.label(forThisMac: "", saved: []), "mac")
+        XCTAssertEqual(HostsCode.label(forThisMac: "studio", saved: ["studio", "studio-mac"]), "studio-mac-2")
+    }
 }

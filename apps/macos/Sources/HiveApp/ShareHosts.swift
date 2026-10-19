@@ -15,7 +15,8 @@ final class ShareHostsWindow {
         let local = model.host(id: HostConnection.localID)
         let saved = model.hostsPath.map(AppModel.readHosts) ?? []
         let content = { (thisMac: String?, hostname: String) in
-            ShareHostsView(saved: saved.map { ($0.label, $0.address) }, thisMac: thisMac.map { (model.newHostLabel(for: hostname), $0) })
+            ShareHostsView(saved: saved.map { ($0.label, $0.address) },
+                           thisMac: thisMac.map { (HostsCode.label(forThisMac: hostname, saved: saved.map(\.label)), $0) })
         }
         let present = { (view: ShareHostsView) in
             if let w = self.window {

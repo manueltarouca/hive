@@ -90,6 +90,10 @@ shows the agent's task and what it is doing:
 - **Blocked:** a Blocked badge, and the reason it is waiting.
 - **Done:** a green hexagon, until you look at the tab.
 
+Right-click a tab for **Pin Tab**: pinned tabs come first, in the title bar,
+the sidebar and on the phone, and ⌘1…⌘9 count them first. Drag a tab among
+the pinned ones to pin it, or out of them to unpin it.
+
 Drag a tab to move it. When an agent in another session needs you, the
 session name in the title bar shows a count, and the session picker (⌘K)
 says which session.
@@ -138,6 +142,8 @@ while you drag.
 
 ## Size
 
-A program's terminal has one size, even when several clients show it. The app
-takes the size when you focus its window or click into a pane. Another
-client showing the same pane sees it at that size.
+A program's terminal has one size, even when several clients show it: the
+size of the device you use. The app takes it when you bring its window to
+the front, resize it, or type, click or scroll in a pane. It doesn't take it
+back on its own while another device, such as your phone, has the pane
+fitted to it. Another client showing the same pane sees it at that size.

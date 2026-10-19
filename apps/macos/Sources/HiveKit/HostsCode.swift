@@ -27,4 +27,18 @@ public enum HostsCode {
         guard let l = listeners.first(where: { $0.kind == "tailnet" }) else { return nil }
         return "http://" + l.addr
     }
+
+    /// This Mac's label in the code: its own name (the hostname's first part,
+    /// as a label allows), and "-mac" only if a saved host already has it.
+    public static func label(forThisMac hostname: String, saved: [String]) -> String {
+        let first = hostname.split(separator: ".").first.map(String.init) ?? ""
+        var base = String(first.lowercased().map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "-" })
+        while base.hasPrefix("-") { base.removeFirst() }
+        if base.isEmpty { base = "mac" }
+        let taken = Set(saved.map { $0.lowercased() })
+        guard taken.contains(base) else { return base }
+        var label = base + "-mac", n = 2
+        while taken.contains(label) { label = "\(base)-mac-\(n)"; n += 1 }
+        return label
+    }
 }

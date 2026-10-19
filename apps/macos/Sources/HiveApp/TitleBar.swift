@@ -128,8 +128,9 @@ struct Tabs: View {
         // Pills share the room between the chip and the buttons: they shrink
         // (their titles fade) rather than push the chip or the buttons out.
         HStack(spacing: 4) {
-            ForEach(Array(model.windows.enumerated()), id: \.element.id) { i, w in
-                TabPill(model: model, window: w, index: i, active: w.id == model.active?.id)
+            // Pinned tabs first, as on the phone.
+            ForEach(model.shownWindows, id: \.window.id) { t in
+                TabPill(model: model, window: t.window, index: t.index, active: t.window.id == model.active?.id)
             }
         }
         .frame(minWidth: 0, alignment: .leading)
@@ -151,6 +152,10 @@ struct TabPill: View {
         let parts = window.titleParts(model.blocks)
         let status = model.status(of: window)
         HStack(spacing: 7) {
+            if window.pinned {
+                Image(systemName: "pin.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(s.accent.swiftUI)
+                    .accessibilityLabel("Pinned")
+            }
             ProgramTile(program: model.program(of: window), size: 18, behind: model.otherPrograms(of: window))
                 .opacity(active ? 1 : 0.85)
             let name = Text(parts.primary).foregroundColor(active ? s.text.swiftUI : s.secondary.swiftUI)
@@ -183,6 +188,9 @@ struct TabPill: View {
         .contentShape(Rectangle())
         .onTapGesture { model.selectWindow(index: index) }
         .onHover { hover = $0 }
+        .contextMenu {
+            Button(window.pinned ? "Unpin Tab" : "Pin Tab") { model.pinTab(window, !window.pinned) }
+        }
         .help("Tab \(index + 1) (⌘\(index + 1))")
     }
 }
