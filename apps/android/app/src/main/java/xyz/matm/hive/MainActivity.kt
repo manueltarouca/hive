@@ -26,10 +26,13 @@ sealed class Screen {
     class Offer(val hosts: List<Offered>) : Screen()
     object Scan : Screen()
     object Settings : Screen()
+    object Hosts : Screen()
 }
 
 class MainActivity : ComponentActivity() {
     private var screen by mutableStateOf<Screen>(Screen.Desk)
+    /** Where the scanner goes back to: the screen it was opened from. */
+    private var scanBack: Screen = Screen.AddHost
     private val model get() = (application as HiveApp).model
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,25 +54,31 @@ class MainActivity : ComponentActivity() {
                     Screen.Desk -> Desk(model, openSwitcher = { screen = if (model.hosts.isEmpty()) Screen.AddHost else Screen.Switcher }, openLink = ::open)
                     Screen.Switcher -> {
                         BackHandler { screen = Screen.Desk }
-                        Switcher(model, close = { screen = Screen.Desk }, addHost = { screen = Screen.AddHost }, settings = { screen = Screen.Settings })
+                        Switcher(model, close = { screen = Screen.Desk }, addHost = { screen = Screen.AddHost }, settings = { screen = Screen.Settings },
+                            hosts = { screen = Screen.Hosts })
                     }
                     Screen.Settings -> {
                         BackHandler { screen = Screen.Switcher }
-                        xyz.matm.hive.ui.Settings(model, close = { screen = Screen.Switcher }, addHost = { screen = Screen.AddHost })
+                        xyz.matm.hive.ui.Settings(model, close = { screen = Screen.Switcher })
+                    }
+                    Screen.Hosts -> {
+                        BackHandler { screen = Screen.Switcher }
+                        xyz.matm.hive.ui.HostsScreen(model, close = { screen = Screen.Switcher }, addHost = { screen = Screen.AddHost },
+                            scan = { scanBack = Screen.Hosts; screen = Screen.Scan })
                     }
                     Screen.AddHost -> {
                         BackHandler(model.hosts.isNotEmpty()) { screen = Screen.Switcher }
                         AddHost(model, close = { screen = if (model.hosts.isEmpty()) Screen.AddHost else Screen.Switcher },
-                            scan = { screen = Screen.Scan }, offer = { screen = Screen.Offer(it) }, done = { screen = Screen.Desk })
+                            scan = { scanBack = Screen.AddHost; screen = Screen.Scan }, offer = { screen = Screen.Offer(it) }, done = { screen = Screen.Desk })
                     }
                     is Screen.Offer -> {
                         BackHandler { screen = Screen.AddHost }
                         Offer(model, s.hosts, close = { screen = Screen.AddHost }, done = { screen = Screen.Switcher })
                     }
                     Screen.Scan -> {
-                        BackHandler { screen = Screen.AddHost }
-                        xyz.matm.hive.ui.Scanner(close = { screen = Screen.AddHost }) { code ->
-                            screen = HostsCode.decode(code)?.let { Screen.Offer(it) } ?: Screen.AddHost
+                        BackHandler { screen = scanBack }
+                        xyz.matm.hive.ui.Scanner(close = { screen = scanBack }) { code ->
+                            screen = HostsCode.decode(code)?.let { Screen.Offer(it) } ?: scanBack
                         }
                     }
                 }
@@ -119,7 +128,8 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         model.paused()
-        // Still visible here, so the service may start: it keeps connected hosts' agents notifying.
-        if (model.hosts.any { it.connected || it.host.always }) xyz.matm.hive.notify.ConnectionService.start(this)
+        // Still visible here, so the service may start: it keeps hosts set to stay connected (and only
+        // those) running in the background, for their agents' notifications. On-demand hosts let go.
+        if (model.hosts.any { it.host.always && it.link != xyz.matm.hive.model.Link.Idle }) xyz.matm.hive.notify.ConnectionService.start(this)
     }
 }

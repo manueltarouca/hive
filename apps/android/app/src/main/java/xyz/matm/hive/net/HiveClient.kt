@@ -133,9 +133,12 @@ class HiveClient(val endpoint: Endpoint, private val main: Executor) {
         send(JSONObject().put("type", "key").put("block_id", block).put("key", name))
     }
 
-    fun resize(block: String, cols: Int, rows: Int, cellWidth: Int, cellHeight: Int, take: Boolean) {
-        send(JSONObject().put("type", "resize").put("block_id", block).put("cols", cols).put("rows", rows)
-            .put("cell_width_px", cellWidth).put("cell_height_px", cellHeight).put("take", take))
+    /** release: set the size and give the claim up (servers before it ignore it, and keep the claim). */
+    fun resize(block: String, cols: Int, rows: Int, cellWidth: Int, cellHeight: Int, take: Boolean, release: Boolean = false) {
+        val m = JSONObject().put("type", "resize").put("block_id", block).put("cols", cols).put("rows", rows)
+            .put("cell_width_px", cellWidth).put("cell_height_px", cellHeight).put("take", take)
+        if (release) m.put("release", true)
+        send(m)
     }
 
     private fun handleText(j: JSONObject) {

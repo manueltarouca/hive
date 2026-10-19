@@ -16,7 +16,7 @@ import xyz.matm.hive.vt.Frame
 import java.io.File
 
 /** A window's panes, in layout order. */
-data class WindowInfo(val id: String, val label: String, val blocks: List<String>, val focused: String?)
+data class WindowInfo(val id: String, val label: String, val blocks: List<String>, val focused: String?, val pinned: Boolean = false)
 
 /** A pane, from session.view. */
 data class BlockInfo(
@@ -28,6 +28,8 @@ data class BlockInfo(
     val harness: String?,
     val agentState: String?,
     val label: String = "",
+    /** The client holding its size (server's size_owner); "" for nobody. */
+    val sizeOwner: String = "",
 ) {
     /** The agent if one reports from here, else the program in front (Programs.shown, as on the Mac). */
     val program: xyz.matm.hive.agents.Program get() = xyz.matm.hive.agents.Programs.shown(harness, foreground.ifEmpty { null })
@@ -162,6 +164,9 @@ class AppModel(private val context: Context) : HostConnection.Listener {
     }
 
     fun removeHost(h: HostConnection) {
+        identities.remove(h.id)
+        saveIdentities()
+        letGone.remove(h)
         h.stop()
         if (current === h) { detach(); current = null; currentSession = null; windows = emptyList() }
         hosts = hosts.filterNot { it === h }
@@ -301,6 +306,61 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         return seen.take(2)
     }
 
+    /** The state that matters most among a tab's agents: blocked, working, done; or null. */
+    fun tabState(w: WindowInfo): String? {
+        // The live agents first (agent_changed), as the Mac's summary; the view's state until they're read.
+        val live = current?.agents.orEmpty().associateBy { it.blockID }
+        val states = w.blocks.map { b -> live[b]?.state ?: blocks[b]?.agentState }
+        return listOf("blocked", "working", "done").firstOrNull { it in states }
+    }
+
+    fun tabs(): List<TabGroups.Tab> = windows.mapIndexed { i, w -> TabGroups.Tab(i, w.pinned, tabState(w)) }
+
+    /** Pins or unpins a tab, for every client: pinned tabs come first, here and on the Mac. */
+    fun pinTab(w: WindowInfo, pinned: Boolean) {
+        val h = current ?: return
+        val sid = currentSession ?: return
+        // Show it at once; the server's window_pinned event confirms it.
+        windows = windows.map { if (it.id == w.id) it.copy(pinned = pinned) else it }
+        h.call("session.pin_window", JSONObject().put("session_id", sid).put("window_id", w.id).put("pinned", pinned)) { r ->
+            r.onFailure {
+                scheduleReload()
+                android.widget.Toast.makeText(context, "Couldn't pin the tab. Pins need a newer hive on ${h.name}.", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun renameTab(w: WindowInfo, label: String) {
+        val h = current ?: return
+        val sid = currentSession ?: return
+        h.call("session.set_window_label", JSONObject().put("session_id", sid).put("window_id", w.id).put("label", label.trim())) { scheduleReload() }
+    }
+
+    /** Closes a tab and ends what runs in it. */
+    fun closeTab(w: WindowInfo) {
+        val h = current ?: return
+        val sid = currentSession ?: return
+        h.call("session.close_window", JSONObject().put("session_id", sid).put("window_id", w.id)) { scheduleReload() }
+    }
+
+    /** The tab sheet's cards: each tab's last two lines, by window. */
+    var previews by mutableStateOf<Map<String, List<String>>>(emptyMap())
+        private set
+
+    /** Reads every tab's last lines (terminal.format's tail); a server without it gives an agent's message, or nothing. */
+    fun loadPreviews() {
+        val h = current ?: return
+        for (w in windows) {
+            val b = w.focused ?: w.blocks.firstOrNull() ?: continue
+            h.call("hive.terminal.format", JSONObject().put("block_id", b).put("args", JSONObject().put("trim", true).put("tail", 2))) { r ->
+                val lines = r.getOrNull()?.optString("content")?.split('\n')?.filter { it.isNotBlank() }
+                    ?: h.agents.firstOrNull { it.blockID == b }?.message?.takeIf { it.isNotBlank() }?.let { listOf(it) }
+                    ?: return@call
+                previews = previews + (w.id to lines)
+            }
+        }
+    }
+
     /** A tab's title: its label, else its focused pane's. */
     fun titleParts(w: WindowInfo): Pair<String, String> =
         if (w.label.isNotEmpty()) w.label to "" else (blocks[w.focused ?: ""] ?: w.blocks.firstNotNullOfOrNull { blocks[it] })?.titleParts ?: ("shell" to "")
@@ -374,6 +434,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
     private fun reloadView(focusServer: Boolean = false) {
         val h = current ?: return
         val sid = currentSession ?: return
+        refreshClients(h)
         h.call("session.view", JSONObject().put("session_id", sid)) { r ->
             if (current !== h || currentSession != sid) return@call
             r.onFailure { if ((it as? xyz.matm.hive.net.HiveError)?.code == "not_found") reloadSessions(h) }
@@ -383,7 +444,8 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                 val ws = j.optJSONArray("windows") ?: JSONArray()
                 val newWindows = (0 until ws.length()).map { i ->
                     val w = ws.getJSONObject(i)
-                    WindowInfo(w.optString("window_id"), w.optString("label"), layoutBlocks(w.optJSONObject("layout")), w.optString("focused_block_id").ifEmpty { null })
+                    WindowInfo(w.optString("window_id"), w.optString("label"), layoutBlocks(w.optJSONObject("layout")), w.optString("focused_block_id").ifEmpty { null },
+                        w.optBoolean("pinned"))
                 }
                 val bj = j.optJSONObject("blocks") ?: JSONObject()
                 val agentsByBlock = h.agents.associateBy { it.blockID }
@@ -400,12 +462,13 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                     val live = agentsByBlock[id]
                     val harness = live?.harness ?: agent?.optString("harness")?.takeIf { it.isNotEmpty() && st != "ended" }
                     newBlocks[id] = BlockInfo(id, b.optString("title"), cwd, fg.optString("program").ifEmpty { fg.optString("name") },
-                        harness, live?.state ?: st.takeIf { it.isNotEmpty() && it != "ended" }, b.optString("label"))
+                        harness, live?.state ?: st.takeIf { it.isNotEmpty() && it != "ended" }, b.optString("label"), b.optString("size_owner"))
                 }
                 val keepWindow = windows.getOrNull(windowIndex)?.id
                 val keepBlock = visibleBlock
                 windows = newWindows
                 blocks = newBlocks
+                previews = previews.filterKeys { k -> newWindows.any { it.id == k } }
                 val wi = if (focusServer || keepWindow == null) newWindows.indexOfFirst { it.id == active }
                 else newWindows.indexOfFirst { it.id == keepWindow }.takeIf { it >= 0 } ?: newWindows.indexOfFirst { it.id == active }
                 val pending = (pendingWindow?.let { id -> newWindows.indexOfFirst { it.id == id } }
@@ -487,6 +550,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         // The size to give back with Mac size: the pane's own, before the phone took it.
         if (!fitted && s.cols > 0) {
             macSize = Triple(s.blockID, intArrayOf(s.cols, s.rows), intArrayOf(s.cellWidth.takeIf { it > 0 } ?: cellWidth, s.cellHeight.takeIf { it > 0 } ?: cellHeight))
+            previousHolder = blocks[s.blockID]?.sizeOwner?.takeIf { it.isNotEmpty() && it != current?.client?.clientID }
         }
         fitSize = intArrayOf(cols, rows, cellWidth, cellHeight)
         asked.addLast(cols to rows)
@@ -497,6 +561,9 @@ class AppModel(private val context: Context) : HostConnection.Listener {
     }
 
     private var macSize: Triple<String, IntArray, IntArray>? = null
+    /** Who held the pane before Fit to phone: the button gives it back to them. */
+    var previousHolder by mutableStateOf<String?>(null)
+        private set
     /** The sizes the phone asked for lately. */
     private val asked = ArrayDeque<Pair<Int, Int>>()
 
@@ -508,7 +575,8 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         val s = stream
         val m = macSize
         macSize = null
-        if (s != null && m != null && m.first == s.blockID) s.client.resize(s.blockID, m.second[0], m.second[1], m.third[0], m.third[1], take = true)
+        // The size it had, and nobody holding it: the device you use picks it up again.
+        if (s != null && m != null && m.first == s.blockID) s.client.resize(s.blockID, m.second[0], m.second[1], m.third[0], m.third[1], take = true, release = true)
     }
 
     /** The phone's size changed (rotation, the keyboard): a fitted pane follows. */
@@ -539,8 +607,23 @@ class AppModel(private val context: Context) : HostConnection.Listener {
      */
     fun answerRemotely(hostID: String, blockID: String, key: String?, text: String?, described: String, finished: (Boolean) -> Unit) {
         var answered = false
-        val done = { ok: Boolean -> if (!answered) { answered = true; finished(ok) } }
-        val h = hosts.firstOrNull { it.id == hostID } ?: return done(false)
+        // While answering, nothing lets go; after, as before (the grace again when hive is away).
+        main.removeCallbacks(letGo)
+        val h = hosts.firstOrNull { it.id == hostID }
+        // Disconnected by hand: connected for the answer only, then let go again.
+        val wasIdle = h?.link == Link.Idle
+        val done = { ok: Boolean ->
+            if (!answered) {
+                answered = true
+                if (!foreground) { main.postDelayed(letGo, LET_GO_MS); hosts.forEach { it.background = true } }
+                // After a typed reply's own delays (escape, text, return).
+                if (wasIdle && h != null) main.postDelayed({ if (h.link != Link.Idle && current !== h) disconnect(h) }, 1500)
+                finished(ok)
+            }
+        }
+        // A server that takes the call and never answers: say so, and let go as usual.
+        main.postDelayed({ done(false) }, 10_500)
+        h ?: return done(false)
         fun go() {
             h.call("agent.list") { r ->
                 val arr = r.getOrNull()?.optJSONArray("agents") ?: return@call done(false)
@@ -567,15 +650,113 @@ class AppModel(private val context: Context) : HostConnection.Listener {
             }
         }
         if (h.connected) go() else {
+            // Now, not on the background schedule: someone is waiting on this answer.
+            h.background = false
             h.start()
+            h.retryNow()
             whenConnected(h, tries = 25) { go() } // about 10 s, then it says it couldn't
-            main.postDelayed({ if (!h.connected) done(false) }, 10_500)
         }
     }
 
     // MARK: HostConnection.Listener
 
+    // MARK: who holds a pane's size
+
+    /** A client of a server, from client.list. */
+    data class Client(val id: String, val name: String, val platform: String, val principal: String)
+
+    /** The current host's clients, for naming who holds a pane's size. */
+    var clients by mutableStateOf<Map<String, Client>>(emptyMap())
+        private set
+
+    private fun refreshClients(h: HostConnection) {
+        h.call("client.list") { r ->
+            val arr = r.getOrNull()?.optJSONArray("clients") ?: return@call
+            if (current !== h) return@call
+            clients = (0 until arr.length()).map { arr.getJSONObject(it) }.associate { c ->
+                c.optString("client_id") to Client(c.optString("client_id"), c.optString("name"), c.optString("platform"), c.optString("principal"))
+            }
+        }
+    }
+
+    /**
+     * Who holds a pane's size, as people say it: "this phone", "Hive.app on
+     * studio" (an app on the server's own machine), a phone by its name, "the
+     * CLI", or null when nobody does.
+     */
+    fun sizeHolder(owner: String): String? {
+        val h = current ?: return null
+        if (owner.isEmpty()) return null
+        if (owner == h.client?.clientID) return "this phone"
+        if (owner == "cli") return "the CLI"
+        val c = clients[owner] ?: return "another device"
+        return when {
+            c.principal.startsWith("peer:") && h.serverHostname.isNotEmpty() -> "${c.name} on ${h.serverHostname}"
+            else -> c.name.ifEmpty { "another device" }
+        }
+    }
+
+    /** The holder's short name for "Back to …": the machine for an app on the server's own machine. */
+    fun sizeHolderShort(owner: String): String? {
+        val h = current ?: return null
+        val c = clients[owner] ?: return null
+        return if (c.principal.startsWith("peer:") && h.serverHostname.isNotEmpty()) h.serverHostname else c.name.ifEmpty { null }
+    }
+
+    // MARK: which server is which
+
+    /** Each saved host's server, as it says who it is (server.version: its hostname and state directory). */
+    private val identities: MutableMap<String, String> = runCatching {
+        val j = JSONObject(prefs.getString("identities", "{}") ?: "{}")
+        j.keys().asSequence().associateWith { j.getString(it) }.toMutableMap()
+    }.getOrDefault(HashMap())
+
+    private fun saveIdentities() = prefs.edit().putString("identities", JSONObject(identities as Map<*, *>).toString()).apply()
+
+    /** Who a server is: its Tailscale name when it has one (unique on the tailnet), else its machine and state directory. */
+    private fun identityOf(v: JSONObject): String? = Hosts.identity(v)
+
+    private fun remember(h: HostConnection) {
+        h.call("server.version") { r ->
+            r.getOrNull()?.optString("hostname")?.let { h.serverHostname = it }
+            val id = r.getOrNull()?.let(::identityOf) ?: return@call
+            identities[h.host.label.lowercase()] = id
+            saveIdentities()
+        }
+    }
+
+    /**
+     * The saved host an address reaches, if any: the same address, or a
+     * server that says it's the same one (your Mac by name and by its
+     * tailnet IP). [done] gets its name, or null; on the main thread.
+     */
+    fun sameServer(address: String, done: (String?) -> Unit) {
+        hosts.firstOrNull { it.host.address.equals(address, true) }?.let { return done(it.name) }
+        val candidates = xyz.matm.hive.net.Endpoint.candidates(address)
+        fun attempt(i: Int) {
+            if (i >= candidates.size) return done(null)
+            val c = xyz.matm.hive.net.HiveClient(candidates[i], main::post)
+            var answered = false
+            val give = Runnable { if (!answered) { answered = true; c.close(); attempt(i + 1) } }
+            main.postDelayed(give, 4000)
+            c.connect(HostConnection.clientName, HostConnection.VERSION) { r ->
+                if (r.isFailure) { if (!answered) { answered = true; main.removeCallbacks(give); attempt(i + 1) }; return@connect }
+                if (answered) { c.close(); return@connect }
+                c.call("server.version") { v ->
+                    if (answered) return@call
+                    answered = true
+                    main.removeCallbacks(give)
+                    c.close()
+                    val id = v.getOrNull()?.let(::identityOf)
+                    done(id?.let { x -> hosts.firstOrNull { identities[it.host.label.lowercase()] == x }?.name })
+                }
+            }
+        }
+        attempt(0)
+    }
+
     override fun connected(h: HostConnection) {
+        remember(h)
         reloadSessions(h)
         if (current === h && currentSession != null) reloadView(focusServer = stream == null && windows.isEmpty())
     }
@@ -596,6 +777,8 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         val here = h === current
         when (ev.optString("type")) {
             "session_created", "session_destroyed" -> reloadSessions(h)
+            // The holder of a pane's size may have gone: "Sized by" follows.
+            "client_left", "client_joined" -> if (here && currentSession != null) scheduleReload()
             "session_event" -> {
                 val payload = ev.optJSONObject("payload") ?: return
                 val sid = if (here) payload.optString("session_id") else null
@@ -612,16 +795,66 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         }
     }
 
-    /** The app is back on screen: reconnect at once instead of waiting out the backoff. */
+    /** Hosts let go while hive was away, to connect again when it's back. */
+    private val letGone = LinkedHashSet<HostConnection>()
+
+    /**
+     * On demand means while you use it: 30 s after hive leaves the screen
+     * (time to switch apps and back), on-demand hosts let go and nothing
+     * runs in the background. Hosts set to stay connected keep going.
+     */
+    private val letGo = Runnable { for (h in hosts) if (!h.host.always) release(h) }
+
+    private fun release(h: HostConnection) {
+        if (h.link == Link.Idle) return
+        letGone += h
+        if (current === h) detach()
+        h.stop()
+    }
+
+    /** Lets go of one host (Hosts screen): until you pick it, or connect it, again. */
+    fun disconnect(h: HostConnection) {
+        letGone.remove(h)
+        if (current === h) detach()
+        h.stop()
+    }
+
+    /** A new label for a host: its address and choice stay; the session to come back to follows it. */
+    fun renameHost(h: HostConnection, label: String) {
+        if (Hosts.checkLabel(label) != null || hosts.any { it !== h && it.host.label.equals(label, true) }) return
+        val oldId = h.id
+        identities.remove(oldId)?.let { identities[label.lowercase()] = it; saveIdentities() }
+        // Notifications already posted name the host by its old label: they'd answer nowhere.
+        val nm = context.getSystemService(android.app.NotificationManager::class.java)
+        for (a in h.agents) nm?.cancel(Notifier.id(oldId, a.blockID))
+        h.host = h.host.copy(label = label)
+        persist(hosts.map { it.host })
+        if (prefs.getString("lastSessionHost", null) == oldId) prefs.edit().putString("lastSessionHost", h.id).apply()
+        hosts = hosts.toList()
+    }
+
+    /** Everything lets go now (the ongoing notification's Disconnect, Settings): until hive is opened again. */
+    fun disconnectAll() { for (h in hosts) release(h) }
+
+    /** The app is back on screen: hosts it let go connect again, and those away retry at once. */
     fun resumed() {
         foreground = true
+        main.removeCallbacks(letGo)
+        for (h in letGone) h.start()
+        letGone.clear()
         for (h in hosts) { h.background = false; h.retryNow() }
     }
 
-    /** Leaving: hosts that are away retry less often, to spare the battery. */
+    /** Leaving: hosts away retry less often; on-demand ones let go after a grace. */
     fun paused() {
         foreground = false
         for (h in hosts) h.background = true
+        main.removeCallbacks(letGo)
+        main.postDelayed(letGo, LET_GO_MS)
+    }
+
+    companion object {
+        const val LET_GO_MS = 30_000L
     }
 
     /** The agents of every host, blocked first. */

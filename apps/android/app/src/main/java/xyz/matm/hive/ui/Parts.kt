@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -60,7 +62,7 @@ fun FadeText(text: String, style: TextStyle, color: Color, modifier: Modifier = 
 
 /** A round pill button: honey-filled when primary, quiet otherwise. */
 @Composable
-fun Pill(text: String, primary: Boolean = false, modifier: Modifier = Modifier, selected: Boolean = false, onClick: () -> Unit) {
+fun Pill(text: String, primary: Boolean = false, modifier: Modifier = Modifier, selected: Boolean = false, danger: Boolean = false, onClick: () -> Unit) {
     val p = LocalPalette.current
     val shape = RoundedCornerShape(50)
     val bg = when {
@@ -83,12 +85,12 @@ fun Pill(text: String, primary: Boolean = false, modifier: Modifier = Modifier, 
             .semantics { this.selected = selected }
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
-        BasicText(text, style = Type.label.copy(color = if (primary) p.onHoney else p.text), maxLines = 1)
+        BasicText(text, style = Type.label.copy(color = if (primary) p.onHoney else if (danger) p.coral else p.text), maxLines = 1)
     }
 }
 
 /** Simple line icons, drawn so they take the palette's colors. */
-enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, Send, Back, Check, Link, Alert, Camera, Gear, Minus }
+enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, Send, Back, Check, Link, Alert, Camera, Gear, Minus, Pin, Search }
 
 @Composable
 fun LineIcon(icon: Icon, color: Color, size: Dp = 18.dp, modifier: Modifier = Modifier, description: String? = null) {
@@ -141,6 +143,18 @@ private fun DrawScope.drawIcon(icon: Icon, color: Color) {
             drawCircle(color, .27f * s, center, style = st)
         }
         Icon.Minus -> line(.2f, .5f, .8f, .5f)
+        Icon.Pin -> {
+            // A push pin, as the Mac's pin.fill: the head, the collar, the needle.
+            val head = Path().apply {
+                moveTo(.34f * s, .14f * s); lineTo(.66f * s, .14f * s); lineTo(.62f * s, .22f * s)
+                lineTo(.64f * s, .44f * s); lineTo(.76f * s, .56f * s); lineTo(.24f * s, .56f * s)
+                lineTo(.36f * s, .44f * s); lineTo(.38f * s, .22f * s); close()
+            }
+            drawPath(head, color)
+            drawPath(head, color, style = Stroke(width = st.width * 0.6f, join = StrokeJoin.Round))
+            line(.5f, .56f, .5f, .88f)
+        }
+        Icon.Search -> { drawCircle(color, .24f * s, Offset(.44f * s, .44f * s), style = st); line(.62f, .62f, .82f, .82f) }
         Icon.Alert -> { line(.5f, .2f, .5f, .6f); drawCircle(color, .05f * s, Offset(.5f * s, .78f * s)) }
         Icon.Camera -> {
             drawRoundRect(color, Offset(.12f * s, .3f * s), androidx.compose.ui.geometry.Size(.76f * s, .5f * s),

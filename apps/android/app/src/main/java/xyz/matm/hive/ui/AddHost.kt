@@ -119,7 +119,7 @@ fun AddHost(model: AppModel, close: () -> Unit, scan: () -> Unit, offer: (List<O
                 }
             }
             Spacer(Modifier.height(14.dp))
-            BasicText("A hive server on your tailnet. The phone reaches it through the Tailscale app, as your Mac does.",
+            BasicText("A hive server on your tailnet. The phone reaches it through the Tailscale app, as your computer does.",
                 style = Type.small.copy(color = p.muted))
 
             Spacer(Modifier.height(28.dp))
@@ -154,6 +154,21 @@ fun Offer(model: AppModel, offered: List<Offered>, close: () -> Unit, done: () -
     var picked by remember(offered) {
         mutableStateOf(offered.filter { o -> o.inTailnet && existing[o.host.label.lowercase()].let { it == null || it == o.host.address } }.map { it.host.label }.toSet())
     }
+    // Each new one asked who it is: a server you already have, by another address or name, starts unchecked too.
+    var same by remember(offered) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var touched by remember(offered) { mutableStateOf(emptySet<String>()) }
+    LaunchedEffect(offered) {
+        // Only addresses on the tailnet, or on a machine you already connect to, are asked: a code
+        // can name any address, and asking is connecting.
+        val known = model.hosts.mapNotNull { xyz.matm.hive.net.Endpoint.candidates(it.host.address).firstOrNull()?.host?.lowercase() }.toSet()
+        fun askable(o: Offered) = o.inTailnet || xyz.matm.hive.net.Endpoint.candidates(o.host.address).firstOrNull()?.host?.lowercase() in known
+        for (o in offered) if (askable(o) && existing[o.host.label.lowercase()] == null) model.sameServer(o.host.address) { name ->
+            if (name != null && !name.equals(o.host.label, true)) {
+                same = same + (o.host.label to name)
+                if (o.host.label !in touched) picked = picked - o.host.label
+            }
+        }
+    }
     Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
@@ -169,7 +184,7 @@ fun Offer(model: AppModel, offered: List<Offered>, close: () -> Unit, done: () -
                 val old = existing[o.host.label.lowercase()]
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                        .clickable(role = Role.Checkbox) { picked = if (on) picked - o.host.label else picked + o.host.label }
+                        .clickable(role = Role.Checkbox) { touched = touched + o.host.label; picked = if (on) picked - o.host.label else picked + o.host.label }
                         .semantics { contentDescription = "${o.host.label} ${o.host.address}" }
                         .padding(vertical = 10.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -185,6 +200,7 @@ fun Offer(model: AppModel, offered: List<Offered>, close: () -> Unit, done: () -
                         if (!o.inTailnet) BasicText("Not a tailnet address: whoever runs it could read what you type.", style = Type.tiny.copy(color = p.coral))
                         if (old != null && old != o.host.address) BasicText("Replaces $old", style = Type.tiny.copy(color = p.coral))
                         else if (old != null) BasicText("Already saved", style = Type.tiny.copy(color = p.muted))
+                        same[o.host.label]?.let { BasicText("Same server as $it, by another address", style = Type.tiny.copy(color = p.honey)) }
                     }
                 }
             }

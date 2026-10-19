@@ -11,7 +11,7 @@ hive for Android is the Mac app, small: the same servers, sessions, tabs and
 agents, live. Answer an agent that needs you from the lock screen, read what
 it did, or type into any pane.
 
-The phone reaches your hosts through the Tailscale app, as your Mac does.
+The phone reaches your hosts through the Tailscale app, as your computer does.
 Sign in to Tailscale on the phone with the same account.
 
 ## Adding hosts
@@ -41,6 +41,13 @@ Below the title are the session's tabs, each with its agents' state, then
 one pane at a time. The dots under it are the panes of a split: tap them, or
 swipe sideways. **+** opens a new tab.
 
+Pinned tabs come first, here and on the Mac. With more than four tabs, the
+strip keeps the pinned ones, the ones that need you and the one you're in,
+after a count of them all. Tap the count, or swipe up on the strip, for
+every tab: pinned, needs you, working, then the quiet ones, each with its
+last two lines. Filter them by name. Swipe a card right to pin it or unpin
+it. Long press any tab for **Pin tab**, **Rename** and **Close tab**.
+
 Tap the pane to type (or the keyboard key, in a program that takes taps as
 clicks). The key bar has what a phone keyboard lacks: **esc**,
 **ctrl** (for the next letter), **tab**, **⌃C**, **paste**, the arrows and a
@@ -50,11 +57,16 @@ programs that use the mouse and opens links.
 
 ## Size
 
-A pane keeps your Mac's size, zoomed to fit the phone's width, so the Mac
-doesn't reflow. Pinch to read closer. **Fit to phone** gives the pane the
-phone's size instead (the Mac shows the rest of the pane empty). **Mac size**
-stops asking for it, and the Mac takes its size back as soon as you use it
-there.
+A pane has one size, set by the device you use. Under the pane the phone
+says who that is: "Sized by Hive.app on studio", "Sized by this phone", or
+nobody. A pane sized by another device is zoomed to fit the phone's width,
+so it doesn't reflow there; pinch to read closer.
+
+**Fit to phone** gives the pane the phone's size (the other device shows
+the rest of the pane empty). **Back to studio** gives it back to whoever
+had it. Using the other device takes it back too: typing or clicking in the
+pane, or bringing its window to the front. A device showing the pane
+without using it never takes it.
 
 ## Agents
 

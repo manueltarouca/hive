@@ -67,6 +67,14 @@ object Hosts {
         return "Tried " + (if (parts.size == 1) parts[0] else parts.dropLast(1).joinToString(", ") + ", and " + parts.last()) + "."
     }
 
+    /** Which server answered (server.version): its own ID, else its tailnet name, else its hostname and state. */
+    fun identity(v: org.json.JSONObject): String? {
+        v.optString("server_id").takeIf { it.length >= 16 }?.let { return "id:$it" }
+        v.optJSONObject("tailscale")?.optString("dns_name")?.takeIf { it.isNotEmpty() }?.let { return "ts:$it" }
+        val host = v.optString("hostname"); val dir = v.optString("state_dir")
+        return if (host.isEmpty() && dir.isEmpty()) null else "$host|$dir"
+    }
+
     fun remove(hs: List<Host>, label: String) = hs.filterNot { it.label.equals(label, ignoreCase = true) }
 
     fun toJson(hs: List<Host>): String {

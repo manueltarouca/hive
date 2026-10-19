@@ -54,7 +54,8 @@ class Server:
         return sh(HIVE, *args, env=self.env)
 
     def start(self):
-        self.hive("server", "start", "--extra-listen", f"127.0.0.1:{PORT}", "--allow-anonymous")
+        # A second port: the same server at another address, as a Mac by name and by tailnet IP.
+        self.hive("server", "start", "--extra-listen", f"127.0.0.1:{PORT}", "--extra-listen", f"127.0.0.1:{PORT + 1}", "--allow-anonymous")
 
     def stop(self):
         sh(HIVE, "server", "stop", env=self.env, check=False)
@@ -164,7 +165,10 @@ def keyboard_up():
 
 
 def hide_keyboard():
-    """BACK closes the keyboard, but on the desk with none up it leaves the app: only when one is up."""
+    """BACK closes the keyboard, but with none up it navigates: only when one stays up."""
+    end = time.time() + 1.5
+    while keyboard_up() and time.time() < end:  # it may be on its way down already (a sheet closing)
+        time.sleep(0.2)
     if not keyboard_up():
         return
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
@@ -181,6 +185,7 @@ def setup(srv):
     srv.hive("new", "demo", "--cwd", "/tmp", "--", "sh", "-c", "echo hello from hive; exec sh")
     srv.hive("new", "agent", "--cwd", "/tmp", "--", "python3", os.path.join(HERE, "fake-agent.py"))
     adb("logcat", "-b", "crash", "-c")
+    adb("shell", "cmd", "statusbar", "collapse")  # a failed run may have left the shade open
     adb("shell", "pm", "clear", PKG)
     adb("shell", "pm", "grant", PKG, "android.permission.POST_NOTIFICATIONS", check=False)
     adb("shell", "settings", "put", "secure", "stylus_handwriting_enabled", "0")
@@ -203,7 +208,7 @@ def step_add_host(srv):
 
 
 def step_add_host_problem(srv):
-    tap("Switch session")
+    open_switcher()
     tap("Add remote host")
     tap("Host address")
     type_text("http://10.0.2.2:4499")
@@ -217,7 +222,7 @@ def step_add_host_problem(srv):
 
 
 def step_switcher(srv):
-    wait("Filter or create")
+    open_switcher()
     for s in ("demo", "agent", f"New session on {LABEL}", "Add remote host"):
         wait(s)
     shot("switcher")
@@ -282,19 +287,77 @@ def step_paste(srv):
 def step_fit(srv):
     block = srv.view("demo")["windows"][0]["layout"]["block_id"]
     cols0 = srv.view("demo")["blocks"][block]["cols"]
-    wait("This pane is your Mac's size")
+    wait("Zoomed to fit")
     shot("mac-size")
     tap("Fit to phone")
     cols = until("the pane took the phone's size", lambda: (c := srv.view("demo")["blocks"][block]["cols"]) < cols0 and c)
-    wait("Mac size")
-    wait("This pane is your Mac's size", gone=True)
+    wait("Give back")  # nobody else held it (the CLI made the pane): no one to name
+    wait("Sized by this phone")
     shot(f"fitted-{cols}-cols")
     assert 30 <= cols <= 70, cols
-    tap("Mac size")
+    tap("Give back")
     wait("Fit to phone")
     # Mac size gives the pane its size back at once, not when the Mac is next used.
     until("the pane is back at the Mac's size", lambda: srv.view("demo")["blocks"][block]["cols"] == cols0)
     shot("back-to-mac-size")
+
+
+MAC_ROOT = os.path.join(ROOT, "apps", "macos")
+MAC_APP = os.path.join(MAC_ROOT, "build", "remote-check", "Hive.app")
+
+
+def mac_cols(srv, block):
+    return srv.view("demo")["blocks"][block]["cols"]
+
+
+def step_two_devices(srv):
+    """The Mac app and the phone on one pane: whoever you use holds its size, and the phone says who."""
+    if not os.path.isdir(MAC_APP):
+        raise AssertionError(f"build the throwaway Mac app first: HIVE_BUNDLE_OUT=build/remote-check script/bundle.sh debug ({MAC_APP})")
+    v = srv.view("demo")
+    w = next(x for x in v["windows"] if x["window_id"] == v["active_window_id"])
+    block = w["focused_block_id"]
+    suite = "xyz.matm.hive.e2e"
+    sh("defaults", "delete", suite, check=False)
+    sh("defaults", "write", suite, "lastSession", v["session_id"])
+    log = os.path.join(OUT, "mac.log")
+    env = srv.env
+    sh("open", "-n", "--env", f"HIVE_SERVER={env['HIVE_SERVER']}", "--env", f"HIVE_CONFIG={env['HIVE_CONFIG']}",
+       "--env", f"HIVE_STATE_DIR={env['HIVE_STATE_DIR']}", "--env", f"HIVE_DEFAULTS_SUITE={suite}",
+       "--stdout", log, "--stderr", log, MAC_APP)
+    def use_mac():
+        """As if you typed in the Mac's pane: the debug build takes it as user input (SIGUSR1)."""
+        sh("pkill", "-USR1", "-f", MAC_APP + "/Contents/MacOS/Hive")
+
+    try:
+        until("the Mac app connected", lambda: any(c.get("platform") == "darwin" for c in srv.clients()), timeout=20)
+        # You use the Mac: it takes the pane.
+        time.sleep(2)
+        use_mac()
+        host = srv.call("server.version")["hostname"]
+        # The Mac, in front, holds the pane; the phone names it.
+        until("the Mac took the pane", lambda: (srv.view("demo")["blocks"][block].get("size_owner") or "") != "", timeout=10)
+        mac = mac_cols(srv, block)
+        wait(f"Sized by Hive.app on {host}", timeout=10)
+        shot("sized-by-mac")
+        tap("Fit to phone")
+        cols = until("the phone took it", lambda: (c := mac_cols(srv, block)) != mac and c)
+        wait("Sized by this phone")
+        wait(f"Back to {host}")
+        # The Mac reloads (the resize itself, then a label change): the phone keeps it.
+        srv.call("session.set_window_label", {"session_id": v["session_id"], "window_id": w["window_id"], "label": "both"})
+        time.sleep(5)
+        assert mac_cols(srv, block) == cols, f"the Mac took the pane back on its own: {mac_cols(srv, block)} columns"
+        shot("phone-holds")
+        # Using the Mac again takes it back.
+        use_mac()
+        until("the Mac took it back when used", lambda: mac_cols(srv, block) == mac, timeout=10)
+        wait(f"Sized by Hive.app on {host}", timeout=10)
+        shot("mac-took-back")
+    finally:
+        sh("pkill", "-f", MAC_APP + "/Contents/MacOS/Hive", check=False)
+        sh("defaults", "delete", suite, check=False)
+        srv.call("session.set_window_label", {"session_id": v["session_id"], "window_id": w["window_id"], "label": ""})
 
 
 def step_tabs(srv):
@@ -320,7 +383,7 @@ def step_agent(srv):
     block = v["windows"][0]["layout"]["block_id"]
     srv.call("agent.report", {"block_id": block, "harness": "claude", "state": "blocked",
                               "message": "Claude needs your permission to use Bash"})
-    tap("Switch session")
+    open_switcher()
     wait("1 blocked")
     shot("switcher-blocked")
     tap("agent", exact=True)
@@ -340,7 +403,181 @@ def step_agent(srv):
     shot("replied")
 
 
+def hold(key, exact=False):
+    """A long press, for a tab's actions."""
+    a, b, c, d = bounds(wait(key, exact=exact))
+    x, y = (a + c) // 2, (b + d) // 2
+    adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "900")
+    time.sleep(0.5)
+
+
+def pinned(srv, label):
+    return {w.get("label"): w.get("pinned", False) for w in srv.view("demo")["windows"]}.get(label)
+
+
+def mac_shot(srv, name):
+    """The throwaway Mac app on the demo session: its window alone (by window ID), for what the phone set to show there too."""
+    if not os.path.isdir(MAC_APP):
+        raise AssertionError(f"build the throwaway Mac app first: HIVE_BUNDLE_OUT=build/remote-check script/bundle.sh debug ({MAC_APP})")
+    winid = os.path.join(MAC_ROOT, "build", "tools", "winid")
+    if not os.path.exists(winid):
+        sh("swiftc", "-O", os.path.join(MAC_ROOT, "script", "tools", "winid.swift"), "-o", winid)
+    suite = "xyz.matm.hive.e2e"
+    sh("defaults", "delete", suite, check=False)
+    sh("defaults", "write", suite, "lastSession", srv.view("demo")["session_id"])
+    env = srv.env
+    log = os.path.join(OUT, "mac.log")
+    sh("open", "-n", "--env", f"HIVE_SERVER={env['HIVE_SERVER']}", "--env", f"HIVE_CONFIG={env['HIVE_CONFIG']}",
+       "--env", f"HIVE_STATE_DIR={env['HIVE_STATE_DIR']}", "--env", f"HIVE_DEFAULTS_SUITE={suite}",
+       "--stdout", log, "--stderr", log, MAC_APP)
+    try:
+        until("the Mac app connected", lambda: any(c.get("platform") == "darwin" for c in srv.clients()), timeout=20)
+        time.sleep(3)
+        pid = sh("pgrep", "-n", "-f", MAC_APP + "/Contents/MacOS/Hive").strip()
+        w = sh(winid, pid).strip()
+        p = os.path.join(OUT, f"{SHOT[0]:02d}-{name}.png")
+        sh("screencapture", "-x", "-o", "-l", w, p)
+        return p
+    finally:
+        sh("pkill", "-f", MAC_APP + "/Contents/MacOS/Hive", check=False)
+        sh("defaults", "delete", suite, check=False)
+
+
+def step_pins(srv):
+    """B Tab sheet: many tabs fold into a count; pins come first, set from a swipe, the strip or the sheet, and reach the server."""
+    open_switcher()
+    tap("demo", exact=True)
+    wait("Switch session")
+    v = srv.view("demo")
+    sid = v["session_id"]
+    names = ["alpha", "beta", "gamma", "delta", "eps", "zeta"]
+    made = []
+    for n in names:
+        # An agent reports only while a program, not the shell, is in front.
+        layout = {"cwd": "/tmp", "command": ["python3", os.path.join(HERE, "fake-agent.py")]} if n in ("beta", "gamma") else {"cwd": "/tmp"}
+        w = srv.call("session.new_window", {"session_id": sid, "layout": layout})
+        srv.call("session.set_window_label", {"session_id": sid, "window_id": w["window_id"], "label": n})
+        made.append(w["window_id"])
+    # beta works, gamma needs you: cards; the rest are quiet.
+    by = {w.get("label"): w for w in srv.view("demo")["windows"]}
+    srv.call("agent.report", {"block_id": by["beta"]["layout"]["block_id"], "harness": "claude", "state": "working", "message": "Baking"})
+    srv.call("agent.report", {"block_id": by["gamma"]["layout"]["block_id"], "harness": "claude", "state": "blocked", "message": "May I?"})
+    n = len(srv.view("demo")["windows"])
+    wait(f"All {n} tabs", timeout=10)
+    # The strip keeps what needs you; the quiet ones wait in the sheet.
+    root = dump()
+    assert find(root, "gamma", exact=True) is not None, "gamma (blocked) is not in the strip"
+    assert find(root, "zeta", exact=True) is None, "a quiet tab stayed in the strip"
+    shot("pins-strip")
+    tap(f"All {n} tabs")
+    wait("Filter tabs")
+    wait("Needs you")
+    wait("Working")
+    shot("pins-sheet")
+    # Swipe the working card right: pinned, here and on the server.
+    a, b, c, d = bounds(wait("beta", exact=True))
+    y = (b + d) // 2
+    x = (a + c) // 2
+    adb("shell", "input", "swipe", str(x - 120), str(y), str(x + 260), str(y), "400")
+    until("beta pinned on the server", lambda: pinned(srv, "beta") is True)
+    wait("beta, pinned")
+    wait("Pinned")
+    shot("pins-swiped")
+    # Hold a quiet tab: Pin tab.
+    hold("zeta", exact=True)
+    tap("Pin tab")
+    until("zeta pinned on the server", lambda: pinned(srv, "zeta") is True)
+    # Filter by name.
+    tap("Filter tabs")
+    type_text("alp")
+    wait("alpha", exact=True)
+    wait("eps", exact=True, gone=True)
+    wait("Needs you", gone=True)
+    hide_keyboard()
+    shot("pins-filter")
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    wait("Filter tabs", gone=True)
+    # The strip: pins first.
+    bx = bounds(wait("beta, pinned"))[0]
+    zx = bounds(wait("zeta, pinned"))[0]
+    gx = bounds(wait("gamma", exact=True))[0]
+    assert bx < gx and zx < gx, f"pins aren't first: beta {bx}, zeta {zx}, gamma {gx}"
+    shot("pins-first")
+    mac_shot(srv, "pins-mac")
+    # Hold a pin in the strip: Unpin tab.
+    hold("zeta, pinned")
+    wait("Back among the others")
+    shot("pins-menu")
+    tap("Unpin tab")
+    until("zeta unpinned on the server", lambda: pinned(srv, "zeta") is False)
+    # Rename from the menu.
+    hold("beta, pinned")
+    tap("Rename")
+    wait("Tab name")
+    type_text("bee")
+    shot("pins-rename")
+    tap("Save the tab name")
+    until("beta renamed on the server", lambda: pinned(srv, "bee") is True)
+    # Close, asked first.
+    hold("gamma", exact=True)
+    tap("Close tab")
+    wait("Close gamma now")
+    shot("pins-close")
+    tap("Close gamma now")
+    until("gamma closed on the server", lambda: "gamma" not in {w.get("label") for w in srv.view("demo")["windows"]})
+    # Leave the session as the other steps know it.
+    for w in srv.view("demo")["windows"]:
+        if w["window_id"] in made:
+            srv.call("session.close_window", {"session_id": sid, "window_id": w["window_id"]})
+    wait("All ", gone=True, timeout=10)
+
+
+def to_desk():
+    """Back to the desk (the session), from wherever the last step ended, so each step starts from a known place."""
+    for _ in range(4):
+        root = dump()
+        if find(root, "Switch session") is not None:
+            return
+        if find(root, "Back") is not None:
+            tap("Back")
+        else:
+            launch()
+    wait("Switch session")
+
+
+def open_switcher():
+    """The switcher, from the desk or already there."""
+    if find(dump(), "Filter or create") is None:
+        tap("Switch session")
+    wait("Filter or create")
+
+
+def open_hosts():
+    """From the desk, the switcher, or already there: the Hosts screen."""
+    root = dump()
+    if find(root, "Scan the code") is not None and find(root, "Stay connected") is not None:
+        return  # hive reopens where you left it
+    if find(root, "Filter or create") is None:
+        tap("Switch session")
+    tap("Hosts", exact=True)
+    wait("Stay connected")
+
+
+def stay_connected(on):
+    open_hosts()
+    # The help line under the switch says which it is.
+    is_on = lambda: find(dump(), "In the background too") is not None
+    if is_on() != on:
+        tap(f"Stay connected to {LABEL}")
+    until("the choice took", lambda: is_on() == on)
+    tap("Back")
+    wait("Filter or create")
+
+
 def step_notify(srv):
+    # Background notifications come from hosts set to stay connected (on-demand ones let go).
+    stay_connected(True)
+    tap("agent", exact=True)
     v = srv.view("agent")
     block = v["windows"][0]["layout"]["block_id"]
     srv.call("agent.report", {"block_id": block, "harness": "claude", "state": "working"})
@@ -369,6 +606,7 @@ def step_notify(srv):
     assert srv.text(block).count("got b'1'") == 2, "Allow answered a question it didn't describe"
     adb("shell", "cmd", "statusbar", "collapse")
     launch()
+    stay_connected(False)
 
 
 def background_luma():
@@ -380,7 +618,7 @@ def background_luma():
 
 
 def step_settings(srv):
-    tap("Switch session")
+    open_switcher()
     tap("Settings", exact=True)
     wait("Appearance")
     shot("settings")
@@ -415,21 +653,21 @@ def step_settings(srv):
     cols = until("the pane fitted, fewer columns than the default 55", lambda: (c := d_cols(srv, w)) != before and c)
     assert cols < 55, f"larger text still fits {cols} columns"
     shot(f"fitted-larger-{cols}-cols")
-    tap("Mac size")
+    tap("Give back")
     until("Mac size again", lambda: d_cols(srv, w) == before)
     # Panes open fitted: and Mac size still gives the size back.
-    tap("Switch session")
+    open_switcher()
     tap("Settings", exact=True)
     tap("Open panes fitted to the phone")
     tap("Back")
     tap("agent", exact=True)
-    wait("Mac size")  # it opened fitted
-    tap("Switch session")
+    wait("Give back")  # it opened fitted
+    open_switcher()
     tap("demo", exact=True)
     until("the pane opened fitted", lambda: d_cols(srv, w) != before)
-    tap("Mac size")
+    tap("Give back")
     until("Mac size gives an auto-fitted pane its size back", lambda: d_cols(srv, w) == before)
-    tap("Switch session")
+    open_switcher()
     tap("Settings", exact=True)
     tap("Open panes fitted to the phone")
     tap("Back")
@@ -438,6 +676,110 @@ def step_settings(srv):
 def d_cols(srv, w):
     v = srv.view("demo")
     return min(v["blocks"][b]["cols"] for b in v["blocks"] if v["blocks"][b]["window_id"] == w["window_id"])
+
+
+def phone_connected(srv):
+    return any(c.get("platform") == "android" for c in srv.clients())
+
+
+def ongoing():
+    return "Connected to" in adb("shell", "dumpsys", "notification", "--noredact")
+
+
+def step_leave(srv):
+    # On demand (the default): leaving the app lets go, after a grace for app switching; nothing stays behind.
+    assert phone_connected(srv)
+    adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    time.sleep(5)
+    assert phone_connected(srv), "let go at once: switching apps for a moment shouldn't drop it"
+    until("the phone let go of an on-demand host", lambda: not phone_connected(srv), timeout=45)
+    assert not ongoing(), "a background notification with nothing kept"
+    launch()
+    until("back in the app, it reconnects", lambda: phone_connected(srv), timeout=15)
+    # Stay connected: kept in the background, with a Disconnect on its notification.
+    open_hosts()
+    tap(f"Stay connected to {LABEL}")
+    shot("stay-connected")
+    adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    time.sleep(40)
+    assert phone_connected(srv), "a host set to stay connected let go"
+    adb("shell", "cmd", "statusbar", "expand-notifications")
+    n = wait("Connected to 1 host")
+    # Silent notifications come collapsed: expand this one for its button.
+    y = bounds(n)[1]
+    exp = min((e for e in dump().iter("node") if (e.get("content-desc") or "") == "Expand"), key=lambda e: abs(bounds(e)[1] - y))
+    a, b, c, d = bounds(exp)
+    adb("shell", "input", "tap", str((a + c) // 2), str((b + d) // 2))
+    shot("ongoing")
+    tap("Disconnect", exact=True)
+    until("Disconnect let go", lambda: not phone_connected(srv), timeout=10)
+    assert not ongoing(), "the ongoing notification stayed after Disconnect"
+    adb("shell", "cmd", "statusbar", "collapse")
+    launch()
+    until("opening hive connects again", lambda: phone_connected(srv), timeout=15)
+    stay_connected(False)
+
+
+def step_hosts(srv):
+    """The Hosts screen: every host command, checked where it counts."""
+    open_hosts()
+    wait("Connected, hive")
+    shot("hosts")
+    tap(f"Disconnect from {LABEL}")
+    until("Disconnect let go", lambda: not phone_connected(srv))
+    wait("Connects when you pick it")
+    # The desk says so, with the way back.
+    tap("Back")
+    tap("Back")
+    wait(f"Disconnected from {LABEL}")
+    shot("disconnected-desk")
+    tap("Connect", exact=True)
+    until("Connect from the desk connected", lambda: phone_connected(srv))
+    wait(f"Disconnected from {LABEL}", gone=True)
+    # A host kept in the background, disconnected by hand: no notification claims it's connected.
+    stay_connected(True)
+    open_hosts()
+    tap(f"Disconnect from {LABEL}")
+    until("Disconnect let go", lambda: not phone_connected(srv))
+    adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    time.sleep(3)
+    assert not ongoing(), "Connected to 1 host, for a host disconnected by hand"
+    launch()
+    open_hosts()
+    tap(f"Connect to {LABEL}")
+    until("Connect connected", lambda: phone_connected(srv))
+    stay_connected(False)
+    open_hosts()
+    # Rename: the switcher follows; a bad name is refused.
+    tap(f"Rename {LABEL}")
+    wait("New name")
+    type_text("box.local")  # the old name comes selected: typing replaces it
+    wait("reads as a host name")
+    shot("rename-refused")
+    adb("shell", "input", "keycombination", "113", "29")  # ctrl+a
+    type_text("studio")
+    tap("Save the name")
+    wait("Host studio")
+    hide_keyboard()
+    tap("Back")
+    wait("studio", exact=True)
+    shot("renamed")
+    open_hosts()
+    tap("Rename studio")
+    wait("New name")
+    type_text(LABEL)
+    tap("Save the name")
+    hide_keyboard()
+    wait(f"Host {LABEL}")
+    # Forget, with a confirmation: one of the code's hosts.
+    tap("Forget box")
+    wait("Forget box?")
+    shot("forget-confirm")
+    tap("Forget box now")
+    wait("Host box", gone=True)
+    tap("Back")
+    wait("Filter or create")
+    assert find(dump(), "box", exact=True) is None, "a forgotten host is still in the switcher"
 
 
 def hosts_code(hosts):
@@ -451,11 +793,13 @@ def step_code(srv):
     # What a scan of the Mac's code opens: every host in plain view; one off
     # the tailnet, and one changing a saved address, start unchecked.
     code = hosts_code([("box", "https://box.example.ts.net"), ("lab", "http://100.101.2.3:4483"),
-                       ("far", "http://203.0.113.9:4483"), (LABEL, "http://10.0.2.2:9999")])
+                       ("far", "http://203.0.113.9:4483"), (LABEL, "http://10.0.2.2:9999"),
+                       ("studio", f"http://10.0.2.2:{PORT + 1}")])
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", f'"{code}"', PKG)
     wait("Hosts from your Mac")
     wait("Not a tailnet address")
     wait("Replaces " + ADDRESS)
+    wait(f"Same server as {LABEL}", timeout=15)  # asked who it is: it's one you have, by another address
     wait("Add 2 hosts")
     shot("code-offer")
     tap("Add 2 hosts")
@@ -470,7 +814,7 @@ def step_code(srv):
 
 
 def step_away(srv):
-    tap("Switch session")
+    open_switcher()
     tap("demo", exact=True)
     wait("Fit to phone")  # the desk, streaming a pane
     srv.stop()
@@ -484,7 +828,7 @@ def step_away(srv):
     shot("back")
 
 
-STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_tabs, step_agent, step_notify, step_settings, step_code, step_away]
+STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_notify, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
 
 
 def main():
@@ -506,6 +850,8 @@ def main():
                 continue
             t0 = time.time()
             try:
+                if step is not step_add_host:
+                    to_desk()
                 step(srv)
                 # A crash fails the step even when the UI came back.
                 crash = adb("logcat", "-d", "-b", "crash", check=False)

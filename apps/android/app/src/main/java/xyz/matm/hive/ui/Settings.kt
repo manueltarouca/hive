@@ -41,9 +41,9 @@ import xyz.matm.hive.model.AppModel
 import xyz.matm.hive.model.Host
 import java.util.Locale
 
-/** Settings, as the Mac's where they apply to a phone: appearance, the terminal, agents, panes, hosts, about. */
+/** Settings, as the Mac's where they apply to a phone: appearance, the terminal, agents, about. Hosts have their own screen. */
 @Composable
-fun Settings(model: AppModel, close: () -> Unit, addHost: () -> Unit) {
+fun Settings(model: AppModel, close: () -> Unit) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
     Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding()) {
@@ -59,7 +59,7 @@ fun Settings(model: AppModel, close: () -> Unit, addHost: () -> Unit) {
                 Item("Theme") {
                     Choice(listOf("system" to "System", "night" to "Night", "day" to "Day"), model.themeChoice, model::chooseTheme)
                 }
-                Item("Text size", "When a pane fits the phone. Pinch to zoom a pane at the Mac's size.") {
+                Item("Text size", "When a pane fits the phone. Pinch to zoom a pane another device sizes.") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RoundKey(Icon.Minus, "Smaller text") { model.chooseTextSize(model.textSp - 0.5f) }
                         Spacer(Modifier.width(10.dp))
@@ -75,7 +75,7 @@ fun Settings(model: AppModel, close: () -> Unit, addHost: () -> Unit) {
             Section("Terminal") {
                 Toggle("Ask before pasting several lines", "When the program didn't ask for pasted text, each line may run as a command.",
                     model.confirmPaste, model::chooseConfirmPaste)
-                Toggle("Open panes fitted to the phone", "Instead of at your Mac's size, zoomed. Mac size gives it back.",
+                Toggle("Open panes fitted to the phone", "Instead of at the size another device gave them, zoomed. Back to … gives it back.",
                     model.openFitted, model::chooseOpenFitted)
             }
             Section("Agents") {
@@ -89,24 +89,6 @@ fun Settings(model: AppModel, close: () -> Unit, addHost: () -> Unit) {
                 Link("Notification settings on this phone") {
                     runCatching { ctx.startActivity(Intent(SystemSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(SystemSettings.EXTRA_APP_PACKAGE, ctx.packageName)) }
                 }
-            }
-            Section("Hosts") {
-                for (h in model.hosts) {
-                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        LineIcon(Icon.Globe, p.muted, 16.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            BasicText(h.name, style = Type.body.copy(color = p.text))
-                            FadeText(h.host.address, Type.tiny, p.muted)
-                        }
-                        Switch(h.host.always, "Stay connected to ${h.name}") {
-                            model.saveHost(h.host.copy(connect = if (it) Host.ALWAYS else Host.ON_DEMAND))
-                        }
-                    }
-                }
-                BasicText("On: connected at launch and in the background, so its agents can notify you. Off: when you pick it.",
-                    style = Type.tiny.copy(color = p.muted), modifier = Modifier.padding(bottom = 6.dp))
-                Link("Add a host", onClick = addHost)
             }
             Section("About") {
                 val version = runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: ""

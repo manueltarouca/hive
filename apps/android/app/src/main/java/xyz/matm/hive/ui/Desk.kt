@@ -73,6 +73,10 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
         if (frame != null && block?.agentState == "blocked") Ask.find((0 until frame.rows).map(frame::rowText)) else null
     }
 
+    var sheet by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf<xyz.matm.hive.model.WindowInfo?>(null) }
+    androidx.activity.compose.BackHandler(enabled = sheet || menu != null) { if (menu != null) menu = null else sheet = false }
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
         // The title chip: session and host; the switcher behind it.
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -96,7 +100,8 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
                 LineIcon(Icon.Chevron, p.muted, 16.dp)
             }
             if (model.stream != null) {
-                Pill(if (model.fitted) "Mac size" else "Fit to phone", selected = model.fitted) {
+                val back = model.previousHolder?.let(model::sizeHolderShort)
+                Pill(if (!model.fitted) "Fit to phone" else if (back != null) "Back to $back" else "Give back", selected = model.fitted) {
                     val s = phone
                     if (model.fitted) model.unfit() else if (s != null) model.fit(s[0], s[1], s[2], s[3])
                 }
@@ -109,32 +114,8 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
             ) { LineIcon(Icon.Plus, p.muted, 20.dp) }
         }
 
-        // Tabs, with their agents' state.
-        if (model.windows.size > 1) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                model.windows.forEachIndexed { i, w ->
-                    val bs = w.blocks.mapNotNull { model.blocks[it] }
-                    val state = listOf("blocked", "working", "done").firstOrNull { s -> bs.any { it.agentState == s } }
-                    val label = model.titleParts(w).first
-                    val sel = i == model.windowIndex
-                    Row(
-                        Modifier.clip(RoundedCornerShape(50))
-                            .background(if (sel) p.raised else p.surface.copy(alpha = if (p.night) 0.6f else 1f))
-                            .then(if (sel) Modifier.border(1.dp, p.line, RoundedCornerShape(50)) else Modifier)
-                            .clickable(role = Role.Tab) { model.selectWindow(i) }
-                            .padding(start = 7.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        // The Mac's tab: the program's cell (a small comb for a split), the name, the state.
-                        ProgramTile(model.program(w), 20.dp, model.otherPrograms(w))
-                        Spacer(Modifier.width(7.dp))
-                        FadeText(label, Type.small, if (sel) p.text else p.muted, Modifier.widthIn(max = 140.dp))
-                        if (state != null) { Spacer(Modifier.width(7.dp)); Hexagon(state, 8.dp) }
-                    }
-                }
-            }
-        }
+        // Tabs, with their agents' state: pins first; with many, the count opens them all.
+        if (model.windows.size > 1) TabStrip(model, openSheet = { sheet = true }, openMenu = { menu = it })
 
         // The pane.
         val paneShape = RoundedCornerShape(12.dp)
@@ -176,7 +157,7 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
             }
             if (model.currentSession == null) EmptyDesk(model, openSwitcher)
             // Away: the Mac's card, over the pane, while its host can't be reached.
-            Box(Modifier.align(Alignment.Center)) { Away(h, show = h != null && model.currentSession != null && h.link != Link.Connected && h.link != Link.Idle) }
+            Box(Modifier.align(Alignment.Center)) { Away(h, show = h != null && model.currentSession != null && h.link != Link.Connected, connect = { h?.let(model::connect) }) }
         }
 
         // The dots: the panes of a split; swipe sideways between them.
@@ -195,9 +176,16 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
             }
         }
 
-        if (!model.sizeHintSeen && !model.fitted && model.stream != null && frame != null && phone != null && frame.cols > (phone?.get(0) ?: 0) + 4) {
-            BasicText("This pane is your Mac's size, zoomed to fit. Pinch to read closer, or fit it to the phone.",
-                style = Type.tiny.copy(color = p.muted), modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+        // Who holds the pane's size, always in view: the device you use sizes it.
+        if (model.stream != null && block != null) {
+            val holder = model.sizeHolder(block.sizeOwner)
+            val zoomed = !model.fitted && frame != null && phone != null && frame.cols > (phone?.get(0) ?: 0) + 4
+            val line = when {
+                holder == null -> "Nobody holds this pane's size."
+                holder == "this phone" -> "Sized by this phone."
+                else -> "Sized by $holder."
+            } + if (zoomed && !model.sizeHintSeen) " Zoomed to fit: pinch to read closer, or fit it to the phone." else ""
+            BasicText(line, style = Type.tiny.copy(color = p.muted), modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
         }
 
         if (ask != null && block != null) AskCard(ask, Harness.name(block.harness ?: ""), model)
@@ -206,6 +194,10 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
 
         KeyBar(model, ask, ctrl, onCtrl = { ctrl = !ctrl }, onKeyboard = { view?.showKeyboard() },
             onConfirmPaste = { lines, go -> confirmPaste = lines to go })
+    }
+    if (sheet) TabSheet(model, close = { sheet = false }, openMenu = { menu = it })
+    // The tab may have closed meanwhile: its menu goes with it.
+    menu?.let { m -> model.windows.firstOrNull { it.id == m.id }?.let { w -> TabMenu(model, w) { menu = null } } ?: run { menu = null } }
     }
 }
 
@@ -232,7 +224,7 @@ private fun EmptyDesk(model: AppModel, openSwitcher: () -> Unit) {
         BasicText(if (model.hosts.isEmpty()) "Add a host to begin" else "Open a session", style = Type.title.copy(color = p.text))
         Spacer(Modifier.height(6.dp))
         BasicText(
-            if (model.hosts.isEmpty()) "A hive server on your tailnet. The phone reaches it through the Tailscale app, as your Mac does."
+            if (model.hosts.isEmpty()) "A hive server on your tailnet. The phone reaches it through the Tailscale app, as your computer does."
             else "Your hosts' sessions are in the switcher.",
             style = Type.small.copy(color = p.muted), modifier = Modifier.widthIn(max = 300.dp),
         )
@@ -242,27 +234,34 @@ private fun EmptyDesk(model: AppModel, openSwitcher: () -> Unit) {
 }
 
 @Composable
-private fun Away(h: xyz.matm.hive.model.HostConnection?, show: Boolean) {
+private fun Away(h: xyz.matm.hive.model.HostConnection?, show: Boolean, connect: () -> Unit) {
     AnimatedVisibility(show, enter = fadeIn(tween(200, easing = Quiet)), exit = fadeOut(tween(200, easing = Quiet))) {
-        if (h != null) AwayCard(h.problem ?: "", h.detail, refused = h.link is Link.Refused)
+        if (h == null) return@AnimatedVisibility
+        // Disconnected by hand: say so, and the way back.
+        if (h.link == Link.Idle) AwayCard("Disconnected from ${h.name}", "Its sessions keep running on the server.", refused = false, action = "Connect" to connect, state = "idle")
+        else AwayCard(h.problem ?: "", h.detail, refused = h.link is Link.Refused)
     }
 }
 
 @Composable
-fun AwayCard(title: String, detail: String?, refused: Boolean) {
+fun AwayCard(title: String, detail: String?, refused: Boolean, action: Pair<String, () -> Unit>? = null, state: String? = null) {
     val p = LocalPalette.current
     Column(
         Modifier.padding(24.dp).widthIn(max = 320.dp).clip(RoundedCornerShape(12.dp)).background(p.surface)
             .border(1.dp, p.line, RoundedCornerShape(12.dp)).padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Hexagon(if (refused) "blocked" else "working", 11.dp)
+            Hexagon(state ?: if (refused) "blocked" else "working", 11.dp)
             Spacer(Modifier.width(10.dp))
             BasicText(title.removeSuffix("…"), style = Type.label.copy(color = p.text))
         }
         if (detail != null) {
             Spacer(Modifier.height(6.dp))
             BasicText(detail, style = Type.small.copy(color = p.muted))
+        }
+        if (action != null) {
+            Spacer(Modifier.height(12.dp))
+            Pill(action.first, primary = true, onClick = action.second)
         }
     }
 }

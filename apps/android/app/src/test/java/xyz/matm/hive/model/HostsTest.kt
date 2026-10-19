@@ -84,4 +84,17 @@ class HostsTest {
         val offer = HostsCode.decode(mac)!!
         assertEquals(listOf(Host("box", "https://box.example.ts.net"), Host("studio", "http://100.101.2.3:4483")), offer.map { it.host })
     }
+
+    @Test fun serversAreKnownByTheirIDFirst() {
+        fun v(s: String) = org.json.JSONObject(s)
+        // Two machines both called ubuntu, same user: their IDs tell them apart.
+        val a = Hosts.identity(v("""{"server_id":"aaaaaaaaaaaaaaaa","hostname":"ubuntu","state_dir":"/home/ubuntu/.local/state/hive"}"""))
+        val b = Hosts.identity(v("""{"server_id":"bbbbbbbbbbbbbbbb","hostname":"ubuntu","state_dir":"/home/ubuntu/.local/state/hive"}"""))
+        assertTrue(a != b)
+        assertEquals("id:aaaaaaaaaaaaaaaa", Hosts.identity(v("""{"server_id":"aaaaaaaaaaaaaaaa","tailscale":{"dns_name":"box.ts.net"}}""")))
+        // Older servers: the tailnet name, else hostname and state.
+        assertEquals("ts:box.ts.net", Hosts.identity(v("""{"tailscale":{"dns_name":"box.ts.net"},"hostname":"box"}""")))
+        assertEquals("box|/s", Hosts.identity(v("""{"hostname":"box","state_dir":"/s"}""")))
+        assertNull(Hosts.identity(v("{}")))
+    }
 }

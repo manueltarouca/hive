@@ -35,7 +35,9 @@ sealed class Link {
  * It connects when asked ([start]) and keeps trying, as the Mac does: the
  * candidates of a bare host in order, then backing off up to 10 s.
  */
-class HostConnection(var host: Host, private val main: Executor, private val listener: Listener) {
+class HostConnection(host: Host, private val main: Executor, private val listener: Listener) {
+    /** Compose state: its name and choices show the moment they change. */
+    var host by mutableStateOf(host)
     interface Listener {
         fun connected(h: HostConnection)
         fun disconnected(h: HostConnection)
@@ -54,6 +56,8 @@ class HostConnection(var host: Host, private val main: Executor, private val lis
     var agents by mutableStateOf<List<Agent>>(emptyList())
     /** Each agent's state at the last load, for notifications; null before the first. */
     var lastAgentStates: Map<String, String>? = null
+    /** The server's machine (server.version), for naming apps on it: "Hive.app on studio". */
+    var serverHostname = ""
     var everConnected = false
         private set
     var client: HiveClient? = null
@@ -107,7 +111,7 @@ class HostConnection(var host: Host, private val main: Executor, private val lis
             listener.event(this, ev)
         }
         c.onEventsResync = { lastEventSeq = null; listener.resynced(this) }
-        c.connect("hive for Android", VERSION) { r ->
+        c.connect(clientName, VERSION) { r ->
             if (client !== c) return@connect
             r.onSuccess {
                 plan.connected()
@@ -198,6 +202,8 @@ class HostConnection(var host: Host, private val main: Executor, private val lis
         }
 
     companion object {
+        /** As other clients see this phone: "hive on Pixel 8". */
+        val clientName: String = "hive on " + (android.os.Build.MODEL?.takeIf { it.isNotBlank() } ?: "Android")
         const val VERSION = "0.1.0"
     }
 }

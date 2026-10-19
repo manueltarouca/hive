@@ -262,7 +262,7 @@ class TerminalView(context: Context) : View(context) {
         val end = f.rows * cellH + pad / 2
         if (!fitted && end < height - 24 * density) {
             canvas.drawLine(0f, end, width.toFloat(), end, edge)
-            canvas.drawText("Your Mac's pane ends here", width / 2f, end + (height - end) / 2, hint)
+            canvas.drawText("The pane ends here", width / 2f, end + (height - end) / 2, hint)
         }
     }
 

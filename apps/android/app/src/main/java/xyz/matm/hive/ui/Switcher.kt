@@ -63,7 +63,7 @@ fun agentSummary(h: HostConnection, s: SessionInfo): Pair<String?, String?> {
 
 /** The Mac's ⌘K list as a full screen: one section per host, the same words, the same check. */
 @Composable
-fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: () -> Unit) {
+fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: () -> Unit, hosts: () -> Unit) {
     val p = LocalPalette.current
     var query by remember { mutableStateOf("") }
     var menuFor by remember { mutableStateOf<HostConnection?>(null) }
@@ -161,6 +161,10 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
                     Box(Modifier.width(26.dp)) { LineIcon(Icon.Globe, p.muted, 15.dp) }
                     BasicText("Add remote host", style = Type.body.copy(color = p.text))
                 }
+                Row(rowModifier(false, onClick = hosts), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.width(26.dp)) { LineIcon(Icon.Laptop, p.muted, 16.dp) }
+                    BasicText("Hosts", style = Type.body.copy(color = p.text))
+                }
                 Row(rowModifier(false, onClick = settings), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.width(26.dp)) { LineIcon(Icon.Gear, p.muted, 16.dp) }
                     BasicText("Settings", style = Type.body.copy(color = p.text))
@@ -187,7 +191,7 @@ private fun HostMenu(model: AppModel, h: HostConnection, dismiss: () -> Unit) {
         Row(rowModifier(false) { model.saveHost(h.host.copy(connect = if (always) Host.ON_DEMAND else Host.ALWAYS)); dismiss() }) {
             BasicText(if (always) "Connect on demand" else "Stay connected", style = Type.body.copy(color = p.text))
         }
-        if (h.connected && !always) Row(rowModifier(false) { h.stop(); dismiss() }) { BasicText("Disconnect", style = Type.body.copy(color = p.text)) }
+        if (h.link != Link.Idle) Row(rowModifier(false) { model.disconnect(h); dismiss() }) { BasicText("Disconnect", style = Type.body.copy(color = p.text)) }
         Row(rowModifier(false) { model.removeHost(h); dismiss() }) { BasicText("Forget ${h.name}", style = Type.body.copy(color = p.coral)) }
     }
 }
