@@ -99,6 +99,9 @@ type rec struct {
 	snapSeq uint64 // output position of the last snapshot
 	owner   string // client with size authority
 	closing bool
+	// resuming: until then, a restored agent's shell in front is the shell
+	// starting it, not the agent gone.
+	resuming time.Time
 }
 
 // Client is a program connected to the server, such as the Mac app.
@@ -456,17 +459,20 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 		r.st.Pwd, _ = e.Payload["pwd"].(string)
 	case "process_changed":
 		if p, ok := e.Payload["foreground"].(block.Process); ok {
-			r.st.Foreground = &p
+			// The shell starting a resumed agent isn't saved as what runs
+			// here: restarted meanwhile, the agent is resumed again.
+			if !(p.AtShell() && time.Now().Before(r.resuming)) {
+				r.st.Foreground = &p
+			}
 			// The shell is back in front: the agent exited, maybe killed
 			// before its SessionEnd hook. Its tools never take the terminal
 			// (they run without one), so this means it's gone. A report from
 			// it later brings it back.
-			if a := r.st.Agent; a != nil && a.State != "ended" && p.AtShell() {
-				a.Before, a.EndedBy = a.State, "shell"
-				a.State, a.Message, a.UpdatedAt = "ended", "", time.Now().UTC()
-				s.bus.Block(r.st.SessionID, e.BlockID, "agent_changed", map[string]any{
-					"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": "", "event": "shell_returned",
-				})
+			if a := r.st.Agent; a != nil && p.Program == a.Harness {
+				r.resuming = time.Time{} // resumed: from now, the shell in front means it's gone
+			}
+			if a := r.st.Agent; a != nil && a.State != "ended" && p.AtShell() && time.Now().After(r.resuming) {
+				s.agentGoneLocked(r, e.BlockID)
 			} else if a != nil && a.EndedBy == "shell" && p.Program == a.Harness {
 				// The same agent is in front again: a tool's interactive shell
 				// had the terminal, or the agent was suspended and resumed.
@@ -889,6 +895,66 @@ func restoreCommand(st *persist.BlockState, resume func(string, string) []string
 	return nil, ""
 }
 
+// agentGoneLocked ends the block's agent: the shell is back in front.
+func (s *Server) agentGoneLocked(r *rec, blockID string) {
+	a := r.st.Agent
+	a.Before, a.EndedBy = a.State, "shell"
+	a.State, a.Message, a.UpdatedAt = "ended", "", time.Now().UTC()
+	s.bus.Block(r.st.SessionID, blockID, "agent_changed", map[string]any{
+		"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": "", "event": "shell_returned",
+	})
+}
+
+// recheckResumed ends a restored agent whose resume never took the
+// terminal: its shell has been in front since the restart.
+func (s *Server) recheckResumed(blockID string) {
+	s.mu.Lock()
+	r := s.blocks[blockID]
+	s.mu.Unlock()
+	if r == nil {
+		return
+	}
+	p, err := r.b.Foreground()
+	if err != nil || !p.AtShell() {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if a := r.st.Agent; a != nil && !r.closing && a.State != "ended" && !r.resuming.IsZero() && time.Now().After(r.resuming) {
+		r.st.Foreground = &p
+		s.agentGoneLocked(r, blockID)
+		s.markDirty()
+	}
+}
+
+// resumeGrace is how long a restored agent's shell may take to start it.
+var resumeGrace = 30 * time.Second
+
+// inShell runs argv in the user's login shell, then stays in that shell:
+// interactive, so the agent sees the environment a pane's shell sets up.
+// The startup files run twice (the shell running the agent, then the one
+// left after it): the price of the same environment as an agent started by
+// hand. ok is false for shells that don't take this command line (nu,
+// csh, tcsh).
+func inShell(argv []string) (_ []string, ok bool) {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+	switch filepath.Base(shell) {
+	case "sh", "bash", "zsh", "dash", "ksh", "mksh", "fish":
+	default:
+		return nil, false
+	}
+	q := make([]string, len(argv))
+	for i, a := range argv {
+		q[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
+	}
+	return []string{shell, "-l", "-i", "-c", strings.Join(q, " ") + "; exec " + q0(shell) + " -l"}, true
+}
+
+func q0(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+
 func (s *Server) restore() error {
 	saved, err := s.store.LoadState()
 	if err != nil || saved == nil {
@@ -910,10 +976,17 @@ func (s *Server) restore() error {
 					Command: argv, Cwd: restoreCwd(st), Cols: max(st.Cols, 2), Rows: max(st.Rows, 2),
 					Restore: snap, Preamble: restorePreamble(was, at), KeepOpen: st.KeepOpen,
 				}
-				// A resumed agent keeps its pane even if the resume fails, so the
-				// error stays visible instead of the layout collapsing.
+				// A resumed agent runs in the user's shell, as one started by
+				// hand: when it quits, or fails to resume, the pane is at a
+				// prompt in the same place, with its last words above.
 				if argv != nil {
-					opts.KeepOpen, st.KeepOpen = true, true
+					if wrapped, ok := inShell(argv); ok {
+						opts.Command = wrapped
+					} else {
+						// A shell that can't run it this way: the agent alone, kept
+						// open so a failed resume stays visible.
+						opts.KeepOpen, st.KeepOpen = true, true
+					}
 				}
 				// The new program is a shell or an agent, never the old command.
 				st.Command, st.Exited, st.ExitCode = argv, false, 0
@@ -925,7 +998,13 @@ func (s *Server) restore() error {
 						st.Agent.State = "idle"
 					}
 				}
-				if _, err := s.startBlock(ss.ID, bid, st, opts); err != nil {
+				r, err := s.startBlock(ss.ID, bid, st, opts)
+				if err == nil && argv != nil {
+					r.resuming = time.Now().Add(resumeGrace)
+					// Nothing in front may change after that: look again then.
+					time.AfterFunc(resumeGrace+100*time.Millisecond, func() { s.recheckResumed(bid) })
+				}
+				if err != nil {
 					s.log.Warn("could not restore block", "block", bid, "err", err)
 					if w.Remove(bid) {
 						ss.RemoveWindow(w.ID)

@@ -227,6 +227,17 @@ func TestRestoreAfterRestart(t *testing.T) {
 	split := h.call("session.new_split", map[string]any{"session_id": sid, "block_id": shell, "direction": "vertical",
 		"layout": map[string]any{"command": []string{"sh", "-c", "printf '\\033]2;✳ Fix login\\007'; exec cat"}, "label": "agent"}})
 	agentBlock := strs(split["block_ids"])[0]
+	// The agent reports once the server has seen it in front: an older
+	// "sh in front" still on its way would end it.
+	for deadline := time.Now().Add(3 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		b := h.call("session.view", map[string]any{"session_id": sid})["blocks"].(map[string]any)[agentBlock].(map[string]any)
+		if fg, _ := b["foreground"].(map[string]any); fg["program"] == "cat" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("cat never came to the front: %v", b["foreground"])
+		}
+	}
 	h.call("agent.report", map[string]any{"block_id": agentBlock, "harness": "claude", "state": "idle",
 		"session_id": "11111111-2222", "cwd": os.TempDir(), "event": "SessionStart"})
 	// /clear mints a new session id; the latest one wins.

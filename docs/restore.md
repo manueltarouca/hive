@@ -15,7 +15,8 @@ or restart the machine, and your sessions come back the next time it starts.
 - Every session, window and layout, with the same IDs and labels.
 - Each terminal's screen and scrollback, followed by a `── restored ──` line.
 - A shell in each terminal's last working directory.
-- Agents, resumed with their latest session. See [Agents](./agents).
+- Agents, resumed with their latest session, in your shell: quit one and the
+  pane is at a prompt in the same place. See [Agents](./agents).
 
 Other programs are not run again. A pane that ran `htop` comes back with a
 shell, and the restored line says what it was running.
