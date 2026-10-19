@@ -63,13 +63,16 @@ you in (see `hive server start --tailscale`).
 Each host gets its own section in the session list. A saved host is
 connected on demand: it's listed with **Connect**, and connects when you pick
 it (or at launch, if the session you were last in is on it). Once connected,
-its sessions show under it, with **New Session on …**; **Disconnect from …**
-in the command palette lets it go. A host saved with `hive hosts add
+its sessions show under it, with **New Session on …**. In the command
+palette, **Connect to Remote Host**, **Disconnect from Remote Host** and
+**Remove Remote Host** each list the hosts they apply to. A host saved with `hive hosts add
 --always` connects at launch and stays connected, so its agents' status and
 notifications are live while you're elsewhere. A session on another machine works as a local one: panes, splits,
 agents and their status, and notifications, which name the host. The title
-bar shows a server icon and the host's name, and, when the host can't be
-reached, why. The app reconnects on its own.
+bar shows a globe and the host's name. While the host is away, the title
+bar says so in a word, and the panes dim under a card that says what's
+happening and why; the app keeps trying, and the card goes the moment the
+host is back. The app reconnects on its own.
 
 Hosts are the same list as `hive hosts`: one added with the CLI shows up in
 the app, and the other way round. Remove one from the command palette.
@@ -107,7 +110,8 @@ Hold **Shift** to select and scroll in hive instead.
 
 ## Links
 
-Hold ⌘ over a link to see the pointing hand, and ⌘-click to open it: a
+Hold ⌘ over a link to see it underlined, with the pointing hand, and
+⌘-click to open it: a
 link a program set (OSC 8), or a web address or file path in the text
 (`/abs`, `~/`, `./`, `../`, with a `:line:col` after it). A web link opens
 in your browser, a file in its app (Preview for an image), a folder in

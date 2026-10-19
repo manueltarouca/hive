@@ -56,6 +56,25 @@ func pixels(_ img: CGImage) -> [UInt8] {
         }
     }
 
+    /// A link under the pointer with ⌘ held is underlined across its
+    /// columns, on its row, and nothing else changes.
+    @Test func hoveredLinkIsUnderlined() throws {
+        let r = try Renderer(fonts: FontSet(pointSize: 13, scale: 2))
+        let m = try Mirror(cols: 40, rows: 4)
+        m.apply(theme: .ghostty)
+        m.feed(Data("see https://hive.matm.xyz now\r\n".utf8))
+        var d = PaneDraw(frame: m.frame(), origin: .zero, size: SIMD2(800, 200), focused: false)
+        let plain = r.instances(for: [d], viewport: SIMD2(800, 200))
+        d.link = (row: 0, columns: 4..<25)
+        let linked = r.instances(for: [d], viewport: SIMD2(800, 200))
+        #expect(linked.count == plain.count + 1)
+        let cw = Float(r.fonts.cellWidth), ch = Float(r.fonts.cellHeight)
+        let line = linked.first { $0.kind == 0 && $0.size.x == 21 * cw && $0.size.y < ch / 2 }
+        #expect(line != nil, "an underline 21 cells wide")
+        #expect(line?.pos.x == 4 * cw)
+        #expect((line?.pos.y ?? 0) > 0 && (line?.pos.y ?? 0) < ch)
+    }
+
     @Test func cellMetricsAreWholePixels() {
         let f = FontSet(pointSize: 13, scale: 2)
         #expect(f.cellWidth >= 14 && f.cellWidth <= 18)

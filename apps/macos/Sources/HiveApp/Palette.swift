@@ -18,6 +18,14 @@ struct PaletteItem: Identifiable {
     var sectionSymbol: String? = nil
     /// A tooltip: the full reason behind a short row.
     var help: String = ""
+    /// Says something, does nothing: never selected, Return skips it.
+    var inert = false
+    /// A warning: the icon in the warning colour, the text muted.
+    var warning = false
+    /// Opens a list of its own (the reference app's > rows).
+    var chevron = false
+    /// A divider above this row: actions after the list they act on.
+    var dividerAbove = false
     var action: () -> Void
 }
 
@@ -32,7 +40,7 @@ final class PalettePanel {
     /// Host"), in place of the magnifying glass. query: what the field
     /// starts with.
     func show(over window: NSWindow, at origin: CGPoint? = nil, width: CGFloat, placeholder: String, style: Style,
-              token: String? = nil, query: String = "",
+              token: String? = nil, query: String = "", notice: (title: String, detail: String)? = nil,
               items: @escaping (String) -> [PaletteItem], onCreate: ((String) -> Void)? = nil) {
         close()
         let p = KeyPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: 360),
@@ -46,7 +54,7 @@ final class PalettePanel {
         if ProcessInfo.processInfo.environment["HIVE_DRAW_COVERED"] == "1" { p.hidesOnDeactivate = false }
         // The panel fits the card: a taller clear panel would catch hovers
         // and clicks meant for the window below and swallow them.
-        let view = PaletteView(placeholder: placeholder, style: style, token: token, initialQuery: query, items: items, onCreate: onCreate,
+        let view = PaletteView(placeholder: placeholder, style: style, token: token, initialQuery: query, notice: notice, items: items, onCreate: onCreate,
                                onHeight: { [weak p] h in
                                    guard let p, h > 0, abs(p.frame.height - h) > 0.5 else { return }
                                    p.setFrame(NSRect(x: p.frame.minX, y: p.frame.maxY - h, width: p.frame.width, height: h), display: true)
@@ -92,6 +100,8 @@ struct PaletteView: View {
     let style: Style
     var token: String? = nil
     var initialQuery = ""
+    /// Something to say under the field (why an Add Host didn't work).
+    var notice: (title: String, detail: String)? = nil
     let items: (String) -> [PaletteItem]
     let onCreate: ((String) -> Void)?
     var onHeight: (CGFloat) -> Void = { _ in }
@@ -130,26 +140,47 @@ struct PaletteView: View {
                     .onSubmit { run(rows, creating) }
             }
             .padding(.horizontal, 12).frame(height: 40)
+            if let notice {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 11)).foregroundStyle(style.blocked.swiftUI)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(notice.title).font(.system(size: 12.5)).foregroundStyle(style.text.swiftUI)
+                        if !notice.detail.isEmpty {
+                            Text(notice.detail).font(.system(size: 11)).foregroundStyle(style.secondary.swiftUI)
+                                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12).padding(.bottom, 10)
+            }
             Divider().overlay(style.border.swiftUI)
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: total > 9) {
                     VStack(alignment: .leading, spacing: 1) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { i, item in
+                            if item.dividerAbove, i > 0 {
+                                Divider().overlay(style.border.swiftUI).padding(.horizontal, 4).padding(.vertical, 4)
+                            }
                             if !item.section.isEmpty, i == 0 || rows[i - 1].section != item.section {
-                                HStack(spacing: 5) {
-                                    if let sym = item.sectionSymbol { Image(systemName: sym).font(.system(size: 10)) }
-                                    Text(item.section).font(.system(size: 10.5, weight: .semibold))
+                                // In the rows' columns: icon over icon, text over text.
+                                HStack(spacing: 8) {
+                                    Group {
+                                        if let sym = item.sectionSymbol { Image(systemName: sym) } else { Color.clear }
+                                    }
+                                    .font(.system(size: 10.5)).frame(width: 16)
+                                    Text(item.section).font(.system(size: 11, weight: .medium))
                                         .lineLimit(1).truncationMode(.middle)
                                 }
                                 .foregroundStyle(style.secondary.swiftUI)
                                 .padding(.horizontal, 10).padding(.top, i == 0 ? 2 : 8).padding(.bottom, 2)
                             }
-                            row(item, selected: i == selected).id(i).help(item.help)
-                                .onTapGesture { item.action(); dismiss() }
+                            row(item, selected: i == selected && !item.inert).id(i).help(item.help)
+                                .onTapGesture { guard !item.inert else { return }; item.action(); dismiss() }
                                 .onContinuousHover { phase in
                                     // The pointer picks the row it moves onto; rows
                                     // scrolling under a resting pointer don't.
-                                    if case .active = phase, hoverGate.accept(pointer: pointerOnScreen()) { selected = i }
+                                    if case .active = phase, !item.inert, hoverGate.accept(pointer: pointerOnScreen()) { selected = i }
                                 }
                         }
                         if creating {
@@ -163,7 +194,7 @@ struct PaletteView: View {
                     }
                     .padding(6)
                 }
-                .frame(height: min(CGFloat(total) * 31 + 12 + sectionHeight(rows), 9 * 31 + 12 + sectionHeight(rows)))
+                .frame(height: min(CGFloat(total) * 31 + 12 + sectionHeight(rows) + dividers(rows), 9 * 31 + 12 + sectionHeight(rows) + dividers(rows)))
                 .onChange(of: selected) { _, v in proxy.scrollTo(v) }
             }
         }
@@ -173,11 +204,34 @@ struct PaletteView: View {
         .background(GeometryReader { g in Color.clear.preference(key: CardHeight.self, value: g.size.height) })
         .onPreferenceChange(CardHeight.self) { onHeight($0) }
         .frame(maxHeight: .infinity, alignment: .top)
-        .onAppear { if query.isEmpty { query = initialQuery }; focused = true }
-        .onChange(of: query) { _, _ in selected = 0 }
-        .onKeyPress(.downArrow) { selected = min(selected + 1, max(0, total - 1)); return .handled }
-        .onKeyPress(.upArrow) { selected = max(selected - 1, 0); return .handled }
+        .onAppear {
+            focused = true
+            selected = firstLive(rows, from: 0, step: 1)
+            // After focus, so the caret lands at the end instead of the
+            // field selecting what it starts with.
+            if !initialQuery.isEmpty { DispatchQueue.main.async { if query.isEmpty { query = initialQuery } } }
+        }
+        .onChange(of: query) { _, q in selected = firstLive(items(q), from: 0, step: 1) }
+        .onKeyPress(.downArrow) {
+            // Past the last live row (inert ones only below): stay put.
+            let n = firstLive(rows, from: selected + 1, step: 1)
+            if n < total { selected = n }
+            return .handled
+        }
+        .onKeyPress(.upArrow) { selected = max(firstLive(rows, from: selected - 1, step: -1), 0); return .handled }
         .onKeyPress(.escape) { dismiss(); return .handled }
+    }
+
+    /// The first row from `from` that can be selected, going by `step`.
+    private func firstLive(_ rows: [PaletteItem], from: Int, step: Int) -> Int {
+        var i = from
+        while i >= 0, i < rows.count, rows[i].inert { i += step }
+        if i < 0 { return selected }
+        return i
+    }
+
+    private func dividers(_ rows: [PaletteItem]) -> CGFloat {
+        CGFloat(rows.enumerated().filter { $0.offset > 0 && $0.element.dividerAbove }.count) * 9
     }
 
     private func sectionHeight(_ rows: [PaletteItem]) -> CGFloat {
@@ -188,6 +242,7 @@ struct PaletteView: View {
 
     private func run(_ rows: [PaletteItem], _ creating: Bool) {
         if selected < rows.count {
+            guard !rows[selected].inert else { return }
             rows[selected].action()
         } else if creating {
             onCreate?(query)
@@ -196,20 +251,36 @@ struct PaletteView: View {
     }
 
     private func row(_ item: PaletteItem, selected: Bool) -> some View {
-        HStack(spacing: 8) {
+        // A checked row without an icon of its own shows its check where
+        // the icon goes (the session you're in, as the reference app marks it).
+        let leadingCheck = item.checked && item.symbol == nil
+        return HStack(spacing: 8) {
             Group {
-                if let sym = item.symbol { Image(systemName: sym) } else { Color.clear }
+                if leadingCheck {
+                    Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(style.accent.swiftUI)
+                        .accessibilityLabel("Current")
+                } else if let sym = item.symbol {
+                    Image(systemName: sym)
+                        .foregroundStyle(item.warning ? style.blocked.swiftUI : selected ? style.accent.swiftUI : style.secondary.swiftUI)
+                        .accessibilityHidden(true)
+                } else {
+                    Color.clear
+                }
             }
             .font(.system(size: 11.5)).frame(width: 16)
-            .foregroundStyle(selected ? style.accent.swiftUI : style.secondary.swiftUI)
-            Text(item.title).font(.system(size: 13)).foregroundStyle(style.text.swiftUI).lineLimit(1)
+            Text(item.title).font(.system(size: 13))
+                .foregroundStyle(item.warning || item.inert ? style.secondary.swiftUI : style.text.swiftUI).lineLimit(1)
             Spacer(minLength: 8)
-            if item.checked { Image(systemName: "checkmark").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(style.accent.swiftUI) }
+            if item.checked, !leadingCheck { Image(systemName: "checkmark").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(style.accent.swiftUI) }
             Text(item.detail).font(.system(size: 11.5)).foregroundStyle(style.secondary.swiftUI)
+            if item.chevron { Image(systemName: "chevron.right").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(style.secondary.swiftUI) }
         }
         .padding(.horizontal, 10).frame(height: 30)
         .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(selected ? style.accent.swiftUI.opacity(0.16) : .clear))
         .contentShape(Rectangle())
+        // A host's problem is read with its host: "hive: No hive server running".
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(item.inert && !item.section.isEmpty ? Text("\(item.section): \(item.title)") : Text(item.title))
     }
 }
 

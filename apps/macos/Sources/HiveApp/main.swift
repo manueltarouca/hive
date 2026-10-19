@@ -31,7 +31,7 @@ final class RootView: NSView {
             } else if v is TitleBarHost<AgentSidebar> {
                 v.isHidden = side == 0
                 v.frame = NSRect(x: 0, y: 0, width: AgentSidebar.width, height: bounds.height)
-            } else if v is PanesView {
+            } else if v is PanesView || v is HostAwayHost {
                 // Cards start just under the bar, clear of the tabs.
                 let top = TitleBar.height + 4
                 v.frame = NSRect(x: side, y: top, width: bounds.width - side, height: bounds.height - top)
@@ -86,6 +86,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         sidebar.safeAreaRegions = []
         root.sidebarWidth = { [weak self] in (self?.model.sidebar ?? false) ? AgentSidebar.width : 0 }
         root.addSubview(panes)
+        let away = HostAwayHost(rootView: HostAway(model: model))
+        away.safeAreaRegions = []
+        away.isHidden = true
+        root.addSubview(away)
+        // Shown while the host is away (connecting at launch isn't that).
+        model.$trouble.removeDuplicates().sink { [weak away] t in away?.isHidden = !t }.store(in: &bag)
         root.addSubview(bar)
         root.addSubview(sidebar)
         window.contentView = root
@@ -148,6 +154,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
                 if what == "palette" { self?.showPalette() } else if what == "picker" { self?.showSessionPicker() }
                 if what.hasPrefix("palette:") { self?.showPalette(query: String(what.dropFirst("palette:".count))) }
+                if what == "hostlist:connect" { self?.showHostList(.connect) }
+                if what == "hostlist:remove" { self?.showHostList(.remove) }
                 if what == "shortcuts" { self?.toggleShortcuts() }
                 if what == "settings" { self?.showSettings() }
                 if what.hasPrefix("addhostproblem:") {
@@ -245,8 +253,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     let detail = !need.isEmpty
                         ? attentionCounts(need)
                         : s.agents > 0 ? "\(s.agents) agent\(s.agents == 1 ? "" : "s")" : ""  // no keys switch sessions by number
+                    // No icon: the session you're in has its check there.
                     rows.append(PaletteItem(key: s.id, title: s.label.isEmpty ? String(s.id.suffix(6)) : s.label, detail: detail,
-                                            symbol: "rectangle.split.2x1", checked: s.id == m.currentSession, section: h.name,
+                                            checked: s.id == m.currentSession, section: h.name,
                                             sectionSymbol: h.local ? "laptopcomputer" : "globe") { [weak self] in
                         self?.model.select(session: s.id)
                     })
@@ -255,13 +264,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let icon = h.local ? "laptopcomputer" : "globe"
                 if h.idle {
                     // Saved, not connected: connect, then show its sessions.
-                    rows.append(PaletteItem(key: "connect:\(h.id)", title: "Connect", symbol: "bolt.horizontal", section: h.name,
+                    rows.append(PaletteItem(key: "connect:\(h.id)", title: "Connect", symbol: "link", section: h.name,
                                             sectionSymbol: icon) { [weak self] in
                         self?.model.connect(host: h.id) { [weak self] in self?.showSessionPicker() }
                     })
                 } else if let problem = h.problem {
-                    rows.append(PaletteItem(key: "host:\(h.id)", title: problem, symbol: "exclamationmark.triangle", section: h.name,
-                                            sectionSymbol: icon, help: h.detail ?? "") {})
+                    // What's wrong, in a word: it says, it doesn't act.
+                    rows.append(PaletteItem(key: "host:\(h.id)", title: problem, symbol: "exclamationmark.triangle.fill", section: h.name,
+                                            sectionSymbol: icon, help: h.detail ?? "", inert: true, warning: h.refused) {})
                 } else if !h.local {
                     rows.append(PaletteItem(key: "new:\(h.id)", title: "New Session on \(h.name)", symbol: "plus", section: h.name,
                                             sectionSymbol: icon) { [weak self] in
@@ -270,7 +280,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
             if q.isEmpty {
-                rows.append(PaletteItem(title: "New Session", detail: ShortcutsPanel.keys(for: "New Session"), symbol: "plus", section: "") { [weak self] in self?.model.newSession() })
+                rows.append(PaletteItem(title: "New Session", detail: ShortcutsPanel.keys(for: "New Session"), symbol: "plus", section: "",
+                                        dividerAbove: true) { [weak self] in self?.model.newSession() })
                 rows.append(PaletteItem(title: "Add Remote Host…", symbol: "globe", section: "") { [weak self] in
                     DispatchQueue.main.async { self?.showAddHost() }
                 })
@@ -346,36 +357,96 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
             PaletteItem(title: "Add Remote Host…", symbol: "globe") { [weak self] in DispatchQueue.main.async { self?.showAddHost() } },
-        ] + m.hostRows.filter { !$0.local }.flatMap { h -> [PaletteItem] in
-            let link = h.idle
-                ? PaletteItem(title: "Connect to \(h.name)", symbol: "bolt.horizontal",
-                              action: { [weak self] in m.connect(host: h.id) { [weak self] in self?.showSessionPicker() } })
-                : PaletteItem(title: "Disconnect from \(h.name)", symbol: "bolt.horizontal.circle", action: { m.disconnect(host: h.id) })
-            return [link, PaletteItem(title: "Remove Host \(h.name)", symbol: "minus.circle") { m.removeHost(h.label) }]
-        } + Appearance.allCases.map { a in
+        ] + hostCommands() + Appearance.allCases.map { a in
             PaletteItem(title: "Theme: \(a.title)", symbol: a == .night ? "moon" : a == .day ? "sun.max" : "circle.lefthalf.filled",
                         checked: m.appearance == a) { m.setAppearance(a) }
         }
     }
 
+    /// The palette's host commands, one row per action (the reference app's > rows), each
+    /// opening the hosts it applies to. Only the ones that apply now.
+    private func hostCommands() -> [PaletteItem] {
+        let remote = model.hostRows.filter { !$0.local }
+        var rows: [PaletteItem] = []
+        if remote.contains(where: \.idle) {
+            rows.append(PaletteItem(title: "Connect to Remote Host", symbol: "link", chevron: true) { [weak self] in
+                DispatchQueue.main.async { self?.showHostList(.connect) }
+            })
+        }
+        if remote.contains(where: { !$0.idle }) {
+            rows.append(PaletteItem(title: "Disconnect from Remote Host", symbol: "xmark.circle", chevron: true) { [weak self] in
+                DispatchQueue.main.async { self?.showHostList(.disconnect) }
+            })
+        }
+        if !remote.isEmpty {
+            rows.append(PaletteItem(title: "Remove Remote Host", symbol: "minus.circle", chevron: true) { [weak self] in
+                DispatchQueue.main.async { self?.showHostList(.remove) }
+            })
+        }
+        return rows
+    }
+
+    enum HostAction { case connect, disconnect, remove }
+
+    /// The hosts an action applies to, by their globe and address.
+    func showHostList(_ action: HostAction) {
+        let token = ["Connect", "Disconnect", "Remove"][[HostAction.connect, .disconnect, .remove].firstIndex(of: action)!]
+        palette.show(over: window, width: 460, placeholder: "Filter hosts…", style: model.style, token: token) { [weak self] q in
+            guard let self else { return [] }
+            let m = self.model
+            return m.hostRows.filter { h in
+                !h.local && fuzzy(h.name + " " + h.label, q) && (action == .remove || (action == .connect) == h.idle)
+            }.map { h in
+                PaletteItem(key: "\(token):\(h.id)", title: h.name, detail: h.name == h.label ? "" : h.label, symbol: "globe") { [weak self] in
+                    switch action {
+                    case .connect: m.connect(host: h.id) { [weak self] in self?.showSessionPicker() }
+                    case .disconnect: m.disconnect(host: h.id)
+                    case .remove: m.removeHost(h.label)
+                    }
+                }
+            }
+        }
+    }
+
     /// Add Host, as an inline prompt: an address, and one row to connect
     /// to it. hive checks the address and saves the URL it answers at; a
-    /// problem comes back as a row, with the address kept.
+    /// problem shows under the field, with the address kept.
     func showAddHost(address: String = "", problem: String? = nil) {
         palette.show(over: window, width: 460, placeholder: "box.example.ts.net, or https://…", style: model.style,
-                     token: "Add Host", query: address) { [weak self] q in
+                     token: "Add Host", query: address, notice: problem.map(AppDelegate.hostProblem)) { [weak self] q in
             let a = q.trimmingCharacters(in: .whitespaces)
-            var rows: [PaletteItem] = []
-            if let problem, a == address {
-                rows.append(PaletteItem(key: "problem", title: problem, symbol: "exclamationmark.triangle", help: problem) {})
-            }
-            if !a.isEmpty {
-                rows.append(PaletteItem(key: "connect", title: "Connect to \u{201C}\(a)\u{201D}", detail: "↩", symbol: "globe") { [weak self] in
-                    self?.addHost(a)
-                })
-            }
-            return rows
+            guard !a.isEmpty else { return [] }
+            return [PaletteItem(key: "connect", title: "Connect to \u{201C}\(a)\u{201D}", detail: "↩", symbol: "globe") { [weak self] in
+                self?.addHost(a)
+            }]
         }
+    }
+
+    /// What `hive hosts add` said, as a person would: the gist, then the
+    /// particulars.
+    /// "https://h, https://h:4483, http://h:4483" as "Tried HTTPS on 443 and
+    /// 4483, and HTTP on 4483": the host is in the title already.
+    static func triedSummary(_ list: String) -> String {
+        var ports: [(scheme: String, ports: [String])] = []
+        for u in list.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }) {
+            guard let c = URLComponents(string: u), let scheme = c.scheme?.uppercased() else { continue }
+            let port = c.port.map(String.init) ?? (scheme == "HTTPS" ? "443" : "80")
+            if let i = ports.firstIndex(where: { $0.scheme == scheme }) { ports[i].ports.append(port) } else { ports.append((scheme, [port])) }
+        }
+        let parts = ports.map { "\($0.scheme) on \($0.ports.joined(separator: " and "))" }
+        guard !parts.isEmpty else { return "" }
+        return "Tried " + (parts.count == 1 ? parts[0] : parts.dropLast().joined(separator: ", ") + ", and " + parts.last!) + "."
+    }
+
+    static func hostProblem(_ raw: String) -> (title: String, detail: String) {
+        var m = raw
+        for prefix in ["hosts add: ", "server unreachable: "] where m.hasPrefix(prefix) { m = String(m.dropFirst(prefix.count)) }
+        if let r = m.range(of: "no hive server at "), let open = m.range(of: " (tried ", range: r.upperBound..<m.endIndex) {
+            let host = String(m[r.upperBound..<open.lowerBound])
+            let tried = String(m[open.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: ")"))
+            return ("No hive server answers at \(host)", triedSummary(tried))
+        }
+        return (m.prefix(1).uppercased() + m.dropFirst(), "")
     }
 
     private func addHost(_ address: String) {

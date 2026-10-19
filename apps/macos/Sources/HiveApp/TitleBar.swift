@@ -96,10 +96,15 @@ struct SessionChip: View {
                         .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(s.text.swiftUI)
                     // The host; while it isn't connected, a sentence saying
                     // why in its place (the full reason on hover).
-                    Text(model.trouble ? model.status : model.host).font(.system(size: 10))
-                        .foregroundStyle(model.trouble ? s.blocked.swiftUI : s.secondary.swiftUI)
-                        .truncationMode(.tail).frame(maxWidth: 220, alignment: .leading)
-                        .help(model.trouble ? model.statusDetail ?? model.status : "")
+                    // Too long, it fades at the edge (never "…").
+                    let line = Text(model.trouble ? model.status : model.host).font(.system(size: 10))
+                        .foregroundStyle(!model.trouble ? s.secondary.swiftUI : model.statusRefused ? s.blocked.swiftUI : s.accent.swiftUI)
+                    ViewThatFits(in: .horizontal) {
+                        line.fixedSize()
+                        line.fixedSize().frame(maxWidth: 220, alignment: .leading).clipped().mask(FadeMask())
+                    }
+                    .frame(maxWidth: 220, alignment: .leading)
+                    .help(model.trouble ? model.statusDetail ?? model.status : "")
                 }
                 .lineLimit(1)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))

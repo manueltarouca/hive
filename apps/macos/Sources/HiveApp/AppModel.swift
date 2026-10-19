@@ -165,9 +165,10 @@ final class AppModel: ObservableObject {
         let id: String
         let name: String       // This Mac, or the server's address
         let label: String      // as `hive hosts` knows it
-        let problem: String?   // a sentence naming the host, while not connected
+        let problem: String?   // a short reason, under its header, while not connected
         let idle: Bool         // saved, not connected: Connect to use it
         let detail: String?    // the reason in full
+        let refused: Bool      // turned away: waiting won't help
         var local: Bool { id == HostConnection.localID }
     }
     /// Runs once a host has connected (and listed its sessions).
@@ -181,6 +182,11 @@ final class AppModel: ObservableObject {
     /// The current host has a problem worth showing (connecting at launch
     /// isn't one).
     @Published var trouble = false
+    /// The host refused this Mac (it won't change by waiting).
+    @Published var statusRefused = false
+    /// The current host's state as a sentence naming it, for the card over
+    /// the panes ("Reconnecting to hive…"); the title bar says it short.
+    @Published var statusSentence = ""
 
     /// The current host's problem in full, for the title bar's tooltip.
     @Published var statusDetail: String?
@@ -302,7 +308,7 @@ final class AppModel: ObservableObject {
             if let p = self.pendingConnected.removeValue(forKey: h.id), Date().timeIntervalSince(p.at) < 20 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { p.then() }
             }
-            if h === self.current { self.connected = true; self.status = h.status }
+            if h === self.current { self.connected = true; self.status = h.shortProblem ?? h.status }
             self.reloadSessions(h, create: h.isLocal)
             if h === self.current { self.reloadView() }
         }
@@ -312,7 +318,7 @@ final class AppModel: ObservableObject {
             self.publishHosts()
             if h === self.current {
                 self.connected = false
-                self.status = h.status
+                self.status = h.shortProblem ?? h.status
                 self.attached.removeAll() // the new engine attaches afresh
             }
         }
@@ -370,13 +376,17 @@ final class AppModel: ObservableObject {
     /// Every host's sessions and agents, as the sidebar and switcher show
     /// them: this Mac's first, agents by urgency.
     func publishHosts() {
-        let rows = hosts.map { HostRow(id: $0.id, name: $0.displayName, label: $0.label, problem: $0.problem, idle: !$0.active, detail: $0.detail) }
+        let rows = hosts.map { HostRow(id: $0.id, name: $0.displayName, label: $0.label, problem: $0.shortProblem, idle: !$0.active, detail: $0.detail, refused: $0.refused) }
         if rows != hostRows { hostRows = rows }
         if connected != current.connected { connected = current.connected }
-        if status != current.status { status = current.status }
+        let short = current.shortProblem ?? current.status
+        if status != short { status = short }
+        let sentence = current.problem ?? ""
+        if statusSentence != sentence { statusSentence = sentence }
         if statusDetail != current.detail { statusDetail = current.detail }
-        let t = !current.connected && current.link != .connecting
+        let t = !current.connected && current.link != .connecting && current.link != .idle
         if trouble != t { trouble = t }
+        if statusRefused != current.refused { statusRefused = current.refused }
         let all = hosts.flatMap(\.sessions)
         if all != sessions { sessions = all }
         let order = ["blocked": 0, "done": 1, "working": 2, "idle": 3]
@@ -520,8 +530,8 @@ final class AppModel: ObservableObject {
         current = h
         host = h.displayName
         remote = !h.isLocal
-        connected = h.connected
-        status = h.status
+        // The title bar, the away card and their tone follow the new host.
+        publishHosts()
     }
 
     func reloadView() {

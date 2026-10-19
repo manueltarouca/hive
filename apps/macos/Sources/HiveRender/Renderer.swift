@@ -21,6 +21,8 @@ public struct PaneDraw {
     public var scrollY: Float = 0
     /// False in a blinking cursor's hidden half (focused panes only).
     public var cursorShown = true
+    /// A link under the pointer with ⌘ held: underlined, as Ghostty does.
+    public var link: (row: Int, columns: Range<Int>)? = nil
     public init(frame: PaneFrame, origin: SIMD2<Float>, size: SIMD2<Float>, focused: Bool) {
         self.frame = frame; self.origin = origin; self.size = size; self.focused = focused
     }
@@ -137,6 +139,11 @@ public final class Renderer {
                                                  uv: .zero, color: color(fgc, alpha: alpha), kind: 0))
                     }
                 }
+            }
+            if let l = p.link, l.row >= 0, l.row < f.rows {
+                let t = max(1, Float(fonts.underlineThickness))
+                let pos = p.origin + SIMD2(Float(l.columns.lowerBound) * cw, Float(l.row) * ch - p.scrollY + ch - Float(fonts.underlinePosition) - t / 2)
+                deco.append(QuadInstance(pos: pos, size: SIMD2(Float(l.columns.count) * cw, t), uv: .zero, color: color(defaultFG), kind: 0))
             }
             // Non-block cursors, and a hollow block for unfocused panes.
             if f.cursor.visible, f.cursor.y < f.rows, p.cursorShown || !p.focused {

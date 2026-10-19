@@ -97,7 +97,13 @@ final class PaneView: MTKView, NSTextInputClient {
         super.viewDidMoveToWindow()
         if window == nil { blinkTimer?.invalidate(); blinkTimer = nil }
         if let o = occlusionObserver { NotificationCenter.default.removeObserver(o); occlusionObserver = nil }
+        if let o = resignObserver { NotificationCenter.default.removeObserver(o); resignObserver = nil }
         if let w = window {
+            // ⌘-Tab away with ⌘ held: no underline or hand left behind.
+            resignObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification,
+                                                                    object: w, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.clearLink() }
+            }
             occlusionObserver = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification,
                                                                        object: w, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { if self?.windowVisible == true { self?.needsDisplay = true } }
@@ -155,6 +161,7 @@ final class PaneView: MTKView, NSTextInputClient {
     /// behind others can be captured without taking the user's focus.
     private static let drawCovered = ProcessInfo.processInfo.environment["HIVE_DRAW_COVERED"] == "1"
     private var occlusionObserver: NSObjectProtocol?
+    private var resignObserver: NSObjectProtocol?
 
     override func draw(_ dirtyRect: NSRect) {
         guard windowVisible else { return }
@@ -168,6 +175,9 @@ final class PaneView: MTKView, NSTextInputClient {
             // The key window or the program's blink may have changed since.
             if blinks != (blinkTimer != nil) { resetBlink() }
             d.cursorShown = !blinks || blink.visible(at: now)
+            d.link = hoveredLink
+            // Output may have moved the link: look again under the pointer.
+            if hoveredLink != nil { DispatchQueue.main.async { [weak self] in self?.updateLinkCursor(NSEvent.modifierFlags) } }
             // Composing text follows the cursor as the program redraws.
             if marked.length > 0 { showPreedit() }
             if !focused {
@@ -235,18 +245,33 @@ final class PaneView: MTKView, NSTextInputClient {
     /// With ⌘ held, a link under the pointer shows the pointing hand; the
     /// cursor goes back when ⌘ is released or the pointer leaves the pane.
     private var overLink = false
+    /// The link under the pointer while ⌘ is held: drawn underlined.
+    private var hoveredLink: (row: Int, columns: Range<Int>)? {
+        didSet { if hoveredLink?.row != oldValue?.row || hoveredLink?.columns != oldValue?.columns { needsDisplay = true } }
+    }
     private func updateLinkCursor(_ flags: NSEvent.ModifierFlags) {
         guard let w = window else { return }
         let at = w.mouseLocationOutsideOfEventStream
-        let over = flags.contains(.command) && bounds.contains(convert(at, from: nil)) && link(atWindowPoint: at) != nil
+        var found: (row: Int, columns: Range<Int>)?
+        if flags.contains(.command), bounds.contains(convert(at, from: nil)) {
+            let p = gridPoint(at: convert(at, from: nil))
+            if cellSize.height > 0, let l = link(atWindowPoint: at) { found = (Int(p.y / cellSize.height), l.columns) }
+        }
+        let over = found != nil
         if over, !overLink { NSCursor.pointingHand.push() }
         if !over, overLink { NSCursor.pop() }
         overLink = over
+        hoveredLink = found
     }
 
     override func mouseExited(with event: NSEvent) {
-        if overLink { NSCursor.pop(); overLink = false }
+        clearLink()
         super.mouseExited(with: event)
+    }
+
+    private func clearLink() {
+        if overLink { NSCursor.pop(); overLink = false }
+        hoveredLink = nil
     }
 
     /// Only ⌘ changes what the pointer means.

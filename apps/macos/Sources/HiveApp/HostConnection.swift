@@ -34,8 +34,12 @@ final class HostConnection {
     /// (box.example.ts.net), as the session list and title bar show it.
     var displayName: String {
         if isLocal { return "This Mac" }
-        if case let .tcp(host, _, _) = endpoints[0] { return host }
-        return label
+        guard case let .tcp(host, port, tls) = endpoints[0] else { return label }
+        // The port only when it isn't the one you'd assume: two servers on
+        // one machine stay apart.
+        let usual = port == ServerEndpoint.defaultPort || (tls && port == 443) || (!tls && port == 80)
+        let h = host.contains(":") ? "[\(host)]" : host
+        return usual ? h : "\(h):\(port)"
     }
 
     /// How the connection stands.
@@ -45,26 +49,54 @@ final class HostConnection {
         case connecting, connected, reconnecting, refused(String), noServer, silent, failed(String)
     }
     private(set) var link = Link.idle
+    /// Whether this run has reached the host yet: until it has, a failure
+    /// is "can't reach", not "reconnecting".
+    private(set) var everConnected = false
+    var refused: Bool { if case .refused = link { return true }; return false }
 
-    /// Why it isn't connected, as a sentence naming the host; nil while
-    /// connected. The details (the server's words) are in `detail`.
+    /// Why it isn't connected, as the title bar says it in place of the
+    /// host's name: what you experience (it keeps trying), naming the host.
+    /// nil while connected. The cause is in `detail`.
     var problem: String? {
         let n = displayName
         switch link {
         case .connected, .idle: return nil
         case .connecting: return "Connecting to \(n)…"
-        case .reconnecting: return "Reconnecting to \(n)…"
         case .refused: return "\(n) refused this Mac"
-        case .noServer: return isLocal ? "The hive server isn't running" : "No hive server on \(n)"
-        case .silent: return "\(n) isn't answering"
-        case .failed: return "Can't reach \(n)"
+        case .reconnecting:
+            return isLocal ? "Reconnecting to the hive server…" : "Reconnecting to \(n)…"
+        case .noServer, .silent, .failed:
+            if !everConnected { return isLocal ? "Can't reach the hive server" : "Can't reach \(n)" }
+            return isLocal ? "Reconnecting to the hive server…" : "Reconnecting to \(n)…"
         }
     }
 
-    /// The reason in full, for a tooltip.
-    var detail: String? {
+    /// The same, under the host's own header in the session list: no need
+    /// to name it again.
+    var shortProblem: String? {
         switch link {
-        case .refused(let m), .failed(let m): return m
+        case .connected, .idle: return nil
+        case .connecting: return "Connecting…"
+        case .reconnecting: return "Reconnecting…"
+        case .refused: return "Refused this Mac"
+        case .noServer: return "No hive server running"
+        case .silent: return "Not answering"
+        case .failed: return "Can't connect"
+        }
+    }
+
+    /// The cause in full, for a tooltip.
+    var detail: String? {
+        let at = endpoint.description
+        switch link {
+        case .refused(let m): return m
+        case .failed(let m): return "\(m) (\(at)). hive keeps trying."
+        case .noServer:
+            // This Mac's server isn't restarted for you once it's stopped.
+            if isLocal { return "No hive server answers at \(at). Start it with hive server start." }
+            return "No hive server answers at \(at). hive keeps trying."
+        case .silent: return "\(at) doesn't answer. hive keeps trying."
+        case .reconnecting: return "The connection to \(at) dropped. hive keeps trying."
         default: return nil
         }
     }
@@ -108,6 +140,7 @@ final class HostConnection {
         guard !active else { return }
         active = true
         closing = false
+        everConnected = false
         link = .connecting
         status = problem ?? ""
         connect()
@@ -208,6 +241,7 @@ final class HostConnection {
                             self.hostname = j["hostname"].string
                             self.home = j["home"].string
                             self.link = .connected
+                            self.everConnected = true
                             self.connected = true
                             self.status = "Connected"
                             self.onConnected?(self)
