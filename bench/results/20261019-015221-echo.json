@@ -1,0 +1,43 @@
+{
+  "scenario": "echo",
+  "meta": {
+    "when": "2026-10-19T00:52:21Z",
+    "machine": "Mac17,8",
+    "cpu": "Apple M5 Pro",
+    "cores": 18,
+    "memory_gb": 48,
+    "os": "macOS 27.0.1",
+    "go": "go1.27.2",
+    "commit": "",
+    "power": "AC Power",
+    "load_before": "6.22 5.88 7.64",
+    "load_after": "6.22 5.88 7.64",
+    "pty_max": 511,
+    "pty_in_use": 36,
+    "open_files_limit": "1048576",
+    "gomaxprocs": 18,
+    "fit_for_baseline": false,
+    "why_not_baseline": "load average 6.22 5.88 7.64"
+  },
+  "params": {
+    "every_ms": 30,
+    "keys": 300,
+    "path": "tailnet direct, Mac to eu-west-1",
+    "server": "http://hive:4483"
+  },
+  "call_rtt": {
+    "n": 45,
+    "p50_ms": 48.41,
+    "p99_ms": 69.52,
+    "max_ms": 69.52
+  },
+  "echo_rtt": {
+    "n": 290,
+    "p50_ms": 47.7,
+    "p99_ms": 49.69,
+    "max_ms": 50.26
+  },
+  "echo_overhead_p50_ms": -0.7099999999999937,
+  "flood_mb_per_s": 119.52888801900082,
+  "flood_resyncs": 1
+}

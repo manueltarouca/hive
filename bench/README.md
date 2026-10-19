@@ -57,6 +57,7 @@ settings, and needs `/tmp/hivebench` (above) as the pane's program.
 | app `engine` | output rate, the app's real HiveClient and Engine on a real server | a resync, or the vt queue over 90% of a core |
 | app `resize` | a mirror's history (0, 4, 16 MB), resized back and forth, a frame after each | resize + frame p99 above 8 ms |
 | app `memory` | mirrors with full scrollback | none: MB per mirror |
+| `echo` | none: a server, local or remote (`--server` socket or URL) | none: a call's round trip, a keystroke's echo through a pane, and with `--flood MB` what the link sustains |
 | `output` | output rate per pane (64 KB/s to 128 MB/s), stamped by the emitter, read by an attach client as the app does; `--client-cost` makes the client spend time on each frame, as the app does parsing | latency p99 above 50 ms, under 90% of the bytes delivered, or a resync |
 
 ## Findings
@@ -231,3 +232,15 @@ scenario). Compare a rerun's numbers against the same machine's.
 - `m7g.xlarge-20261018`: Linux, Go 1.27.2, the tree of 640feeb (its
   results say 4a6d228+dirty: the VM's copy predated the commits). Knees:
   flush 192 panes empty, 32 full (CPU, then disk); ptyread 128.
+
+**2026-10-19, remote: how a server feels over a tailnet** (`echo`; the
+Mac at home to the lab VM in eu-west-1, a direct WireGuard path, ping 47 ms).
+- Keystroke echo p50 47.7 ms, p99 49.7 ms; a call over the attach stream
+  p50 48.4 ms. On the local socket: echo 0.14 ms. hive adds nothing
+  measurable: typing on a remote host is the network's round trip.
+- The link sustains ~20 MB/s of output (8 MB, no resync). A longer flood
+  falls behind and resyncs, by design: the client gets the screen now, not
+  the backlog. A resync's snapshot is at most the scrollback limit (16 MB
+  by default), under a second here.
+- What's left is distance. Hiding it means predicting echo on the client
+  (mosh-style), a feature of its own.

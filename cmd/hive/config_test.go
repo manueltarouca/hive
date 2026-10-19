@@ -35,6 +35,10 @@ func TestConfigCommands(t *testing.T) {
 		}
 		return string(out), 0
 	}
+	// Numbers read as the file writes them: no exponents.
+	if out, code := run("config", "show"); code != 0 || strings.Contains(out, "e+") || !strings.Contains(out, "scrollback-limit = 16777216 ") {
+		t.Fatalf("config show = %q %d", out, code)
+	}
 	if out, code := run("config", "path"); code != 0 || strings.TrimSpace(out) != conf {
 		t.Fatalf("path = %q %d", out, code)
 	}

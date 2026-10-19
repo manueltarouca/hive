@@ -41,6 +41,8 @@ func main() {
 		err = clientsProbe(os.Args[2:])
 	case "soak":
 		err = soakProbe(os.Args[2:])
+	case "echo":
+		err = echoProbe(os.Args[2:])
 	case "churn":
 		err = churnProbe(os.Args[2:])
 	default:

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,7 +78,7 @@ func cmdConfig(g globals, args []string) error {
 			if k.Name == "theme" && os.Getenv("HIVE_STYLE") != "" {
 				note = "HIVE_STYLE overrides it"
 			}
-			fmt.Printf("%s = %v    # %s\n", k.Name, values[k.Name], note)
+			fmt.Printf("%s = %s    # %s\n", k.Name, showValue(values[k.Name]), note)
 		}
 		for _, d := range diags {
 			fmt.Printf("%s: %s\n", d.Level, d)
@@ -116,4 +117,13 @@ func setKeys(path string) map[string]bool {
 		}
 	}
 	return set
+}
+
+// showValue prints a setting as the file writes it: JSON made its numbers
+// floats, which %v prints with an exponent (1.6777216e+07).
+func showValue(v any) string {
+	if f, ok := v.(float64); ok {
+		return strconv.FormatFloat(f, 'f', -1, 64)
+	}
+	return fmt.Sprint(v)
 }
