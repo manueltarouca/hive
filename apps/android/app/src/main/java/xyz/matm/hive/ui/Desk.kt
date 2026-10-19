@@ -116,20 +116,21 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
                 model.windows.forEachIndexed { i, w ->
                     val bs = w.blocks.mapNotNull { model.blocks[it] }
                     val state = listOf("blocked", "working", "done").firstOrNull { s -> bs.any { it.agentState == s } }
-                    val focused = model.blocks[w.focused ?: ""] ?: bs.firstOrNull()
-                    val label = w.label.ifEmpty { focused?.title?.ifEmpty { null } ?: focused?.name ?: "tab ${i + 1}" }
+                    val label = model.titleParts(w).first
                     val sel = i == model.windowIndex
                     Row(
                         Modifier.clip(RoundedCornerShape(50))
                             .background(if (sel) p.raised else p.surface.copy(alpha = if (p.night) 0.6f else 1f))
                             .then(if (sel) Modifier.border(1.dp, p.line, RoundedCornerShape(50)) else Modifier)
                             .clickable(role = Role.Tab) { model.selectWindow(i) }
-                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                            .padding(start = 7.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Hexagon(state ?: "idle", 9.dp)
+                        // The Mac's tab: the program's cell (a small comb for a split), the name, the state.
+                        ProgramTile(model.program(w), 20.dp, model.otherPrograms(w))
                         Spacer(Modifier.width(7.dp))
                         FadeText(label, Type.small, if (sel) p.text else p.muted, Modifier.widthIn(max = 140.dp))
+                        if (state != null) { Spacer(Modifier.width(7.dp)); Hexagon(state, 8.dp) }
                     }
                 }
             }
@@ -144,11 +145,15 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
             Column(Modifier.fillMaxSize()) {
                 if (block != null) {
                     Row(Modifier.fillMaxWidth().background(p.surface).padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Hexagon(block.agentState ?: "idle", 9.dp)
+                        // The Mac's pane header: the program's mark, the title and where, the state.
+                        val (title, where) = block.titleParts
+                        ProgramGlyph(block.program, p.text.copy(alpha = 0.9f), 14.dp)
                         Spacer(Modifier.width(8.dp))
-                        BasicText(block.name, style = Type.small.copy(color = p.text), maxLines = 1)
-                        Spacer(Modifier.width(8.dp))
-                        FadeText(shortPath(block.cwd), Type.small, p.muted)
+                        // The title takes the room and fades; the folder stays short beside it.
+                        FadeText(title, Type.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(500)), p.text, Modifier.weight(1f, fill = false))
+                        if (where.isNotEmpty()) { Spacer(Modifier.width(8.dp)); FadeText(where, Type.small, p.muted, Modifier.widthIn(max = 110.dp)) }
+                        Spacer(Modifier.weight(0.001f))
+                        if (block.agentState in setOf("working", "blocked", "done")) { Spacer(Modifier.width(8.dp)); StateBadge(block.agentState!!) }
                     }
                 }
                 AndroidView(
@@ -156,6 +161,7 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     update = { v ->
                         v.theme = model.termTheme
+                        v.textSp = model.textSp
                         v.stream = model.stream
                         v.fitted = model.fitted
                         v.show(model.frame)
@@ -201,6 +207,20 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
         KeyBar(model, ask, ctrl, onCtrl = { ctrl = !ctrl }, onKeyboard = { view?.showKeyboard() },
             onConfirmPaste = { lines, go -> confirmPaste = lines to go })
     }
+}
+
+/** The Mac's StatusBadge: "Blocked" in words, else the state's hexagon. */
+@Composable
+fun StateBadge(state: String) {
+    val p = LocalPalette.current
+    if (state == "blocked") {
+        Row(Modifier.clip(RoundedCornerShape(50)).background(p.coral.copy(alpha = 0.14f)).padding(horizontal = 7.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Hexagon("blocked", 7.dp)
+            Spacer(Modifier.width(4.dp))
+            BasicText("Blocked", style = Type.tiny.copy(color = p.coral, fontWeight = androidx.compose.ui.text.font.FontWeight(600)))
+        }
+    } else Hexagon(state, 8.dp)
 }
 
 @Composable
@@ -305,7 +325,7 @@ private fun KeyBar(model: AppModel, ask: Ask?, ctrl: Boolean, onCtrl: () -> Unit
             add(K("ctrl", "Control") { onCtrl() })
             add(K("tab", "Tab") { s?.key("tab") })
             add(K("⌃C", "Control C") { s?.key("ctrl+c") })
-            add(K("paste", "Paste") { paste(ctx, s, onConfirmPaste) })
+            add(K("paste", "Paste") { paste(ctx, s, onConfirmPaste, model.confirmPaste) })
             add(K("↑", "Up") { s?.key("up") })
             add(K("↓", "Down") { s?.key("down") })
             add(K("←", "Left") { s?.key("left") })
@@ -338,14 +358,14 @@ private fun KeyBar(model: AppModel, ask: Ask?, ctrl: Boolean, onCtrl: () -> Unit
 }
 
 /** Paste the clipboard's text; text that could run commands (lines, without bracketed paste) asks first, as on the Mac. */
-private fun paste(ctx: android.content.Context, s: xyz.matm.hive.model.PaneStream?, confirm: (Int, () -> Unit) -> Unit) {
+private fun paste(ctx: android.content.Context, s: xyz.matm.hive.model.PaneStream?, confirm: (Int, () -> Unit) -> Unit, ask: Boolean = true) {
     s ?: return
     val text = ctx.getSystemService(android.content.ClipboardManager::class.java)?.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString()
     if (text.isNullOrEmpty()) {
         android.widget.Toast.makeText(ctx, "Nothing to paste", android.widget.Toast.LENGTH_SHORT).show()
         return
     }
-    s.paste(text, confirm)
+    s.paste(text) { lines, go -> if (ask) confirm(lines, go) else go() }
 }
 
 @Composable

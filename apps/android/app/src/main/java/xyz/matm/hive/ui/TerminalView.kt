@@ -63,7 +63,15 @@ class TerminalView(context: Context) : View(context) {
 
     private var frame: Frame? = null
     private val density = resources.displayMetrics.density
-    private val fittedTextPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 11.5f, resources.displayMetrics)
+    private var fittedTextPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 11.5f, resources.displayMetrics)
+    /** The text size when fitted to the phone (Settings), in sp. */
+    var textSp = 11.5f
+        set(v) {
+            if (field == v) return
+            field = v
+            fittedTextPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, v, resources.displayMetrics)
+            requestLayoutMetrics()
+        }
     private val fonts = arrayOf("Regular", "Bold", "Italic", "BoldItalic").map {
         runCatching { withFallbacks(context, "JetBrainsMonoNerdFont-$it.ttf") }.getOrDefault(Typeface.MONOSPACE)
     }

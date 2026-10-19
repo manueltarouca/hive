@@ -63,7 +63,7 @@ fun agentSummary(h: HostConnection, s: SessionInfo): Pair<String?, String?> {
 
 /** The Mac's ⌘K list as a full screen: one section per host, the same words, the same check. */
 @Composable
-fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit) {
+fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: () -> Unit) {
     val p = LocalPalette.current
     var query by remember { mutableStateOf("") }
     var menuFor by remember { mutableStateOf<HostConnection?>(null) }
@@ -160,6 +160,10 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit) {
                 Row(rowModifier(false, onClick = addHost), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.width(26.dp)) { LineIcon(Icon.Globe, p.muted, 15.dp) }
                     BasicText("Add remote host", style = Type.body.copy(color = p.text))
+                }
+                Row(rowModifier(false, onClick = settings), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.width(26.dp)) { LineIcon(Icon.Gear, p.muted, 16.dp) }
+                    BasicText("Settings", style = Type.body.copy(color = p.text))
                 }
             }
         }

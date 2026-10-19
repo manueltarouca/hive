@@ -13,7 +13,7 @@ data class Agent(
 )
 
 object Harness {
-    fun name(harness: String): String = when (harness.lowercase()) {
+    fun name(harness: String): String = Programs.lookup(harness).name.takeIf { harness.isNotEmpty() && it != harness } ?: when (harness.lowercase()) {
         "claude" -> "Claude Code"
         "codex" -> "Codex"
         "opencode" -> "OpenCode"

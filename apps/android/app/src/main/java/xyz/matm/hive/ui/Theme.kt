@@ -78,8 +78,9 @@ object Type {
 }
 
 @Composable
-fun HiveTheme(content: @Composable () -> Unit) {
-    val p = if (isSystemInDarkTheme()) NightPalette else DayPalette
+fun HiveTheme(choice: String = "system", content: @Composable () -> Unit) {
+    val dark = when (choice) { "night" -> true; "day" -> false; else -> isSystemInDarkTheme() }
+    val p = if (dark) NightPalette else DayPalette
     val assets = LocalContext.current.assets
     val mono = androidx.compose.runtime.remember { FontFamily(Font("JetBrainsMonoNerdFont-Regular.ttf", assets)) }
     CompositionLocalProvider(LocalPalette provides p, LocalMono provides mono, content = content)

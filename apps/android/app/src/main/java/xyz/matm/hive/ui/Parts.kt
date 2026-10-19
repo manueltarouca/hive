@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -79,6 +80,7 @@ fun Pill(text: String, primary: Boolean = false, modifier: Modifier = Modifier, 
             .background(bg)
             .then(if (line != null) Modifier.border(1.dp, line, shape) else Modifier)
             .clickable(role = Role.Button, onClick = onClick)
+            .semantics { this.selected = selected }
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         BasicText(text, style = Type.label.copy(color = if (primary) p.onHoney else p.text), maxLines = 1)
@@ -86,7 +88,7 @@ fun Pill(text: String, primary: Boolean = false, modifier: Modifier = Modifier, 
 }
 
 /** Simple line icons, drawn so they take the palette's colors. */
-enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, Send, Back, Check, Link, Alert, Camera }
+enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, Send, Back, Check, Link, Alert, Camera, Gear, Minus }
 
 @Composable
 fun LineIcon(icon: Icon, color: Color, size: Dp = 18.dp, modifier: Modifier = Modifier, description: String? = null) {
@@ -129,6 +131,16 @@ private fun DrawScope.drawIcon(icon: Icon, color: Color) {
             drawRoundRect(color, Offset(.44f * s, .37f * s), androidx.compose.ui.geometry.Size(.46f * s, .26f * s),
                 androidx.compose.ui.geometry.CornerRadius(.13f * s), style = st)
         }
+        Icon.Gear -> {
+            drawCircle(color, .13f * s, center, style = st)
+            for (i in 0 until 8) {
+                val a = Math.toRadians(45.0 * i)
+                val c = Math.cos(a).toFloat(); val n = Math.sin(a).toFloat()
+                line(.5f + .27f * c, .5f + .27f * n, .5f + .38f * c, .5f + .38f * n)
+            }
+            drawCircle(color, .27f * s, center, style = st)
+        }
+        Icon.Minus -> line(.2f, .5f, .8f, .5f)
         Icon.Alert -> { line(.5f, .2f, .5f, .6f); drawCircle(color, .05f * s, Offset(.5f * s, .78f * s)) }
         Icon.Camera -> {
             drawRoundRect(color, Offset(.12f * s, .3f * s), androidx.compose.ui.geometry.Size(.76f * s, .5f * s),

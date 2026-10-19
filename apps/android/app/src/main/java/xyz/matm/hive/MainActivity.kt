@@ -25,6 +25,7 @@ sealed class Screen {
     object AddHost : Screen()
     class Offer(val hosts: List<Offered>) : Screen()
     object Scan : Screen()
+    object Settings : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -37,12 +38,24 @@ class MainActivity : ComponentActivity() {
         if (model.hosts.isEmpty()) screen = Screen.AddHost
         handle(intent)
         setContent {
-            HiveTheme {
+            HiveTheme(model.themeChoice) {
+                // The status and navigation bars follow hive's theme, not only the system's.
+                val night = xyz.matm.hive.ui.LocalPalette.current.night
+                androidx.compose.runtime.SideEffect {
+                    androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !night
+                        isAppearanceLightNavigationBars = !night
+                    }
+                }
                 when (val s = screen) {
                     Screen.Desk -> Desk(model, openSwitcher = { screen = if (model.hosts.isEmpty()) Screen.AddHost else Screen.Switcher }, openLink = ::open)
                     Screen.Switcher -> {
                         BackHandler { screen = Screen.Desk }
-                        Switcher(model, close = { screen = Screen.Desk }, addHost = { screen = Screen.AddHost })
+                        Switcher(model, close = { screen = Screen.Desk }, addHost = { screen = Screen.AddHost }, settings = { screen = Screen.Settings })
+                    }
+                    Screen.Settings -> {
+                        BackHandler { screen = Screen.Switcher }
+                        xyz.matm.hive.ui.Settings(model, close = { screen = Screen.Switcher }, addHost = { screen = Screen.AddHost })
                     }
                     Screen.AddHost -> {
                         BackHandler(model.hosts.isNotEmpty()) { screen = Screen.Switcher }
@@ -95,7 +108,7 @@ class MainActivity : ComponentActivity() {
         model.resumed()
         xyz.matm.hive.notify.ConnectionService.stop(this)
         // Agents notify: asked once there's a host to hear from.
-        if (model.hosts.isNotEmpty() && android.os.Build.VERSION.SDK_INT >= 33 &&
+        if (model.hosts.isNotEmpty() && model.notify != "never" && android.os.Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
             !getSharedPreferences("hive", MODE_PRIVATE).getBoolean("askedNotify", false)) {
             getSharedPreferences("hive", MODE_PRIVATE).edit().putBoolean("askedNotify", true).apply()

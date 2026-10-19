@@ -23,12 +23,30 @@ data class BlockInfo(
     val id: String,
     val title: String,
     val cwd: String,
-    val program: String,
+    /** The program in front, as the server names it (zsh, node, claude). */
+    val foreground: String,
     val harness: String?,
     val agentState: String?,
+    val label: String = "",
 ) {
+    /** The agent if one reports from here, else the program in front (Programs.shown, as on the Mac). */
+    val program: xyz.matm.hive.agents.Program get() = xyz.matm.hive.agents.Programs.shown(harness, foreground.ifEmpty { null })
+
     /** "Claude Code" for an agent's pane, else its program. */
-    val name: String get() = harness?.let(Harness::name) ?: program.ifEmpty { "shell" }
+    val name: String get() = program.name
+
+    /** An agent's task, from the title it sets. */
+    val task: String? get() = harness?.let { xyz.matm.hive.agents.Programs.taskName(title, it) }
+
+    /** Header and tab title, as the Mac's: the label, an agent's task, or the program; then where. */
+    val titleParts: Pair<String, String>
+        get() = when {
+            label.isNotEmpty() -> label to shortDir
+            task != null -> task!! to shortDir.substringAfterLast('/')
+            else -> name to shortDir
+        }
+
+    val shortDir: String get() = xyz.matm.hive.ui.shortPath(cwd)
 }
 
 /**
@@ -66,6 +84,29 @@ class AppModel(private val context: Context) : HostConnection.Listener {
     /** Compose state: the key bar, the size chip and the terminal follow it. */
     var stream by mutableStateOf<PaneStream?>(null)
         private set
+    // MARK: settings (Settings screen), kept on the phone.
+
+    /** system, night or day. */
+    var themeChoice by mutableStateOf(prefs.getString("theme", "system") ?: "system")
+        private set
+    /** The terminal's text size when fitted to the phone, in sp. */
+    var textSp by mutableStateOf(prefs.getFloat("textSp", 11.5f))
+        private set
+    /** As the Mac's notify: background, always or never. */
+    var notify by mutableStateOf(prefs.getString("notify", "background") ?: "background")
+        private set
+    var confirmPaste by mutableStateOf(prefs.getBoolean("confirmPaste", true))
+        private set
+    /** Panes open fitted to the phone instead of at the Mac's size. */
+    var openFitted by mutableStateOf(prefs.getBoolean("openFitted", false))
+        private set
+
+    fun chooseTheme(v: String) { themeChoice = v; prefs.edit().putString("theme", v).apply() }
+    fun chooseTextSize(sp: Float) { textSp = sp.coerceIn(9f, 18f); prefs.edit().putFloat("textSp", textSp).apply() }
+    fun chooseNotify(v: String) { notify = v; prefs.edit().putString("notify", v).apply() }
+    fun chooseConfirmPaste(v: Boolean) { confirmPaste = v; prefs.edit().putBoolean("confirmPaste", v).apply() }
+    fun chooseOpenFitted(v: Boolean) { openFitted = v; prefs.edit().putBoolean("openFitted", v).apply() }
+
     /** The terminal's colours follow the system's Night or Day, as the Mac's follow its appearance. */
     var termTheme by mutableStateOf(
         if (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_NO)
@@ -109,6 +150,8 @@ class AppModel(private val context: Context) : HostConnection.Listener {
             val moved = existing.host.address != saved.address
             existing.host = saved
             if (moved) { existing.stop(); existing.start() }
+            // Stay connected means now, not at the next launch.
+            else if (saved.always) existing.start()
             hosts = hosts.toList()
             return existing
         }
@@ -242,6 +285,26 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         attachVisible()
     }
 
+    /** A tab's program: its agent if one of its panes has one, else its focused pane's (the Mac's program(of:)). */
+    fun program(w: WindowInfo): xyz.matm.hive.agents.Program {
+        val bs = w.blocks.mapNotNull { blocks[it] }
+        return (bs.firstOrNull { it.harness != null } ?: blocks[w.focused ?: ""] ?: bs.firstOrNull())?.program
+            ?: xyz.matm.hive.agents.Programs.lookup("")
+    }
+
+    /** The programs of a tab's other panes, for the cells behind its icon: up to two. */
+    fun otherPrograms(w: WindowInfo): List<xyz.matm.hive.agents.Program> {
+        val main = program(w)
+        val seen = ArrayList<xyz.matm.hive.agents.Program>()
+        for (id in w.blocks) { val p = blocks[id]?.program ?: continue; if (p != main && p !in seen) seen += p }
+        while (seen.size < minOf(w.blocks.size - 1, 2)) seen += main
+        return seen.take(2)
+    }
+
+    /** A tab's title: its label, else its focused pane's. */
+    fun titleParts(w: WindowInfo): Pair<String, String> =
+        if (w.label.isNotEmpty()) w.label to "" else (blocks[w.focused ?: ""] ?: w.blocks.firstNotNullOfOrNull { blocks[it] })?.titleParts ?: ("shell" to "")
+
     val visibleBlock: String? get() = windows.getOrNull(windowIndex)?.blocks?.getOrNull(paneIndex)
 
     private fun reloadSessions(h: HostConnection) {
@@ -287,7 +350,9 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                         b.copy(harness = a?.harness, agentState = a?.state)
                     }
                 }
-                if (!foreground) news.forEach { onNotify?.invoke(h, it) }
+                // As the Mac's notify setting: in the background (the default), always, or never.
+                val now = when (notify) { "never" -> false; "always" -> true; else -> !foreground }
+                if (now) news.forEach { onNotify?.invoke(h, it) }
             }
         }
     }
@@ -335,7 +400,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                     val live = agentsByBlock[id]
                     val harness = live?.harness ?: agent?.optString("harness")?.takeIf { it.isNotEmpty() && st != "ended" }
                     newBlocks[id] = BlockInfo(id, b.optString("title"), cwd, fg.optString("program").ifEmpty { fg.optString("name") },
-                        harness, live?.state ?: st.takeIf { it.isNotEmpty() && it != "ended" })
+                        harness, live?.state ?: st.takeIf { it.isNotEmpty() && it != "ended" }, b.optString("label"))
                 }
                 val keepWindow = windows.getOrNull(windowIndex)?.id
                 val keepBlock = visibleBlock
@@ -388,12 +453,19 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         frame = null
     }
 
+    /** Panes fitted on opening (Settings), once each: Mac size afterwards sticks. */
+    private val autoFitted = HashSet<String>()
+    private var lastPhone: IntArray? = null
+
     private fun onFrame(f: Frame) {
-        val size = fitSize
-        if (fitted && size != null && (f.cols != size[0] || f.rows != size[1]) && frame?.let { it.cols == size[0] && it.rows == size[1] } == true) {
-            // It was at the phone's size and isn't now: the Mac took it back.
-            fitted = false
-        }
+        // Open fitted: on the pane's first frame, so its own size is known and Mac size can give it back.
+        val s = stream
+        val ph = lastPhone
+        if (openFitted && !fitted && s != null && s.cols > 0 && ph != null && autoFitted.add(s.blockID)) fit(ph[0], ph[1], ph[2], ph[3])
+        // A size the phone didn't ask for, after one it did: the Mac took it back. (The phone's own
+        // size changes as the keyboard or the agent's card comes and goes: those are asked for too.)
+        val mine = { c: Int, r: Int -> asked.any { it.first == c && it.second == r } }
+        if (fitted && !mine(f.cols, f.rows) && frame?.let { mine(it.cols, it.rows) } == true) fitted = false
         frame = f
     }
 
@@ -417,17 +489,22 @@ class AppModel(private val context: Context) : HostConnection.Listener {
             macSize = Triple(s.blockID, intArrayOf(s.cols, s.rows), intArrayOf(s.cellWidth.takeIf { it > 0 } ?: cellWidth, s.cellHeight.takeIf { it > 0 } ?: cellHeight))
         }
         fitSize = intArrayOf(cols, rows, cellWidth, cellHeight)
+        asked.addLast(cols to rows)
+        while (asked.size > 6) asked.removeFirst()
         fitted = true
         sizeLearned()
         s.client.resize(s.blockID, cols, rows, cellWidth, cellHeight, take = true)
     }
 
     private var macSize: Triple<String, IntArray, IntArray>? = null
+    /** The sizes the phone asked for lately. */
+    private val asked = ArrayDeque<Pair<Int, Int>>()
 
     /** Back to the Mac's size, at once: the size the pane had before Fit to phone. */
     fun unfit() {
         fitted = false
         fitSize = null
+        asked.clear()
         val s = stream
         val m = macSize
         macSize = null
@@ -436,6 +513,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
 
     /** The phone's size changed (rotation, the keyboard): a fitted pane follows. */
     fun phoneSize(cols: Int, rows: Int, cellWidth: Int, cellHeight: Int) {
+        lastPhone = intArrayOf(cols, rows, cellWidth, cellHeight)
         if (!fitted) return
         val f = fitSize
         if (f != null && f[0] == cols && f[1] == rows) return

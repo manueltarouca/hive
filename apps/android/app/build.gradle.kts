@@ -3,6 +3,24 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+/** Program icons from the Mac app's own sources (script/program-icons.py): one truth for both apps. */
+abstract class ProgramIconsTask : DefaultTask() {
+    @get:InputFile abstract val script: RegularFileProperty
+    @get:InputFiles abstract val sources: ConfigurableFileCollection
+    @get:Internal abstract val macSources: DirectoryProperty
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun run() {
+        val out = outputDir.get().asFile.also { it.mkdirs() }
+        val p = ProcessBuilder("python3", script.get().asFile.path, macSources.get().asFile.path, File(out, "programs.json").path)
+            .redirectErrorStream(true).start()
+        val said = p.inputStream.bufferedReader().readText().trim()
+        check(p.waitFor() == 0) { "program-icons.py failed: $said" }
+        logger.lifecycle(said)
+    }
+}
+
 // The repository root: libghostty-vt (make vt-android), the Mac app's C shim
 // and its terminal fonts are shared from there.
 val root = rootDir.parentFile.parentFile
@@ -16,8 +34,8 @@ android {
         applicationId = "xyz.matm.hive"
         minSdk = 29
         targetSdk = 37
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += listOf("-DHIVE_ROOT=${root.absolutePath}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON") }
@@ -73,6 +91,24 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+}
+
+val programIcons = tasks.register<ProgramIconsTask>("generateProgramIcons") {
+    val core = File(root, "apps/macos/Sources/HiveCore")
+    script.set(file("../script/program-icons.py"))
+    macSources.set(File(root, "apps/macos/Sources"))
+    sources.from(File(core, "Program.swift"), File(core, "Icons.generated.swift"), File(core, "VendorIcons.generated.swift"))
+    outputDir.set(layout.buildDirectory.dir("generated/programs"))
+}
+
+androidComponents {
+    onVariants { v -> v.sources.assets?.addGeneratedSourceDirectory(programIcons, ProgramIconsTask::outputDir) }
+}
+
+// Unit tests read the same generated table.
+tasks.withType<Test>().configureEach {
+    dependsOn(programIcons)
+    systemProperty("hive.programs", layout.buildDirectory.file("generated/programs/programs.json").get().asFile.path)
 }
 
 dependencies {

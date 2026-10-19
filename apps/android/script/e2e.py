@@ -371,6 +371,75 @@ def step_notify(srv):
     launch()
 
 
+def background_luma():
+    from PIL import Image  # only for this check
+    import io
+    png = subprocess.run(["adb", "exec-out", "screencap", "-p"], capture_output=True).stdout
+    im = Image.open(io.BytesIO(png)).convert("L")
+    return im.getpixel((im.width // 2, im.height - 60))
+
+
+def step_settings(srv):
+    tap("Switch session")
+    tap("Settings", exact=True)
+    wait("Appearance")
+    shot("settings")
+    # The theme: Day whatever the system says.
+    tap("Day", exact=True)
+    until("the app turned Day", lambda: background_luma() > 200)
+    shot("settings-day")
+    tap("System", exact=True)
+    # Notifications: Never means none, even in the background.
+    tap("Never", exact=True)
+    v = srv.view("agent")
+    block = v["windows"][0]["layout"]["block_id"]
+    srv.call("agent.report", {"block_id": block, "harness": "claude", "state": "working"})
+    adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    time.sleep(1)
+    srv.call("agent.report", {"block_id": block, "harness": "claude", "state": "blocked", "message": "Claude wants to read secrets.txt"})
+    time.sleep(4)
+    assert "secrets.txt" not in adb("shell", "dumpsys", "notification", "--noredact"), "notified with notifications set to Never"
+    launch()
+    tap("When hive is in the background", exact=True)
+    # Larger text: fitting gives fewer columns.
+    tap("Larger text", exact=True)
+    tap("Larger text", exact=True)
+    shot("settings-larger")
+    tap("Back")  # to the switcher, where Settings was opened
+    tap("demo", exact=True)
+    wait("Fit to phone")
+    d = srv.view("demo")
+    w = next(x for x in d["windows"] if x["window_id"] == d["active_window_id"])
+    before = d_cols(srv, w)  # the pane's own size: a split's panes are narrower than the Mac's 120
+    tap("Fit to phone")
+    cols = until("the pane fitted, fewer columns than the default 55", lambda: (c := d_cols(srv, w)) != before and c)
+    assert cols < 55, f"larger text still fits {cols} columns"
+    shot(f"fitted-larger-{cols}-cols")
+    tap("Mac size")
+    until("Mac size again", lambda: d_cols(srv, w) == before)
+    # Panes open fitted: and Mac size still gives the size back.
+    tap("Switch session")
+    tap("Settings", exact=True)
+    tap("Open panes fitted to the phone")
+    tap("Back")
+    tap("agent", exact=True)
+    wait("Mac size")  # it opened fitted
+    tap("Switch session")
+    tap("demo", exact=True)
+    until("the pane opened fitted", lambda: d_cols(srv, w) != before)
+    tap("Mac size")
+    until("Mac size gives an auto-fitted pane its size back", lambda: d_cols(srv, w) == before)
+    tap("Switch session")
+    tap("Settings", exact=True)
+    tap("Open panes fitted to the phone")
+    tap("Back")
+
+
+def d_cols(srv, w):
+    v = srv.view("demo")
+    return min(v["blocks"][b]["cols"] for b in v["blocks"] if v["blocks"][b]["window_id"] == w["window_id"])
+
+
 def hosts_code(hosts):
     """The Mac's code (HiveKit/HostsCode.swift): sorted keys, base64url without padding."""
     import base64
@@ -415,7 +484,7 @@ def step_away(srv):
     shot("back")
 
 
-STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_tabs, step_agent, step_notify, step_code, step_away]
+STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_tabs, step_agent, step_notify, step_settings, step_code, step_away]
 
 
 def main():
