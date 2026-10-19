@@ -16,8 +16,8 @@ android {
         applicationId = "xyz.matm.hive"
         minSdk = 29
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.1.3"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += listOf("-DHIVE_ROOT=${root.absolutePath}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON") }
@@ -52,8 +52,11 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            // Beside the release on a test phone: "hive dev".
+            resValue("string", "app_name", "hive dev")
         }
         release {
+            resValue("string", "app_name", "hive")
             signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -65,6 +68,7 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = true
     }
     testOptions {
         unitTests.isReturnDefaultValues = true

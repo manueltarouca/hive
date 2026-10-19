@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The mark (apps/macos/script/icon.swift): three honeycomb cells, the top one lit. Many sessions; one needs you. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M26.48,43.26a27.52,27.52 0 1,0 55.05,0a27.52,27.52 0 1,0 -55.05,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="54.00" android:centerY="43.26" android:gradientRadius="27.52"
+                android:startColor="#4DF2A93B" android:endColor="#00F2A93B" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M38.513,53.414Q41.601,51.631 44.688,53.414L49.864,56.402Q52.951,58.185 52.951,61.750L52.951,67.727Q52.951,71.292 49.864,73.074L44.688,76.062Q41.601,77.845 38.513,76.062L33.337,73.074Q30.250,71.292 30.250,67.727L30.250,61.750Q30.250,58.185 33.337,56.402Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="51.63" android:endX="0" android:endY="77.84"
+                android:startColor="#FF535963" android:endColor="#FF3D424A" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M63.312,53.414Q66.399,51.631 69.487,53.414L74.663,56.402Q77.750,58.185 77.750,61.750L77.750,67.727Q77.750,71.292 74.663,73.074L69.487,76.062Q66.399,77.845 63.312,76.062L58.136,73.074Q55.049,71.292 55.049,67.727L55.049,61.750Q55.049,58.185 58.136,56.402Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="51.63" android:endX="0" android:endY="77.84"
+                android:startColor="#FF535963" android:endColor="#FF3D424A" />
+        </aapt:attr>
+    </path>
+    <path android:fillColor="#FFF2A93B" android:pathData="M50.913,31.938Q54.000,30.155 57.087,31.938L62.263,34.926Q65.351,36.708 65.351,40.273L65.351,46.250Q65.351,49.815 62.263,51.598L57.087,54.586Q54.000,56.369 50.913,54.586L45.737,51.598Q42.649,49.815 42.649,46.250L42.649,40.273Q42.649,36.708 45.737,34.926Z" />
+</vector>
