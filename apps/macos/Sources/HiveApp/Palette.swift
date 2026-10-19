@@ -22,7 +22,7 @@ struct PaletteItem: Identifiable {
     var inert = false
     /// A warning: the icon in the warning colour, the text muted.
     var warning = false
-    /// Opens a list of its own (the reference app's > rows).
+    /// Opens a list of its own (rows ending in >).
     var chevron = false
     /// A divider above this row: actions after the list they act on.
     var dividerAbove = false
@@ -259,7 +259,7 @@ struct PaletteView: View {
 
     private func row(_ item: PaletteItem, selected: Bool) -> some View {
         // A checked row without an icon of its own shows its check where
-        // the icon goes (the session you're in, as the reference app marks it).
+        // the icon goes (the session you're in).
         let leadingCheck = item.checked && item.symbol == nil
         return HStack(spacing: 8) {
             Group {

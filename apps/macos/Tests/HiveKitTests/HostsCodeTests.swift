@@ -5,7 +5,7 @@ final class HostsCodeTests: XCTestCase {
     /// The phone decodes exactly this (apps/android HostsTest.decodesTheMacsOwnCode).
     func testEncodesWhatThePhoneReads() {
         let code = HostsCode.encode([("box", "https://box.example.ts.net"), ("studio", "http://100.101.2.3:4483")])
-        XCTAssertEqual(code, "hive://hosts?d=eyJob3N0cyI6W3siYWRkcmVzcyI6Imh0dHBzOi8vYm94LmV4YW1wbGUudHMubmV0IiwibGFiZWwiOiJib3gifSx7ImFkZHJlc3MiOiJodHRwOi8vMTAwLjEwMS4yLjM6NDQ4MyIsImxhYmVsIjoibmV3dG9uIn1dLCJ2IjoxfQ")
+        XCTAssertEqual(code, "hive://hosts?d=eyJob3N0cyI6W3siYWRkcmVzcyI6Imh0dHBzOi8vYm94LmV4YW1wbGUudHMubmV0IiwibGFiZWwiOiJib3gifSx7ImFkZHJlc3MiOiJodHRwOi8vMTAwLjEwMS4yLjM6NDQ4MyIsImxhYmVsIjoic3R1ZGlvIn1dLCJ2IjoxfQ")
     }
 
     /// This Mac, when its server listens on the tailnet: Tailscale's own URL first, else a tailnet listener's address.

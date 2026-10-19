@@ -8,7 +8,7 @@ public struct AgentSnapshot: Equatable, Sendable {
     }
 }
 
-/// What a sidebar row says about a tab. the reference app-style: the tab is the agent.
+/// What a sidebar row says about a tab. The tab is the agent.
 /// The title is the tab's label, else the agent's task, else the program.
 /// The second line carries only what matters: the task when the label hides
 /// it. A blocked agent shows its reason instead. The state is the row's

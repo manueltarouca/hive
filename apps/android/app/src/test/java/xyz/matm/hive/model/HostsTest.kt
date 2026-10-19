@@ -80,7 +80,7 @@ class HostsTest {
 
     /** The Mac makes the code (HiveKit/HostsCode.swift); this is one it made, byte for byte. */
     @Test fun decodesTheMacsOwnCode() {
-        val mac = "hive://hosts?d=eyJob3N0cyI6W3siYWRkcmVzcyI6Imh0dHBzOi8vYm94LmV4YW1wbGUudHMubmV0IiwibGFiZWwiOiJib3gifSx7ImFkZHJlc3MiOiJodHRwOi8vMTAwLjEwMS4yLjM6NDQ4MyIsImxhYmVsIjoibmV3dG9uIn1dLCJ2IjoxfQ"
+        val mac = "hive://hosts?d=eyJob3N0cyI6W3siYWRkcmVzcyI6Imh0dHBzOi8vYm94LmV4YW1wbGUudHMubmV0IiwibGFiZWwiOiJib3gifSx7ImFkZHJlc3MiOiJodHRwOi8vMTAwLjEwMS4yLjM6NDQ4MyIsImxhYmVsIjoic3R1ZGlvIn1dLCJ2IjoxfQ"
         val offer = HostsCode.decode(mac)!!
         assertEquals(listOf(Host("box", "https://box.example.ts.net"), Host("studio", "http://100.101.2.3:4483")), offer.map { it.host })
     }

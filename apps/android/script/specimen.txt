@@ -3,7 +3,7 @@
 ╰───────────────────────────────────────────╯
  ▐▛███▜▌   Claude Code v2
 ▝▜█████▛▘  Opus 5.5 · Claude Max
-  ▘▘ ▝▝    ~/code/research/ref
+  ▘▘ ▝▝    ~/code/projects/demo
 
 ⏺ Fixed in 0.1.1, attached above.
   ⎿  Read 42 lines (ctrl+o to expand)

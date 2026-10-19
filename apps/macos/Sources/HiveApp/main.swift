@@ -458,7 +458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
     }
 
-    /// The palette's host commands, one row per action (the reference app's > rows), each
+    /// The palette's host commands, one row per action (rows ending in >), each
     /// opening the hosts it applies to. Only the ones that apply now.
     private func hostCommands() -> [PaletteItem] {
         let remote = model.hostRows.filter { !$0.local }

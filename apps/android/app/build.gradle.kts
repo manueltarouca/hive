@@ -34,8 +34,15 @@ android {
         applicationId = "xyz.matm.hive"
         minSdk = 29
         targetSdk = 37
-        versionCode = 8
-        versionName = "0.1.7"
+        // Releases: from the version, so each is above the last and above
+        // the dev builds (0.1.0 is 10000; X.Y.Z-rc.N one below X.Y.Z).
+        versionCode = System.getenv("HIVE_VERSION")?.let { v ->
+            val m = Regex("""^(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?""").find(v) ?: error("HIVE_VERSION: not a version: $v")
+            val (a, b, c, rc) = m.destructured
+            a.toInt() * 1_000_000 + b.toInt() * 10_000 + c.toInt() * 100 + (if (rc.isEmpty()) 99 else rc.toInt().coerceAtMost(98))
+        } ?: 8
+        // A release build takes the release's version (HIVE_VERSION, set by CI).
+        versionName = System.getenv("HIVE_VERSION") ?: "0.1.7"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += listOf("-DHIVE_ROOT=${root.absolutePath}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON") }
@@ -60,7 +67,7 @@ android {
     val releasePw = System.getenv("HIVE_RELEASE_PW")
     signingConfigs {
         if (releasePw != null) create("release") {
-            storeFile = file("${System.getProperty("user.home")}/.android-keys/hive-release.jks")
+            storeFile = file(System.getenv("HIVE_RELEASE_KEYSTORE") ?: "${System.getProperty("user.home")}/.android-keys/hive-release.jks")
             storePassword = releasePw
             keyAlias = "hive-release"
             keyPassword = releasePw
