@@ -184,6 +184,7 @@ public final class Mirror {
 
     /// Processes program output.
     public func feed(_ data: Data) {
+        linkGeneration &+= 1
         data.withUnsafeBytes { p in
             if let base = p.bindMemory(to: UInt8.self).baseAddress { ghostty_terminal_vt_write(term, base, p.count) }
         }
@@ -202,10 +203,11 @@ public final class Mirror {
     }
 
     public func resize(cols: UInt16, rows: UInt16, cellWidth: UInt32, cellHeight: UInt32) {
+        linkGeneration &+= 1
         ghostty_terminal_resize(term, cols, rows, max(cellWidth, 1), max(cellHeight, 1))
     }
 
-    public func scroll(rows: Int) { hive_scroll_delta(term, rows) }
+    public func scroll(rows: Int) { linkGeneration &+= 1; hive_scroll_delta(term, rows) }
 
     /// Where a scroll-wheel movement of `rows` lines goes (negative is up):
     /// to the program when it asked for the mouse, as arrow keys on the
@@ -218,12 +220,13 @@ public final class Mirror {
                                       cell_width: UInt32(max(g.cellWidth, 1)), cell_height: UInt32(max(g.cellHeight, 1)))
         let lines = max(-64, min(64, rows))
         let (x, y) = Mirror.clamp(x: x, y: y, g)
+        linkGeneration &+= 1
         if hive_wheel(term, lines, shift, Float(x), Float(y), geo, &out, out.count, &written) == 0 {
             return .viewport(rows: rows)
         }
         return .send(Data(out.prefix(written)))
     }
-    public func scrollToBottom() { hive_scroll_bottom(term) }
+    public func scrollToBottom() { linkGeneration &+= 1; hive_scroll_bottom(term) }
 
     /// Encodes a key press for the program's current modes.
     public func encodeKey(_ k: KeyInput) -> Data {
@@ -335,6 +338,56 @@ public final class Mirror {
     }
 
     public func clearSelection() { hive_clear_selection(term) }
+
+    /// The link at a viewport cell: an OSC 8 hyperlink the program set, else
+    /// a URL or path in the row's text.
+    public func link(col: Int, row: Int) -> TerminalLink? {
+        let f = last ?? frame()
+        guard col >= 0, row >= 0, col < f.cols, row < f.rows else { return nil }
+        if let uri = hyperlink(col: col, row: row) {
+            // The link covers the neighbouring cells with the same URI.
+            var lo = col, hi = col + 1
+            while lo > 0, hyperlink(col: lo - 1, row: row) == uri { lo -= 1 }
+            while hi < f.cols, hyperlink(col: hi, row: row) == uri { hi += 1 }
+            return TerminalLink(target: uri, columns: lo..<hi)
+        }
+        return rowLinks(row, cols: f.cols).first { $0.columns.contains(col) }
+    }
+
+    /// Output, a resize or a scroll since: cached row links are stale.
+    private var linkGeneration = 0
+    private var linkCache: (row: Int, generation: Int, links: [TerminalLink])?
+
+    /// A row's plain-text links, worked out once per row and generation:
+    /// ⌘-hover asks on every mouse move.
+    private func rowLinks(_ row: Int, cols: Int) -> [TerminalLink] {
+        if let c = linkCache, c.row == row, c.generation == linkGeneration { return c.links }
+        let per = 8
+        var cps = [UInt32](repeating: 32, count: cols * per)
+        var counts = [UInt8](repeating: 1, count: cols)
+        let got = hive_row_graphemes(term, UInt16(row), &cps, &counts, cols, per)
+        let cells: [String] = (0..<got).map { c in
+            let n = Int(counts[c])
+            return String(String.UnicodeScalarView(cps[(c * per)..<(c * per + n)].compactMap(UnicodeScalar.init)))
+        }
+        let links = LinkDetector.links(in: cells)
+        linkCache = (row, linkGeneration, links)
+        return links
+    }
+
+    private var uriBuffer = [UInt8](repeating: 0, count: 4096)
+
+    /// A cell's OSC 8 link, read whole (up to 64 KB).
+    private func hyperlink(col: Int, row: Int) -> String? {
+        var len = 0
+        var r = hive_hyperlink_at(term, UInt16(col), UInt16(row), &uriBuffer, uriBuffer.count, &len)
+        if r == GHOSTTY_OUT_OF_SPACE, len <= 64 << 10 {
+            uriBuffer = [UInt8](repeating: 0, count: len)
+            r = hive_hyperlink_at(term, UInt16(col), UInt16(row), &uriBuffer, uriBuffer.count, &len)
+        }
+        guard r == GHOSTTY_SUCCESS, len > 0 else { return nil }
+        return String(decoding: uriBuffer.prefix(len), as: UTF8.self)
+    }
 
     public func snapshot() -> Data? {
         var ptr: UnsafeMutablePointer<UInt8>?

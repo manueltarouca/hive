@@ -126,9 +126,12 @@ final class PaneView: MTKView, NSTextInputClient {
     }
 
     /// A point in the pane, in the grid's points (below any hidden rows).
-    private func gridPoint(_ event: NSEvent) -> NSPoint {
-        let p = convert(event.locationInWindow, from: nil)
-        return NSPoint(x: p.x, y: p.y + CGFloat(rowOffset) * cellSize.height)
+    private func gridPoint(_ event: NSEvent) -> NSPoint { gridPoint(at: convert(event.locationInWindow, from: nil)) }
+
+    /// A point in the view, in the grid's terms (the view may show the grid
+    /// scrolled by rowOffset rows).
+    private func gridPoint(at p: NSPoint) -> NSPoint {
+        NSPoint(x: p.x, y: p.y + CGFloat(rowOffset) * cellSize.height)
     }
 
     /// The grid that fits.
@@ -184,11 +187,76 @@ final class PaneView: MTKView, NSTextInputClient {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         model.focus(block: blockID)
+        // ⌘-click on a link is the link's, not the program's or a
+        // selection's (as in Ghostty, even when the program uses the mouse).
+        // It opens on release, if the click didn't drag off the link.
+        if event.modifierFlags.contains(.command), let l = link(at: event) {
+            pendingLink = (l, cell(event))
+            return
+        }
         pointer(.press, .left, event)
     }
 
-    override func mouseDragged(with event: NSEvent) { pointer(.motion, .left, event) }
-    override func mouseUp(with event: NSEvent) { pointer(.release, .left, event) }
+    /// A ⌘-click on a link, and the cell it began on.
+    private var pendingLink: (link: TerminalLink, cell: (col: Int, row: Int))?
+
+    override func mouseDragged(with event: NSEvent) {
+        if pendingLink != nil { return }
+        pointer(.motion, .left, event)
+    }
+    override func mouseUp(with event: NSEvent) {
+        if let p = pendingLink {
+            pendingLink = nil
+            let c = cell(event)
+            if c.row == p.cell.row, p.link.columns.contains(c.col) { model.open(p.link, block: blockID) }
+            return
+        }
+        pointer(.release, .left, event)
+    }
+
+    // MARK: links
+
+    private func cell(_ event: NSEvent) -> (col: Int, row: Int) {
+        let p = gridPoint(event)
+        guard cellSize.width > 0, cellSize.height > 0 else { return (-1, -1) }
+        return (Int(p.x / cellSize.width), Int(p.y / cellSize.height))
+    }
+
+    private func link(at event: NSEvent) -> TerminalLink? {
+        link(atWindowPoint: event.locationInWindow)
+    }
+
+    private func link(atWindowPoint w: NSPoint) -> TerminalLink? {
+        let p = gridPoint(at: convert(w, from: nil))
+        guard p.x >= 0, p.y >= 0, cellSize.width > 0, cellSize.height > 0 else { return nil }
+        return model.link(block: blockID, col: Int(p.x / cellSize.width), row: Int(p.y / cellSize.height))
+    }
+
+    /// With ⌘ held, a link under the pointer shows the pointing hand; the
+    /// cursor goes back when ⌘ is released or the pointer leaves the pane.
+    private var overLink = false
+    private func updateLinkCursor(_ flags: NSEvent.ModifierFlags) {
+        guard let w = window else { return }
+        let at = w.mouseLocationOutsideOfEventStream
+        let over = flags.contains(.command) && bounds.contains(convert(at, from: nil)) && link(atWindowPoint: at) != nil
+        if over, !overLink { NSCursor.pointingHand.push() }
+        if !over, overLink { NSCursor.pop() }
+        overLink = over
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        if overLink { NSCursor.pop(); overLink = false }
+        super.mouseExited(with: event)
+    }
+
+    /// Only ⌘ changes what the pointer means.
+    private var commandHeld = false
+
+    override func flagsChanged(with event: NSEvent) {
+        let held = event.modifierFlags.contains(.command)
+        if held != commandHeld { commandHeld = held; updateLinkCursor(event.modifierFlags) }
+        super.flagsChanged(with: event)
+    }
     /// A right-click is the program's when it uses the mouse; otherwise, or
     /// with Shift, it opens hive's menu for the pane.
     override func rightMouseDown(with event: NSEvent) {
@@ -219,14 +287,17 @@ final class PaneView: MTKView, NSTextInputClient {
     }
     override func otherMouseDown(with event: NSEvent) { pointer(.press, .middle, event) }
     override func otherMouseUp(with event: NSEvent) { pointer(.release, .middle, event) }
-    override func mouseMoved(with event: NSEvent) { pointer(.motion, nil, event) }
+    override func mouseMoved(with event: NSEvent) {
+        if event.modifierFlags.contains(.command) || overLink { updateLinkCursor(event.modifierFlags) }
+        pointer(.motion, nil, event)
+    }
 
     // Hover reaches programs that track all motion (Claude Code's links).
     private var hoverArea: NSTrackingArea?
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
+        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
         addTrackingArea(area)
         hoverArea = area
     }

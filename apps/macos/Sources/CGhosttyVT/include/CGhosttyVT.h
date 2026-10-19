@@ -69,6 +69,8 @@ void hive_select(GhosttyTerminal t, GhosttySelectionGesture g, int type, uint16_
                  uint64_t repeat_interval_ns, double repeat_distance);
 // The selected text, or NULL. Free with hive_free.
 bool hive_selection_text(GhosttyTerminal t, uint8_t **out, size_t *len);
+GhosttyResult hive_hyperlink_at(GhosttyTerminal t, uint16_t col, uint16_t row, uint8_t *buf, size_t cap, size_t *len);
+size_t hive_row_graphemes(GhosttyTerminal t, uint16_t row, uint32_t *out, uint8_t *counts, size_t cols, size_t per);
 void hive_clear_selection(GhosttyTerminal t);
 
 // Pointer geometry in surface pixels, for the mouse encoder.

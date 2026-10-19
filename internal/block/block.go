@@ -215,12 +215,23 @@ func baseEnv() []string {
 		case len(kv) > 5 && kv[:5] == "TERM=",
 			len(kv) > 10 && kv[:10] == "COLORTERM=",
 			len(kv) > 13 && kv[:13] == "TERM_PROGRAM=",
+			// The outer terminal's version, not hive's.
+			len(kv) > 21 && kv[:21] == "TERM_PROGRAM_VERSION=",
 			len(kv) > 5 && kv[:5] == "TMUX=":
 			continue
+		case kv == "FORCE_HYPERLINK=":
+			continue // empty is unset: hive's default below
 		}
 		env = append(env, kv)
 	}
-	return append(env, "TERM=xterm-256color", "COLORTERM=truecolor", "TERM_PROGRAM=hive")
+	env = append(env, "TERM=xterm-256color", "COLORTERM=truecolor", "TERM_PROGRAM=hive")
+	// hive shows OSC 8 hyperlinks and opens them; programs that can't tell
+	// from TERM_PROGRAM ask this (Claude Code then makes its file and URL
+	// links clickable). The user's own setting wins.
+	if v := os.Getenv("FORCE_HYPERLINK"); v == "" {
+		env = append(env, "FORCE_HYPERLINK=1")
+	}
+	return env
 }
 
 func (b *Block) send(name string, payload map[string]any) {

@@ -333,3 +333,44 @@ bool hive_mouse_tracking(GhosttyTerminal t) {
   ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &tracking);
   return tracking;
 }
+
+// The OSC 8 hyperlink of a viewport cell. GHOSTTY_SUCCESS with *len 0: no
+// link. GHOSTTY_OUT_OF_SPACE: *len is the size it needs (retry with that).
+GhosttyResult hive_hyperlink_at(GhosttyTerminal t, uint16_t col, uint16_t row, uint8_t *buf, size_t cap, size_t *len) {
+  *len = 0;
+  GhosttyGridRef ref = GHOSTTY_INIT_SIZED(GhosttyGridRef);
+  GhosttyPoint p = {.tag = GHOSTTY_POINT_TAG_VIEWPORT, .value = {.coordinate = {.x = col, .y = row}}};
+  GhosttyResult r = ghostty_terminal_grid_ref(t, p, &ref);
+  if (r != GHOSTTY_SUCCESS) return r;
+  return ghostty_grid_ref_hyperlink_uri(&ref, buf, cap, len);
+}
+
+// A viewport row's text, cell by cell: each cell's grapheme (up to `per`
+// codepoints) at out[c * per], its length in counts[c]. An empty cell is
+// one ' '; a wide character's second cell is 0 codepoints. A spacer at a
+// soft-wrapped row's end is a ' '. Returns the columns read.
+size_t hive_row_graphemes(GhosttyTerminal t, uint16_t row, uint32_t *out, uint8_t *counts, size_t cols, size_t per) {
+  for (size_t c = 0; c < cols; c++) {
+    out[c * per] = ' ';
+    counts[c] = 1;
+    GhosttyGridRef ref = GHOSTTY_INIT_SIZED(GhosttyGridRef);
+    GhosttyPoint p = {.tag = GHOSTTY_POINT_TAG_VIEWPORT, .value = {.coordinate = {.x = (uint16_t)c, .y = row}}};
+    if (ghostty_terminal_grid_ref(t, p, &ref) != GHOSTTY_SUCCESS) return c;
+    GhosttyCell cell;
+    if (ghostty_grid_ref_cell(&ref, &cell) != GHOSTTY_SUCCESS) continue;
+    GhosttyCellWide wide = GHOSTTY_CELL_WIDE_NARROW;
+    ghostty_cell_get(cell, GHOSTTY_CELL_DATA_WIDE, &wide);
+    if (wide == GHOSTTY_CELL_WIDE_SPACER_TAIL) { counts[c] = 0; continue; }
+    if (wide == GHOSTTY_CELL_WIDE_SPACER_HEAD) continue;
+    size_t n = 0;
+    GhosttyResult r = ghostty_grid_ref_graphemes(&ref, &out[c * per], per, &n);
+    if (r == GHOSTTY_SUCCESS && n > 0) {
+      counts[c] = (uint8_t)n;
+    } else if (r == GHOSTTY_OUT_OF_SPACE) {
+      // A cluster longer than `per`: its first codepoint.
+      uint32_t cp = ' ';
+      if (ghostty_cell_get(cell, GHOSTTY_CELL_DATA_CODEPOINT, &cp) == GHOSTTY_SUCCESS && cp != 0) out[c * per] = cp;
+    }
+  }
+  return cols;
+}

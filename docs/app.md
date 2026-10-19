@@ -100,6 +100,23 @@ clipboard, it can reach your other devices through Universal Clipboard.
 
 Hold **Shift** to select and scroll in hive instead.
 
+## Links
+
+Hold ⌘ over a link to see the pointing hand, and ⌘-click to open it: a
+link a program set (OSC 8), or a web address or file path in the text
+(`/abs`, `~/`, `./`, `../`, with a `:line:col` after it). A web link opens
+in your browser, a file in its app (Preview for an image), a folder in
+Finder. A link to anything that could run, such as an app, a script, an
+installer or an executable, is shown in Finder instead; another kind of
+link (`ssh://`) asks first. On a remote host, only web links open: its
+paths aren't on this Mac.
+
+hive tells programs it shows links (`FORCE_HYPERLINK=1` in every pane).
+Claude Code then makes its file paths and links clickable with a plain
+click, as in Ghostty. Some command-line tools also write link codes into
+piped or redirected output when it's set; to turn it off, set
+`FORCE_HYPERLINK=0` in the environment hive starts with.
+
 ## Selection
 
 Drag to select. Double-click selects a word, triple-click a line. ⌘C copies.

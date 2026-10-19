@@ -25,3 +25,14 @@ func TestEmptyCwdIsHome(t *testing.T) {
 		t.Fatal("the test runs in the home it checks for")
 	}
 }
+
+// A pane says it's hive, with hive's version (not the outer terminal's),
+// and that hyperlinks work.
+func TestPaneTerminalIdentity(t *testing.T) {
+	t.Setenv("TERM_PROGRAM_VERSION", "9.9.9-outer")
+	t.Setenv("FORCE_HYPERLINK", "")
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	out := h.call("session.create", map[string]any{"command": []string{"/bin/sh", "-c", `echo "id=$TERM_PROGRAM/$TERM_PROGRAM_VERSION/$FORCE_HYPERLINK"; sleep 30`}})
+	h.waitScreen(out["session_id"].(string), strs(out["block_ids"])[0], "id=hive/"+Version+"/1")
+}

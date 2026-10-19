@@ -308,7 +308,8 @@ type LayoutSpec struct {
 }
 
 func (s *Server) env(sessionID, blockID string) []string {
-	env := []string{"HIVE_SERVER=" + s.cfg.Socket, "HIVE_SESSION=" + sessionID, "HIVE_BLOCK=" + blockID}
+	env := []string{"HIVE_SERVER=" + s.cfg.Socket, "HIVE_SESSION=" + sessionID, "HIVE_BLOCK=" + blockID,
+		"TERM_PROGRAM_VERSION=" + Version}
 	if s.cfg.HivePath != "" {
 		dir := filepath.Dir(s.cfg.HivePath)
 		env = append(env, "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"))

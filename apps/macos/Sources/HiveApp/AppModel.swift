@@ -926,6 +926,52 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// The link at a pane's cell, read from its mirror on the vt queue (a
+    /// quick read; it never waits on the main thread).
+    func link(block: String, col: Int, row: Int) -> TerminalLink? {
+        let engine = engine
+        return vt.sync { engine.mirror(block: block)?.link(col: col, row: row) }
+    }
+
+    /// Opens a link as Ghostty does: a web link in its app, a file on this
+    /// Mac in its app (Preview for an image), a folder in Finder; another
+    /// scheme after asking; a file that would run, shown in Finder instead.
+    /// A remote pane's paths are on that machine: only its web links open.
+    func open(_ link: TerminalLink, block: String) {
+        userActed()
+        let host = ProcessInfo.processInfo.hostName
+        let names = [host, String(host.split(separator: ".").first ?? ""), Host.current().localizedName ?? ""].filter { !$0.isEmpty }
+        let action = LinkAction.resolve(link.target, cwd: blocks[block]?.cwd, home: NSHomeDirectory(),
+                                        local: current.isLocal, hostnames: names)
+        // Test runs write down what would open, instead of opening it.
+        if let log = ProcessInfo.processInfo.environment["HIVE_LINK_LOG"] {
+            let line = "\(link.target) -> \(action)\n"
+            if let h = FileHandle(forWritingAtPath: log) { h.seekToEndOfFile(); h.write(Data(line.utf8)); h.closeFile() }
+            else { FileManager.default.createFile(atPath: log, contents: Data(line.utf8)) }
+            return
+        }
+        switch action {
+        case .open(let u):
+            NSWorkspace.shared.open(u)
+        case .reveal(let u):
+            NSWorkspace.shared.activateFileViewerSelecting([u])
+        case .confirm(let u):
+            let app = NSWorkspace.shared.urlForApplication(toOpen: u).map { FileManager.default.displayName(atPath: $0.path) }
+            let alert = NSAlert()
+            alert.messageText = app.map { "Open this link with \($0)?" } ?? "No app opens this link"
+            alert.informativeText = u.absoluteString
+            if app != nil {
+                alert.addButton(withTitle: "Open")
+                alert.addButton(withTitle: "Cancel")
+                if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(u) }
+            } else {
+                alert.runModal()
+            }
+        case .none:
+            NSSound.beep()
+        }
+    }
+
     func copySelection(block: String) {
         let engine = engine
         vt.async {
