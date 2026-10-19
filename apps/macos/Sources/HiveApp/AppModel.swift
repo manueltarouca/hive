@@ -171,6 +171,7 @@ final class AppModel: ObservableObject {
         let idle: Bool         // saved, not connected: Connect to use it
         let detail: String?    // the reason in full
         let refused: Bool      // turned away: waiting won't help
+        var connected = false
         var local: Bool { id == HostConnection.localID }
     }
     /// Runs once a host has connected (and listed its sessions).
@@ -234,6 +235,22 @@ final class AppModel: ObservableObject {
     /// Runs after the layout changed, so the view can size the panes.
     var onLayout: (() -> Void)?
     private var attached: Set<String> = []
+    /// The window is open (not closed to the menu bar): set by the app.
+    var windowOpen: () -> Bool = { true }
+    /// The window can be seen: open and not covered.
+    var windowShown: () -> Bool = { true }
+    /// You're looking at hive: it's in front and its window shows.
+    var inFront: Bool { NSApp.isActive && windowShown() }
+    /// The session the windows and blocks belong to.
+    private var viewSession: String?
+
+    /// The window opened, closed or came into view: panes attach only while
+    /// it's open, and what's now on screen is seen.
+    func windowChanged() {
+        attachVisible()
+        if windowOpen() { reloadView() }
+        markSeen()
+    }
     private var reloadPending = false
 
     init() {
@@ -378,7 +395,8 @@ final class AppModel: ObservableObject {
     /// Every host's sessions and agents, as the sidebar and switcher show
     /// them: this Mac's first, agents by urgency.
     func publishHosts() {
-        let rows = hosts.map { HostRow(id: $0.id, name: $0.displayName, label: $0.label, problem: $0.shortProblem, idle: !$0.active, detail: $0.detail, refused: $0.refused) }
+        let rows = hosts.map { HostRow(id: $0.id, name: $0.displayName, label: $0.label, problem: $0.shortProblem, idle: !$0.active, detail: $0.detail,
+                                       refused: $0.refused, connected: $0.connected) }
         if rows != hostRows { hostRows = rows }
         if connected != current.connected { connected = current.connected }
         let short = current.shortProblem ?? current.status
@@ -489,7 +507,7 @@ final class AppModel: ObservableObject {
         switch settings.notify {
         case "never": return
         case "always": break
-        default: guard !NSApp.isActive else { return } // background
+        default: guard !inFront else { return } // background
         }
         for a in list where (a.state == "blocked" || a.state == "done") && h.lastAgentStates[a.blockID] != a.state {
             let c = UNMutableNotificationContent()
@@ -499,6 +517,7 @@ final class AppModel: ObservableObject {
             let session = a.sessionLabel.isEmpty ? "a session" : a.sessionLabel
             c.subtitle = h.isLocal ? a.sessionLabel : "\(session) on \(h.displayName)"
             c.body = a.message
+            c.userInfo = ["block_id": a.blockID, "host": h.id]
             UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "\(h.id)-\(a.blockID)-\(a.state)", content: c, trigger: nil))
         }
     }
@@ -541,6 +560,7 @@ final class AppModel: ObservableObject {
         let h = current
         h.call("session.view", ["session_id": .string(sid)]) { [weak self] j in
             guard let self, self.currentSession == sid, self.current === h else { return }
+            viewSession = sid
             sessionLabel = j["label"].string ?? ""
             activeWindow = j["active_window_id"].string
             windows = j["windows"].array.map { w in
@@ -588,7 +608,8 @@ final class AppModel: ObservableObject {
     }
 
     private func attachVisible() {
-        let want = Set(visibleBlocks.map(\.0))
+        // Closed to the menu bar: nothing streams for nobody.
+        let want = windowOpen() ? Set(visibleBlocks.map(\.0)) : []
         let engine = engine
         for b in want.subtracting(attached) {
             vt.async {
@@ -625,7 +646,7 @@ final class AppModel: ObservableObject {
     /// from the pane the user is working in, and say so in the pane header.
     private func programCopied(block: String, text: String) {
         guard ClipboardPolicy.accepts(text: text, from: block, focusedBlock: focusedBlock,
-                                      appActive: NSApp.isActive) else { return }
+                                      appActive: inFront) else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         copiedBlock = block
@@ -764,7 +785,7 @@ final class AppModel: ObservableObject {
     /// tab already, by their status.
     func bell(block: String) {
         guard blocks[block] != nil else { return }
-        for effect in bellPolicy.ring(block: block, setting: settings.bell, appActive: NSApp.isActive) {
+        for effect in bellPolicy.ring(block: block, setting: settings.bell, appActive: inFront) {
             switch effect {
             case .flash: onFlash?(block)
             case .sound: NSSound.beep()
@@ -776,7 +797,9 @@ final class AppModel: ObservableObject {
     func isIn(_ block: String, _ w: WindowInfo) -> Bool { w.layout?.rects().contains { $0.0 == block } ?? false }
 
     func markSeen() {
-        guard NSApp.isActive, let w = active else { return }
+        // Only what's on screen now: the window showing, and the session
+        // whose view arrived (not the one being left).
+        guard inFront, viewSession == currentSession, let w = active else { return }
         let ids = Set(w.layout?.rects().map(\.0) ?? [])
         for a in agents where a.state == "done" && ids.contains(a.blockID) {
             if let d = a.updatedAt, seenDone[a.blockID] != d { seenDone[a.blockID] = d }
@@ -915,11 +938,13 @@ final class AppModel: ObservableObject {
     func renameSession(_ label: String) { call("session.set_label", ["session_id": sid, "label": .string(label)]) }
 
     func jump(to agent: AgentInfo) {
+        // The agent's own host: a session list entry could be stale.
+        if agent.host != current.id, let h = host(id: agent.host) { switchHost(to: h) }
         if currentSession != agent.sessionID {
             select(session: agent.sessionID)
         }
         call("session.focus_block", ["session_id": .string(agent.sessionID), "block_id": .string(agent.blockID)]) { [weak self] _ in
-            self?.reloadView()
+            self?.reloadView()  // and marks what's then on screen seen
         }
     }
 

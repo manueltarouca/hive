@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 import HiveCore
 import Combine
 import HiveRender
@@ -41,8 +42,9 @@ final class RootView: NSView {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUserNotificationCenterDelegate {
     let model = AppModel()
+    var menuBar: MenuBar!
     var window: NSWindow!
     var root: RootView!
     var panes: PanesView!
@@ -68,6 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
+        // Closing hides it: hive stays in the menu bar, and the window comes back as it was.
+        window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         // An empty toolbar makes the title bar taller and centers the
@@ -107,6 +111,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.setContentSize(NSSize(width: 1280, height: 800))
             window.center()
         }
+
+        menuBar = MenuBar(model: model)
+        menuBar.showWindow = { [weak self] in self?.showMainWindow() }
+        // From the menu bar hive isn't in front: bring it, with the window asked for.
+        menuBar.showSettings = { [weak self] in NSApp.activate(); self?.showSettings() }
+        menuBar.showShareHosts = { [weak self] in NSApp.activate(); self?.showShareHosts() }
+        model.windowOpen = { [weak self] in !NSApp.isHidden && (self?.window.isVisible ?? false) }
+        model.windowShown = { [weak self] in self?.window.occlusionState.contains(.visible) ?? false }
+        UNUserNotificationCenter.current().delegate = self
 
         model.onFrame = { [weak self] block in self?.panes.redraw(block) }
         model.openSettings = { [weak self] in self?.showSettings() }
@@ -177,6 +190,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if what == "shortcuts" { self?.toggleShortcuts() }
                 if what == "settings" { self?.showSettings() }
                 if what == "sharehosts" { self?.showShareHosts() }
+                if what == "menubar" { self?.menuBar.open() }
+                #if DEBUG
+                if what.hasPrefix("menuicons:") { self?.menuBar.writeIcons(to: String(what.dropFirst("menuicons:".count))) }
+                // Closed to the menu bar, then opened again from it.
+                if what == "reopen" {
+                    self?.window.performClose(nil)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self?.showMainWindow() }
+                }
+                #endif
                 if what.hasPrefix("addhostproblem:") {
                     self?.showAddHost(address: String(what.dropFirst("addhostproblem:".count)), problem: "hosts add: no hive server at box.example.ts.net (tried https://box.example.ts.net, https://box.example.ts.net:4483, http://box.example.ts.net:4483)")
                 } else if what.hasPrefix("addhost") { self?.showAddHost(address: String(what.dropFirst("addhost".count).drop { $0 == ":" })) }
@@ -259,7 +281,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) { panes.sync() }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// hive stays in the menu bar with the window closed; ⌘Q quits.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if NSApp.isHidden || !window.isVisible { showMainWindow() }
+        return true
+    }
+
+    func showMainWindow() {
+        if NSApp.isHidden { NSApp.unhide(nil) }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
+    /// Closing the window puts hive in the menu bar: hidden, as with ⌘H, not
+    /// ordered out (a Metal pane whose window was ordered out stops drawing
+    /// when it's back). The window comes back as it was.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        NSApp.hide(nil)
+        return false
+    }
+
+    // Hidden or back: panes stream only while you can see them.
+    func applicationDidHide(_ notification: Notification) { model.windowChanged() }
+    func applicationDidUnhide(_ notification: Notification) { model.windowChanged() }
+
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        // In view again: what's on screen is seen.
+        if window.occlusionState.contains(.visible) { model.markSeen() }
+    }
+
+    // A notification clicked: the window, on that agent.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let info = response.notification.request.content.userInfo
+        guard let block = info["block_id"] as? String else { return }
+        let host = info["host"] as? String
+        await MainActor.run {
+            if let a = self.model.agents.first(where: { $0.blockID == block && (host == nil || $0.host == host) }) { self.model.jump(to: a) }
+            self.showMainWindow()
+        }
+    }
 
     func applicationDidBecomeActive(_ notification: Notification) { model.markSeen() }
 

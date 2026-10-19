@@ -100,6 +100,18 @@ says which session.
 
 See [Agents](./agents) for how agents report their state.
 
+## The menu bar
+
+hive's three cells sit in the menu bar. The top cell fills while agents are
+working, and a count says how many need you. The menu lists them, blocked
+first, then finished ones you haven't looked at, then the ones working:
+pick one to open its pane. It also has your hosts, to connect or
+disconnect, and **This Mac**, which shows how your phone and other Macs
+reach this one.
+
+Closing the window keeps hive in the menu bar, and your sessions keep
+running. Open it again from the menu or the Dock; ⌘Q quits.
+
 ## Theme
 
 Choose **Hive Day**, **Hive Night** or **Match System** in the View menu, or
