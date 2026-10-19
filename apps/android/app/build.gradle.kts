@@ -37,11 +37,24 @@ android {
         }
     }
 
+    // The release key lives in ~/.android-keys; its password comes from the macOS Keychain at build time:
+    // HIVE_RELEASE_PW=$(security find-generic-password -s hive-release-keystore -w) ./gradlew assembleRelease
+    val releasePw = System.getenv("HIVE_RELEASE_PW")
+    signingConfigs {
+        if (releasePw != null) create("release") {
+            storeFile = file("${System.getProperty("user.home")}/.android-keys/hive-release.jks")
+            storePassword = releasePw
+            keyAlias = "hive-release"
+            keyPassword = releasePw
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
         }
         release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

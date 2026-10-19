@@ -6,7 +6,7 @@ Mac), with its own state and config dirs: never the user's server. Every
 step drives the real UI (uiautomator, adb input) and checks the result on
 the server, where it counts. Screenshots go to build/e2e.
 
-    python3 script/e2e.py [--night] [--keep] [--only NAME...]
+    python3 script/e2e.py [--release] [--night] [--keep] [--only NAME...]
 """
 import json
 import os
@@ -24,7 +24,8 @@ APP = os.path.dirname(HERE)
 ROOT = os.path.dirname(os.path.dirname(APP))
 HIVE = os.path.join(ROOT, "bin", "hive")
 OUT = os.path.join(APP, "build", "e2e")
-PKG = "xyz.matm.hive.debug"
+# --release: the signed release build (minified); paste needs the debug build's clipboard hook.
+PKG = "xyz.matm.hive" if "--release" in sys.argv else "xyz.matm.hive.debug"
 PORT = 4490
 ADDRESS = f"http://10.0.2.2:{PORT}"
 LABEL = "10-0-2-2"
@@ -427,6 +428,9 @@ def main():
         for step in STEPS:
             name = step.__name__.removeprefix("step_")
             if only and name not in only and name != "add_host":
+                continue
+            if PKG == "xyz.matm.hive" and step is step_paste:
+                print("skip  paste (debug builds only)")
                 continue
             t0 = time.time()
             try:
