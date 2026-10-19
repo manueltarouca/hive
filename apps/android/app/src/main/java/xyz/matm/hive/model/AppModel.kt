@@ -359,6 +359,8 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         val c = h?.client
         val b = visibleBlock
         if (stream?.blockID == b && stream?.client === c && c != null) return
+        // Leaving a fitted pane gives it back its size; the next one starts at the Mac's.
+        if (fitted) unfit()
         detach()
         if (c == null || b == null || !h.connected) return
         val s = PaneStream(c, b) { f -> if (stream?.blockID == b) onFrame(f) }
@@ -396,14 +398,27 @@ class AppModel(private val context: Context) : HostConnection.Listener {
     /** Fit to phone: the pane takes this size (take: the Mac letterboxes). */
     fun fit(cols: Int, rows: Int, cellWidth: Int, cellHeight: Int) {
         val s = stream ?: return
+        // The size to give back with Mac size: the pane's own, before the phone took it.
+        if (!fitted && s.cols > 0) {
+            macSize = Triple(s.blockID, intArrayOf(s.cols, s.rows), intArrayOf(s.cellWidth.takeIf { it > 0 } ?: cellWidth, s.cellHeight.takeIf { it > 0 } ?: cellHeight))
+        }
         fitSize = intArrayOf(cols, rows, cellWidth, cellHeight)
         fitted = true
         sizeLearned()
         s.client.resize(s.blockID, cols, rows, cellWidth, cellHeight, take = true)
     }
 
-    /** Back to the Mac's size: the phone stops asking; the Mac takes it back when used. */
-    fun unfit() { fitted = false; fitSize = null }
+    private var macSize: Triple<String, IntArray, IntArray>? = null
+
+    /** Back to the Mac's size, at once: the size the pane had before Fit to phone. */
+    fun unfit() {
+        fitted = false
+        fitSize = null
+        val s = stream
+        val m = macSize
+        macSize = null
+        if (s != null && m != null && m.first == s.blockID) s.client.resize(s.blockID, m.second[0], m.second[1], m.third[0], m.third[1], take = true)
+    }
 
     /** The phone's size changed (rotation, the keyboard): a fitted pane follows. */
     fun phoneSize(cols: Int, rows: Int, cellWidth: Int, cellHeight: Int) {

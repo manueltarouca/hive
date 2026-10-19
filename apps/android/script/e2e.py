@@ -281,7 +281,7 @@ def step_paste(srv):
 
 def step_fit(srv):
     block = srv.view("demo")["windows"][0]["layout"]["block_id"]
-    cols0 = srv.call("session.view", {"session_id": srv.sessions()["demo"]["session_id"]})["blocks"][block]["cols"]
+    cols0 = srv.view("demo")["blocks"][block]["cols"]
     wait("This pane is your Mac's size")
     shot("mac-size")
     tap("Fit to phone")
@@ -292,6 +292,9 @@ def step_fit(srv):
     assert 30 <= cols <= 70, cols
     tap("Mac size")
     wait("Fit to phone")
+    # Mac size gives the pane its size back at once, not when the Mac is next used.
+    until("the pane is back at the Mac's size", lambda: srv.view("demo")["blocks"][block]["cols"] == cols0)
+    shot("back-to-mac-size")
 
 
 def step_tabs(srv):

@@ -25,6 +25,11 @@ class PaneStream(val client: HiveClient, val blockID: String, private val sink: 
         private set
     @Volatile var rows = 0
         private set
+    /** The cell size in pixels the size's owner reported (resize frames), 0 until one arrives. */
+    @Volatile var cellWidth = 0
+        private set
+    @Volatile var cellHeight = 0
+        private set
 
     companion object {
         /** Every mirror lives on this thread. */
@@ -47,7 +52,11 @@ class PaneStream(val client: HiveClient, val blockID: String, private val sink: 
                 mirror = Mirror.fromSnapshot(u.data)
             }
             is BlockUpdate.Output -> mirror?.feed(u.data)
-            is BlockUpdate.Resize -> mirror?.resize(u.cols, u.rows, u.cellWidth, u.cellHeight)
+            is BlockUpdate.Resize -> {
+                cellWidth = u.cellWidth
+                cellHeight = u.cellHeight
+                mirror?.resize(u.cols, u.rows, u.cellWidth, u.cellHeight)
+            }
             BlockUpdate.Resync -> { start(); return }
             BlockUpdate.Exited -> exited = true
         }
