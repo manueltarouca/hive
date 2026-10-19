@@ -20,7 +20,7 @@ endif
 LDFLAGS     := -s -w -X github.com/manueltarouca/hive/internal/server.Version=$(VERSION)
 export PKG_CONFIG_PATH := $(VT_PREFIX)/share/pkgconfig
 
-.PHONY: all build test vt clean version
+.PHONY: all build test vt vt-android clean version
 
 all: build
 
@@ -42,6 +42,17 @@ $(VT_PREFIX)/lib/libghostty-vt.a:
 	git -C third_party/ghostty fetch -q --depth 1 origin $(GHOSTTY_REV)
 	git -C third_party/ghostty checkout -q FETCH_HEAD
 	cd third_party/ghostty && $(ZIG) build -Demit-lib-vt -Demit-xcframework=false -Doptimize=ReleaseFast $(VT_TARGET) --prefix $(VT_PREFIX)
+
+# libghostty-vt for the Android app (apps/android), from the same checkout.
+# The NDK comes from ANDROID_NDK_HOME, or the newest under the Android SDK.
+VT_ANDROID  := $(CURDIR)/third_party/ghostty-vt-android
+
+vt-android: $(VT_ANDROID)/lib/libghostty-vt.a
+
+$(VT_ANDROID)/lib/libghostty-vt.a: $(VT_PREFIX)/lib/libghostty-vt.a
+	@if [ -z "$$ANDROID_NDK_HOME" ] && ! ls -d "$${ANDROID_HOME:-$$HOME/Library/Android/sdk}"/ndk/* >/dev/null 2>&1; then \
+	  echo "vt-android needs the Android NDK: set ANDROID_NDK_HOME, or install one under the SDK" >&2; exit 1; fi
+	cd third_party/ghostty && $(ZIG) build -Demit-lib-vt -Demit-xcframework=false -Doptimize=ReleaseFast -Dtarget=aarch64-linux-android.29 --prefix $(VT_ANDROID)
 
 clean:
 	rm -rf bin

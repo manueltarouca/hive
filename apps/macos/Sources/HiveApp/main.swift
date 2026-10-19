@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let palette = PalettePanel()
     let shortcuts = ShortcutsPanel()
     let settingsWindow = SettingsWindow()
+    let shareHostsWindow = ShareHostsWindow()
     var bag: Set<AnyCancellable> = []
     var appearanceObserver: NSKeyValueObservation?
     var appearanceItems: [(Appearance, NSMenuItem)] = []
@@ -158,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if what == "hostlist:remove" { self?.showHostList(.remove) }
                 if what == "shortcuts" { self?.toggleShortcuts() }
                 if what == "settings" { self?.showSettings() }
+                if what == "sharehosts" { self?.showShareHosts() }
                 if what.hasPrefix("addhostproblem:") {
                     self?.showAddHost(address: String(what.dropFirst("addhostproblem:".count)), problem: "hosts add: no hive server at box.example.ts.net (tried https://box.example.ts.net, https://box.example.ts.net:4483, http://box.example.ts.net:4483)")
                 } else if what.hasPrefix("addhost") { self?.showAddHost(address: String(what.dropFirst("addhost".count).drop { $0 == ":" })) }
@@ -306,6 +308,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func toggleShortcuts() { shortcuts.toggle(over: window, style: model.style) }
 
     func showSettings() { settingsWindow.show(model: model) }
+    func showShareHosts() { shareHostsWindow.show(model: model) }
 
     func applyFont() {
         let s = model.settings
@@ -518,6 +521,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .separator(),
             item("Settings…", ",") { [weak self] in self?.showSettings() },
             item("Add Remote Host…", "") { [weak self] in self?.showAddHost() },
+            item("Share Hosts with Phone…", "") { [weak self] in self?.showShareHosts() },
             .separator(),
             item("Command Palette…", "p", [.command, .shift]) { [weak self] in self?.showPalette() },
             .separator(),

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Hive" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/night_bg</item>
+    </style>
+    <color name="night_bg">#1D1F21</color>
+</resources>
