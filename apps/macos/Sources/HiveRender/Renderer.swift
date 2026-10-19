@@ -143,7 +143,12 @@ public final class Renderer {
             if let l = p.link, l.row >= 0, l.row < f.rows {
                 let t = max(1, Float(fonts.underlineThickness))
                 let pos = p.origin + SIMD2(Float(l.columns.lowerBound) * cw, Float(l.row) * ch - p.scrollY + ch - Float(fonts.underlinePosition) - t / 2)
-                deco.append(QuadInstance(pos: pos, size: SIMD2(Float(l.columns.count) * cw, t), uv: .zero, color: color(defaultFG), kind: 0))
+                // In the link's own colour (its first cell's), as cells' underlines are.
+                var c = defaultFG
+                if let first = f.cells[l.row].indices.contains(l.columns.lowerBound) ? f.cells[l.row][l.columns.lowerBound] : nil {
+                    c = first.inverse ? (first.bg ?? defaultBG) : (first.fg ?? defaultFG)
+                }
+                deco.append(QuadInstance(pos: pos, size: SIMD2(Float(l.columns.count) * cw, t), uv: .zero, color: color(c), kind: 0))
             }
             // Non-block cursors, and a hollow block for unfocused panes.
             if f.cursor.visible, f.cursor.y < f.rows, p.cursorShown || !p.focused {

@@ -109,6 +109,9 @@ struct PaletteView: View {
     @State private var query = ""
     @State private var selected = 0
     @State private var hoverGate = HoverGate()
+    /// The list's own height, measured: headers and dividers vary, so a
+    /// count of rows times a constant clipped the last row.
+    @State private var listHeight: CGFloat = 0
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -193,8 +196,12 @@ struct PaletteView: View {
                         }
                     }
                     .padding(6)
+                    .background(GeometryReader { g in Color.clear.preference(key: ListHeight.self, value: g.size.height) })
                 }
-                .frame(height: min(CGFloat(total) * 31 + 12 + sectionHeight(rows) + dividers(rows), 9 * 31 + 12 + sectionHeight(rows) + dividers(rows)))
+                .onPreferenceChange(ListHeight.self) { listHeight = $0 }
+                // Up to about nine rows, then it scrolls; the estimate only until measured.
+                .frame(height: min(listHeight > 0 ? listHeight : CGFloat(total) * 31 + 12 + sectionHeight(rows) + dividers(rows),
+                                   9 * 31 + 12 + sectionHeight(rows) + dividers(rows)))
                 .onChange(of: selected) { _, v in proxy.scrollTo(v) }
             }
         }
@@ -294,6 +301,11 @@ func pointerOnScreen() -> CGPoint {
         return w.convertPoint(toScreen: e.locationInWindow)
     }
     return NSEvent.mouseLocation
+}
+
+private struct ListHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 private struct CardHeight: PreferenceKey {

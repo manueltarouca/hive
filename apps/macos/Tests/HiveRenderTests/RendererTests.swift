@@ -75,6 +75,20 @@ func pixels(_ img: CGImage) -> [UInt8] {
         #expect((line?.pos.y ?? 0) > 0 && (line?.pos.y ?? 0) < ch)
     }
 
+    /// A link printed in a colour is underlined in that colour, as the
+    /// cells' own underlines are.
+    @Test func hoveredLinkUnderlineTakesTheLinksColor() throws {
+        let r = try Renderer(fonts: FontSet(pointSize: 13, scale: 2))
+        let m = try Mirror(cols: 40, rows: 4)
+        m.apply(theme: .ghostty)
+        m.feed(Data("see \u{1B}[38;2;80;160;240mhttps://hive.matm.xyz\u{1B}[0m now\r\n".utf8))
+        var d = PaneDraw(frame: m.frame(), origin: .zero, size: SIMD2(800, 200), focused: false)
+        d.link = (row: 0, columns: 4..<25)
+        let cw = Float(r.fonts.cellWidth), ch = Float(r.fonts.cellHeight)
+        let line = r.instances(for: [d], viewport: SIMD2(800, 200)).first { $0.kind == 0 && $0.size.x == 21 * cw && $0.size.y < ch / 2 }
+        #expect(line?.color == SIMD4<Float>(Float(80) / 255, Float(160) / 255, Float(240) / 255, 1))
+    }
+
     @Test func cellMetricsAreWholePixels() {
         let f = FontSet(pointSize: 13, scale: 2)
         #expect(f.cellWidth >= 14 && f.cellWidth <= 18)
