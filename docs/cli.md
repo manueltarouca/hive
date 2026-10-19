@@ -88,7 +88,8 @@ Every command takes `--json` for output a script can parse.
 Any command runs against another machine's server with `-S`. The server
 there must listen on your tailnet (`hive server start --tailscale`, or
 `--extra-listen tailnet://:4483`), and let you in: by default only the
-Tailscale user who owns that machine.
+Tailscale user who owns that machine. [Remote servers](./remote) has the
+listeners and who they let in.
 
 ```sh
 hive -S https://box.example.ts.net ls

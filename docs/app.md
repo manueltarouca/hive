@@ -74,6 +74,10 @@ bar says so in a word, and the panes dim under a card that says what's
 happening and why; the app keeps trying, and the card goes the moment the
 host is back. The app reconnects on its own.
 
+**Share Hosts with Phone…** (in the Hive menu) shows a code that brings your
+hosts to hive on your phone, and this Mac too when its server listens on the
+tailnet. See [Remote servers](./remote) and [hive on your phone](./android).
+
 Hosts are the same list as `hive hosts`: one added with the CLI shows up in
 the app, and the other way round. Remove one from the command palette.
 
