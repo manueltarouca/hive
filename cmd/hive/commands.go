@@ -74,7 +74,9 @@ API
 
 Remote servers
   hosts [ls]                 the servers you've named
-  hosts add LABEL URL        name one: hive -S LABEL ls
+  hosts add LABEL URL [--always|--on-demand]
+                             name one: hive -S LABEL ls (the app connects
+                             when you pick it, or always)
   hosts rm LABEL             forget it
   whoami                     who the server thinks you are, and how
   client ls                  who is connected, and as whom

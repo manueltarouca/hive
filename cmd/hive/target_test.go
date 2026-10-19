@@ -138,9 +138,25 @@ func TestRemoteCLI(t *testing.T) {
 		t.Fatalf("whoami = %q", out)
 	}
 	must("hosts", "add", "hivetest-box", url)
-	if out := must("hosts", "ls"); !strings.Contains(out, "hivetest-box") || !strings.Contains(out, url) {
+	if out := must("hosts", "ls"); !strings.Contains(out, "hivetest-box") || !strings.Contains(out, url) || !strings.Contains(out, "on-demand") {
 		t.Fatalf("hosts ls = %q", out)
 	}
+	// --always sticks when the host is saved again without a choice.
+	must("hosts", "add", "--always", "hivetest-box", url)
+	must("hosts", "add", "hivetest-box", url)
+	if out := must("hosts", "ls"); !strings.Contains(out, "always") {
+		t.Fatalf("hosts ls after --always and a re-save = %q", out)
+	}
+	must("hosts", "add", "hivetest-box", url, "--on-demand")
+	// A flag anywhere; both at once is a mistake.
+	must("hosts", "add", "hivetest-box", "--always", url)
+	if out := must("hosts", "ls"); !strings.Contains(out, "always") {
+		t.Fatalf("a flag between label and URL: %q", out)
+	}
+	if out, code := hive("hosts", "add", "hivetest-box", url, "--always", "--on-demand"); code != 2 || !strings.Contains(out, "one of") {
+		t.Fatalf("both flags: exit %d, %q", code, out)
+	}
+	must("hosts", "add", "hivetest-box", url, "--on-demand")
 	must("-S", "hivetest-box", "new", "far", "--", "sh", "-c", "pwd -P; exec cat")
 	if out := must("-S", "hivetest-box", "ls"); !strings.Contains(out, "far") {
 		t.Fatalf("ls on the remote = %q", out)

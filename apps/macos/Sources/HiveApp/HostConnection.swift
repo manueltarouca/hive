@@ -40,16 +40,18 @@ final class HostConnection {
 
     /// How the connection stands.
     enum Link: Equatable {
+        /// Saved, not connected: an on-demand host nobody picked yet.
+        case idle
         case connecting, connected, reconnecting, refused(String), noServer, silent, failed(String)
     }
-    private(set) var link = Link.connecting
+    private(set) var link = Link.idle
 
     /// Why it isn't connected, as a sentence naming the host; nil while
     /// connected. The details (the server's words) are in `detail`.
     var problem: String? {
         let n = displayName
         switch link {
-        case .connected: return nil
+        case .connected, .idle: return nil
         case .connecting: return "Connecting to \(n)…"
         case .reconnecting: return "Reconnecting to \(n)…"
         case .refused: return "\(n) refused this Mac"
@@ -95,6 +97,41 @@ final class HostConnection {
     var onDisconnected: ((HostConnection) -> Void)?
 
     private var closing = false
+    /// A connection is wanted: always-on, or picked. False for an on-demand
+    /// host until it's used, and again after Disconnect.
+    private(set) var active = false
+    /// hosts.json says always: connect at launch, and when switched to it.
+    var savedAlways = false
+
+    /// Connects (an on-demand host that was picked, or an always one).
+    func start() {
+        guard !active else { return }
+        active = true
+        closing = false
+        link = .connecting
+        status = problem ?? ""
+        connect()
+    }
+
+    /// Disconnects and stays so until started again. Its sessions and
+    /// agents go with the connection.
+    func stop() {
+        guard active else { return }
+        active = false
+        closing = true
+        let client = client
+        vt.async { client.close() }
+        // A fresh, unconnected client and engine: whatever the stopped one
+        // still delivers (its close, a late reply, events) is ignored.
+        self.client = HiveClient(endpoint: endpoint, queue: vt)
+        engine = Engine(client: self.client)
+        connected = false
+        link = .idle
+        status = ""
+        sessions = []
+        agents = []
+        lastAgentStates = [:]
+    }
     private var nextDelay: TimeInterval = 0.5
 
     /// The saved address became this one endpoint (the URL it answered at).
@@ -140,11 +177,17 @@ final class HostConnection {
                     Task { @MainActor in
                         guard let self else { return }
                         let (events, overflowed) = batch.takeAll()
+                        guard self.engine === engine else { return }
                         self.onEvents?(self, events, overflowed)
                     }
                 }
             }
-            engine.client.onClose = { _ in Task { @MainActor in self?.disconnected() } }
+            engine.client.onClose = { _ in
+                Task { @MainActor in
+                    guard let self, self.engine === engine else { return } // a replaced engine's
+                    self.disconnected()
+                }
+            }
             engine.client.onError = { kind, block, err in NSLog("hive error (%@ %@): %@", kind ?? "-", block ?? "-", err.description) }
             engine.client.connect(name: "Hive.app", version: AppModel.version) { result in
                 Task { @MainActor in
@@ -205,6 +248,7 @@ final class HostConnection {
 
     /// Stops for good (the host was removed).
     func close() {
+        active = false
         closing = true
         let client = client
         vt.async { client.close() }
@@ -214,7 +258,9 @@ final class HostConnection {
         let client = client
         vt.async {
             client.call(method, params) { result in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
+                    // A reply for a connection since replaced or stopped.
+                    guard let self, self.client === client else { return }
                     switch result {
                     case .success(let j): then?(j)
                     case .failure(let e): NSLog("hive %@: %@", method, e.description)

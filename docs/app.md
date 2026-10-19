@@ -60,8 +60,13 @@ the command palette) and give it a label and an address, such as
 `https://box.example.ts.net` or a machine name. The server there must let
 you in (see `hive server start --tailscale`).
 
-Each host gets its own section in the session list, with **New Session on
-…**. A session on another machine works as a local one: panes, splits,
+Each host gets its own section in the session list. A saved host is
+connected on demand: it's listed with **Connect**, and connects when you pick
+it (or at launch, if the session you were last in is on it). Once connected,
+its sessions show under it, with **New Session on …**; **Disconnect from …**
+in the command palette lets it go. A host saved with `hive hosts add
+--always` connects at launch and stays connected, so its agents' status and
+notifications are live while you're elsewhere. A session on another machine works as a local one: panes, splits,
 agents and their status, and notifications, which name the host. The title
 bar shows a server icon and the host's name, and, when the host can't be
 reached, why. The app reconnects on its own.

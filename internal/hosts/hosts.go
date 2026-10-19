@@ -17,10 +17,24 @@ import (
 
 // Host is a named remote server. Address is a URL (https://box.ts.net) or
 // a bare host, tried at https:443, then https and http on hive's port.
+//
+// Connect is when the app connects: on demand (the default: when you pick
+// the host or one of its sessions), or always (at launch, staying
+// connected, so its agents' status and notifications are live).
 type Host struct {
 	Label   string `json:"label"`
 	Address string `json:"address"`
+	Connect string `json:"connect,omitempty"`
 }
+
+// The connect modes. Empty means on demand.
+const (
+	OnDemand = "on-demand"
+	Always   = "always"
+)
+
+// Always reports whether the app keeps this host connected.
+func (h Host) Always() bool { return h.Connect == Always }
 
 type file struct {
 	Version int    `json:"version"`
@@ -65,8 +79,8 @@ func CheckLabel(l string) error {
 	switch {
 	case l == "":
 		return errors.New("a host needs a label")
-	case strings.ContainsAny(l, "/:@ \t") || strings.HasPrefix(l, "~") || strings.HasPrefix(l, "."):
-		return fmt.Errorf("label %q: letters, digits, '-', '_' and '.' only, not starting with '.'", l)
+	case strings.ContainsAny(l, "/:@ \t") || strings.HasPrefix(l, "~") || strings.HasPrefix(l, ".") || strings.HasPrefix(l, "-"):
+		return fmt.Errorf("label %q: letters, digits, '-' and '_' only, not starting with '-'", l)
 	case strings.Contains(l, "."):
 		return fmt.Errorf("label %q: a label with a dot reads as a host name; use something like %q", l, strings.ReplaceAll(l, ".", "-"))
 	}
@@ -103,10 +117,18 @@ func lock() (func(), error) {
 	return func() { syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
 }
 
-// Add saves a host, replacing one with the same label.
+// Add saves a host, replacing one with the same label. Saved again without
+// a connect mode, a host keeps the one it had.
 func Add(h Host) error {
 	if err := CheckLabel(h.Label); err != nil {
 		return err
+	}
+	if h.Connect != "" && h.Connect != OnDemand && h.Connect != Always {
+		return fmt.Errorf("connect %q: on-demand or always", h.Connect)
+	}
+	explicit := h.Connect != ""
+	if h.Connect == OnDemand {
+		h.Connect = "" // saved as the default is
 	}
 	if err := CheckAddress(h.Address); err != nil {
 		return err
@@ -119,6 +141,11 @@ func Add(h Host) error {
 	hs, err := List()
 	if err != nil {
 		return err
+	}
+	for _, x := range hs {
+		if strings.EqualFold(x.Label, h.Label) && !explicit {
+			h.Connect = x.Connect
+		}
 	}
 	out := []Host{h}
 	for _, x := range hs {

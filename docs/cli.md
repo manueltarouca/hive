@@ -100,7 +100,7 @@ hive -S box whoami
 | Command | Does |
 | --- | --- |
 | `hive hosts [ls]` | The servers you've named |
-| `hive hosts add LABEL URL` | Name one. The app shows the same list. |
+| `hive hosts add LABEL URL [--always\|--on-demand]` | Name one. The app shows the same list, and connects when you pick it (`--on-demand`, the default), or with `--always` at launch, staying connected (its agents' status and notifications stay live). Saved again without a flag, a host keeps its choice. |
 | `hive hosts rm LABEL` | Forget it |
 | `hive whoami` | Who the server thinks you are, and how you reached it |
 | `hive client ls` | The apps connected to a server, and as whom |

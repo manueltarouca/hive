@@ -166,13 +166,16 @@ final class AppModel: ObservableObject {
         let name: String       // This Mac, or the server's address
         let label: String      // as `hive hosts` knows it
         let problem: String?   // a sentence naming the host, while not connected
+        let idle: Bool         // saved, not connected: Connect to use it
         let detail: String?    // the reason in full
         var local: Bool { id == HostConnection.localID }
     }
     /// Runs once a host has connected (and listed its sessions).
-    var pendingConnected: [String: () -> Void] = [:]
+    /// Waits at most 20 s: a host that answers later doesn't pop anything
+    /// up while you're doing something else.
+    var pendingConnected: [String: (at: Date, then: () -> Void)] = [:]
     func whenConnected(_ h: HostConnection, then: @escaping () -> Void) {
-        if h.connected { then() } else { pendingConnected[h.id] = then }
+        if h.connected { then() } else { pendingConnected[h.id] = (Date(), then) }
     }
 
     /// The current host has a problem worth showing (connecting at launch
@@ -276,7 +279,7 @@ final class AppModel: ObservableObject {
         // Only at launch: if the server stops later, it was asked to.
         // Reconnecting must not undo `hive server stop`.
         ensureServer()
-        for h in hosts { wireHost(h); h.connect() }
+        for h in hosts { wireHost(h); h.start() }
         watchHosts()
     }
 
@@ -296,7 +299,9 @@ final class AppModel: ObservableObject {
         h.onConnected = { [weak self] h in
             guard let self else { return }
             self.publishHosts()
-            if let then = self.pendingConnected.removeValue(forKey: h.id) { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { then() } }
+            if let p = self.pendingConnected.removeValue(forKey: h.id), Date().timeIntervalSince(p.at) < 20 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { p.then() }
+            }
             if h === self.current { self.connected = true; self.status = h.status }
             self.reloadSessions(h, create: h.isLocal)
             if h === self.current { self.reloadView() }
@@ -365,7 +370,7 @@ final class AppModel: ObservableObject {
     /// Every host's sessions and agents, as the sidebar and switcher show
     /// them: this Mac's first, agents by urgency.
     func publishHosts() {
-        let rows = hosts.map { HostRow(id: $0.id, name: $0.displayName, label: $0.label, problem: $0.problem, detail: $0.detail) }
+        let rows = hosts.map { HostRow(id: $0.id, name: $0.displayName, label: $0.label, problem: $0.problem, idle: !$0.active, detail: $0.detail) }
         if rows != hostRows { hostRows = rows }
         if connected != current.connected { connected = current.connected }
         if status != current.status { status = current.status }
@@ -495,7 +500,11 @@ final class AppModel: ObservableObject {
         }
         currentSession = id
         // A fallback doesn't replace the session to come back to.
-        if let id, !restoring || restoreSession == nil { AppModel.defaults.set(id, forKey: "lastSession") }
+        if let id, !restoring || restoreSession == nil {
+            AppModel.defaults.set(id, forKey: "lastSession")
+            // Its host connects at launch, on demand or not.
+            AppModel.defaults.set(current.isLocal ? nil : current.label, forKey: "lastSessionHost")
+        }
         reloadView()
     }
 

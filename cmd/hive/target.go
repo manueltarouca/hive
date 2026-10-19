@@ -113,15 +113,36 @@ func cmdHosts(g globals, args []string) error {
 			return nil
 		}
 		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(tw, "LABEL\tADDRESS")
+		fmt.Fprintln(tw, "LABEL\tADDRESS\tCONNECT")
 		for _, h := range hs {
-			fmt.Fprintf(tw, "%s\t%s\n", h.Label, h.Address)
+			mode := hosts.OnDemand
+			if h.Always() {
+				mode = hosts.Always
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", h.Label, h.Address, mode)
 		}
 		return tw.Flush()
 	case "add":
-		if len(args) != 3 {
-			return usagef("usage: hive hosts add LABEL URL")
+		// --always: the app connects at launch and stays connected;
+		// --on-demand (the default for a new host): when you pick it.
+		// Neither: a known host keeps its choice.
+		var pos []string
+		mode := ""
+		for _, a := range args[1:] {
+			switch a {
+			case "--always", "--on-demand":
+				if mode != "" {
+					return usagef("hosts add: give one of --always and --on-demand")
+				}
+				mode = map[string]string{"--always": hosts.Always, "--on-demand": hosts.OnDemand}[a]
+			default:
+				pos = append(pos, a)
+			}
 		}
+		if len(pos) != 2 {
+			return usagef("usage: hive hosts add LABEL URL [--always|--on-demand]")
+		}
+		args = append([]string{"add"}, pos...)
 		addr := args[2]
 		if err := hosts.CheckLabel(args[1]); err != nil {
 			return usagef("hosts add: %v", err)
@@ -141,10 +162,15 @@ func cmdHosts(g globals, args []string) error {
 				fmt.Fprintf(os.Stderr, "%s doesn't answer now; saved as given, tried each time\n", addr)
 			}
 		}
-		if err := hosts.Add(hosts.Host{Label: args[1], Address: addr}); err != nil {
+		if err := hosts.Add(hosts.Host{Label: args[1], Address: addr, Connect: mode}); err != nil {
 			return usagef("hosts add: %v", err)
 		}
-		fmt.Printf("added %s (%s): hive -S %s ls\n", args[1], addr, args[1])
+		h, _, _ := hosts.Find(args[1])
+		when := "when you pick it"
+		if h.Always() {
+			when = "always"
+		}
+		fmt.Printf("added %s (%s), the app connects %s: hive -S %s ls\n", args[1], addr, when, args[1])
 		return nil
 	case "rm", "remove":
 		if len(args) != 2 {
@@ -159,7 +185,7 @@ func cmdHosts(g globals, args []string) error {
 		}
 		return nil
 	}
-	return usagef("usage: hive hosts [ls] | add LABEL URL | rm LABEL")
+	return usagef("usage: hive hosts [ls] | add LABEL URL [--always|--on-demand] | rm LABEL")
 }
 
 // ---- whoami, clients ----

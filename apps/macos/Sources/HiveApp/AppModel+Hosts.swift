@@ -5,6 +5,9 @@ import HiveKit
 struct SavedHost: Equatable, Decodable {
     let label: String
     let address: String
+    /// "always", or on demand (missing, or "on-demand").
+    var connect: String? = nil
+    var always: Bool { connect == "always" }
 }
 
 extension AppModel {
@@ -49,17 +52,29 @@ extension AppModel {
             let eps = HostConnection.endpoints(for: s.address)
             let id = HostConnection.remoteID(s.label)
             if let h = hosts.first(where: { $0.id == id }) {
-                if h.endpoints == eps { next.append(h); continue }
+                var keep = h.endpoints == eps
                 // Saved as the URL it already answered at: keep the connection.
-                if eps.count == 1, h.endpoint == eps[0] { h.pin(to: eps[0]); next.append(h); continue }
+                if !keep, eps.count == 1, h.endpoint == eps[0] { h.pin(to: eps[0]); keep = true }
+                if keep {
+                    if s.always, !h.savedAlways { h.start() } // switched to always: connect now
+                    h.savedAlways = s.always
+                    next.append(h)
+                    continue
+                }
             }
+            // A new address for a host in use stays in use.
+            let wasActive = hosts.first { $0.id == id }?.active ?? false
             guard !eps.isEmpty else { continue }
             let h = HostConnection(id: id, label: s.label, endpoints: eps, vt: vt)
             h.theme = hosts[0].theme
             h.cursorBlink = hosts[0].cursorBlink
             wireHost(h)
             h.onPinned = { [weak self] h, e in self?.saveAnswered(h, e) }
-            h.connect()
+            // On demand: listed, connected when picked; or at launch when the
+            // session you were last in is on it.
+            h.savedAlways = s.always
+            let last = AppModel.defaults.string(forKey: "lastSessionHost")
+            if s.always || wasActive || last?.caseInsensitiveCompare(s.label) == .orderedSame { h.start() }
             next.append(h)
         }
         for h in hosts where !next.contains(where: { $0 === h }) {
@@ -108,6 +123,25 @@ extension AppModel {
         var label = base, n = 2
         while taken.contains(label.lowercased()) { label = "\(base)-\(n)"; n += 1 }
         return label
+    }
+
+    /// Connects an on-demand host; `then` runs once it's connected.
+    func connect(host id: String, then: (() -> Void)? = nil) {
+        guard let h = host(id: id) else { return }
+        h.start()
+        publishHosts()
+        if let then { whenConnected(h, then: then) }
+    }
+
+    /// Lets a remote host go. Its sessions leave the list until it's
+    /// picked again; if one was on screen, this Mac's takes its place.
+    func disconnect(host id: String) {
+        guard let h = host(id: id), !h.isLocal else { return }
+        let wasCurrent = h === current
+        h.stop()
+        pendingConnected[h.id] = nil
+        if wasCurrent, let local = hosts.first(where: \.isLocal) { select(onHost: local) }
+        publishHosts()
     }
 
     func removeHost(_ label: String) {

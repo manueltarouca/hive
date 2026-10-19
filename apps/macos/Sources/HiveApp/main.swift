@@ -147,9 +147,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let what = ProcessInfo.processInfo.environment["HIVE_OPEN"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
                 if what == "palette" { self?.showPalette() } else if what == "picker" { self?.showSessionPicker() }
+                if what.hasPrefix("palette:") { self?.showPalette(query: String(what.dropFirst("palette:".count))) }
                 if what == "shortcuts" { self?.toggleShortcuts() }
                 if what == "settings" { self?.showSettings() }
-                if what.hasPrefix("addhost") { self?.showAddHost(address: String(what.dropFirst("addhost".count).drop { $0 == ":" })) }
+                if what.hasPrefix("addhostproblem:") {
+                    self?.showAddHost(address: String(what.dropFirst("addhostproblem:".count)), problem: "hosts add: no hive server at box.example.ts.net (tried https://box.example.ts.net, https://box.example.ts.net:4483, http://box.example.ts.net:4483)")
+                } else if what.hasPrefix("addhost") { self?.showAddHost(address: String(what.dropFirst("addhost".count).drop { $0 == ":" })) }
                 if what == "panemenu", let self, let b = self.model.focusedBlock, let card = self.panes.card(b) {
                     card.pane.showContextMenuForTesting()
                 }
@@ -222,8 +225,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: palette and picker
 
-    func showPalette() {
-        palette.show(over: window, width: 460, placeholder: "Search commands…", style: model.style) { [weak self] q in
+    func showPalette(query: String = "") {
+        palette.show(over: window, width: 460, placeholder: "Search commands…", style: model.style, query: query) { [weak self] q in
             (self?.commands() ?? []).filter { fuzzy($0.title, q) }
         }
     }
@@ -250,7 +253,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
                 guard q.isEmpty else { continue }
                 let icon = h.local ? "laptopcomputer" : "globe"
-                if let problem = h.problem {
+                if h.idle {
+                    // Saved, not connected: connect, then show its sessions.
+                    rows.append(PaletteItem(key: "connect:\(h.id)", title: "Connect", symbol: "bolt.horizontal", section: h.name,
+                                            sectionSymbol: icon) { [weak self] in
+                        self?.model.connect(host: h.id) { [weak self] in self?.showSessionPicker() }
+                    })
+                } else if let problem = h.problem {
                     rows.append(PaletteItem(key: "host:\(h.id)", title: problem, symbol: "exclamationmark.triangle", section: h.name,
                                             sectionSymbol: icon, help: h.detail ?? "") {})
                 } else if !h.local {
@@ -337,8 +346,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
             PaletteItem(title: "Add Remote Host…", symbol: "globe") { [weak self] in DispatchQueue.main.async { self?.showAddHost() } },
-        ] + m.hostRows.filter { !$0.local }.map { h in
-            PaletteItem(title: "Remove Host \(h.name)", symbol: "minus.circle") { m.removeHost(h.label) }
+        ] + m.hostRows.filter { !$0.local }.flatMap { h -> [PaletteItem] in
+            let link = h.idle
+                ? PaletteItem(title: "Connect to \(h.name)", symbol: "bolt.horizontal",
+                              action: { [weak self] in m.connect(host: h.id) { [weak self] in self?.showSessionPicker() } })
+                : PaletteItem(title: "Disconnect from \(h.name)", symbol: "bolt.horizontal.circle", action: { m.disconnect(host: h.id) })
+            return [link, PaletteItem(title: "Remove Host \(h.name)", symbol: "minus.circle") { m.removeHost(h.label) }]
         } + Appearance.allCases.map { a in
             PaletteItem(title: "Theme: \(a.title)", symbol: a == .night ? "moon" : a == .day ? "sun.max" : "circle.lefthalf.filled",
                         checked: m.appearance == a) { m.setAppearance(a) }
@@ -371,9 +384,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard let self else { return }
             if let err {
                 self.showAddHost(address: address, problem: err)
-            } else if let h = self.model.host(id: HostConnection.remoteID(label)) {
-                // There at once: its sessions show as soon as it connects.
-                self.model.whenConnected(h) { [weak self] in self?.showSessionPicker() }
+            } else {
+                // Just added: connect it now, and show its sessions.
+                self.model.connect(host: HostConnection.remoteID(label)) { [weak self] in self?.showSessionPicker() }
             }
         }
     }
