@@ -1,0 +1,19 @@
+╭───────────────────────────────────────────╮
+│ ✻ Welcome to Claude Code!                 │
+╰───────────────────────────────────────────╯
+ ▐▛███▜▌   Claude Code v2
+▝▜█████▛▘  Opus 5.5 · Claude Max
+  ▘▘ ▝▝    ~/code/research/ref
+
+⏺ Fixed in 0.1.1, attached above.
+  ⎿  Read 42 lines (ctrl+o to expand)
+⏺ Bash(./gradlew assembleRelease)
+  ⎿  BUILD SUCCESSFUL ✔  ☐ todo  ☒ done  ✘ failed
+✽ Baking… (12s · ↓ 1.2k tokens · esc to interrupt)
+✳ ✢ ✶ ✻ · ⧉ ⎯ ⇣ ⇡ ↯ ★ ☆ ◐ ◑ ➤ ⬢ ⬡ ✦ ✧
+────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+  ⏸ plan mode on        ░▒▓ █▉▊▋▌▍▎▏ ▀▄
+  emoji ⭐ 🟢 ✅ ⚠️ ⌛  漢字 カナ  [31mred[0m [32mgreen[0m [33myellow[0m [34mblue[0m [1mbold[0m [4munder[0m

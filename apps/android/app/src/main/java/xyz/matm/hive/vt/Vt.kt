@@ -74,16 +74,18 @@ class Frame(
     fun text(): String = (0 until rows).map(::rowText).joinToString("\n").trimEnd('\n')
 }
 
-/** Theme: Ghostty's default, as the Mac app (HiveCore/Theme.swift). */
-object TermTheme {
-    const val FOREGROUND = 0xFFFFFF
-    const val BACKGROUND = 0x282C34
-    const val CURSOR = 0xFFFFFF
-    const val SELECTION = 0x3E4451
-    val palette = intArrayOf(
-        0x1D1F21, 0xCC6666, 0xB5BD68, 0xF0C674, 0x81A2BE, 0xB294BB, 0x8ABEB7, 0xC5C8C6,
-        0x666666, 0xD54E53, 0xB9CA4A, 0xE7C547, 0x7AA6DA, 0xC397D8, 0x70C0B1, 0xEAEAEA,
-    )
+/** The terminal's colours, as the Mac app's (Style.swift): Hive Night is Ghostty's default with a honey cursor, Hive Day is paper. */
+class TermTheme(val foreground: Int, val background: Int, val cursor: Int, val selection: Int, val palette: IntArray) {
+    companion object {
+        val night = TermTheme(0xFFFFFF, 0x282C34, 0xF2A93B, 0x3E4451, intArrayOf(
+            0x1D1F21, 0xCC6666, 0xB5BD68, 0xF0C674, 0x81A2BE, 0xB294BB, 0x8ABEB7, 0xC5C8C6,
+            0x666666, 0xD54E53, 0xB9CA4A, 0xE7C547, 0x7AA6DA, 0xC397D8, 0x70C0B1, 0xEAEAEA,
+        ))
+        val day = TermTheme(0x231F1A, 0xFDFBF7, 0xD98A12, 0xF6E3BF, intArrayOf(
+            0x231F1A, 0xC2453D, 0x3F8A55, 0xA8740B, 0x356CB0, 0x8A55A8, 0x2A868C, 0x8C8478,
+            0x5E574D, 0xD4584F, 0x4C9C64, 0xC08814, 0x467EC4, 0x9C67BA, 0x37999F, 0xB5ADA0,
+        ))
+    }
 }
 
 /**
@@ -91,19 +93,22 @@ object TermTheme {
  * the vt thread only. It never answers the program: the server's terminal
  * already did.
  */
-class Mirror private constructor(private var h: Long) {
+class Mirror private constructor(private var h: Long, theme: TermTheme) {
     private var last: Frame? = null
     private var generation = 0L
     private val textCache = HashMap<String, String>()
 
-    init {
-        Vt.nSetTheme(h, TermTheme.FOREGROUND, TermTheme.BACKGROUND, TermTheme.CURSOR, TermTheme.palette)
-    }
+    init { setTheme(theme) }
 
     companion object {
-        fun create(cols: Int, rows: Int): Mirror = Mirror(Vt.nNew(cols, rows).also { require(it != 0L) { "terminal_new" } })
-        fun fromSnapshot(data: ByteArray): Mirror? = Vt.nFromSnapshot(data).takeIf { it != 0L }?.let(::Mirror)
+        fun create(cols: Int, rows: Int, theme: TermTheme = TermTheme.night): Mirror =
+            Mirror(Vt.nNew(cols, rows).also { require(it != 0L) { "terminal_new" } }, theme)
+        fun fromSnapshot(data: ByteArray, theme: TermTheme = TermTheme.night): Mirror? =
+            Vt.nFromSnapshot(data).takeIf { it != 0L }?.let { Mirror(it, theme) }
     }
+
+    /** Default colours; programs' own colours still win. */
+    fun setTheme(t: TermTheme) { if (h != 0L) Vt.nSetTheme(h, t.foreground, t.background, t.cursor, t.palette) }
 
     fun close() { if (h != 0L) { Vt.nFree(h); h = 0L } }
 
@@ -135,7 +140,7 @@ class Mirror private constructor(private var h: Long) {
     fun frame(): Frame {
         val buf = if (h == 0L) null else Vt.nFrame(h)
         val prev = last
-        if (buf == null) return prev ?: Frame(0, 0, emptyList(), 0, 0, false, 1, TermTheme.BACKGROUND, TermTheme.FOREGROUND, 0)
+        if (buf == null) return prev ?: Frame(0, 0, emptyList(), 0, 0, false, 1, TermTheme.night.background, TermTheme.night.foreground, 0)
         buf.order(ByteOrder.LITTLE_ENDIAN)
         val cols = buf.getInt(0)
         val rows = buf.getInt(4)

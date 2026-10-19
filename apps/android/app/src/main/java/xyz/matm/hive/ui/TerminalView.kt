@@ -22,7 +22,9 @@ import xyz.matm.hive.vt.Frame
 import xyz.matm.hive.vt.Mirror
 import xyz.matm.hive.vt.TermTheme
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 import kotlin.math.max
 import kotlin.math.min
 
@@ -33,6 +35,17 @@ import kotlin.math.min
  * size). Taps click for programs that track the mouse, open links, or
  * bring up the keyboard; vertical drags scroll.
  */
+/** A face of the terminal font, with text-style symbol fonts before the system's (whose fallback is colour emoji). */
+private fun withFallbacks(ctx: Context, file: String): Typeface {
+    fun family(f: String) = android.graphics.fonts.FontFamily.Builder(android.graphics.fonts.Font.Builder(ctx.assets, f).build()).build()
+    return Typeface.CustomFallbackBuilder(family(file))
+        .addCustomFallback(family("NotoSansSymbols2-Regular.ttf"))
+        .addCustomFallback(family("NotoSansMath-Regular.ttf"))
+        .addCustomFallback(family("NotoSansSymbols-Regular.ttf"))
+        .setSystemFallback("monospace")
+        .build()
+}
+
 @SuppressLint("ViewConstructor")
 class TerminalView(context: Context) : View(context) {
     var stream: PaneStream? = null
@@ -52,10 +65,24 @@ class TerminalView(context: Context) : View(context) {
     private val density = resources.displayMetrics.density
     private val fittedTextPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 11.5f, resources.displayMetrics)
     private val fonts = arrayOf("Regular", "Bold", "Italic", "BoldItalic").map {
-        runCatching { Typeface.createFromAsset(context.assets, "JetBrainsMonoNerdFont-$it.ttf") }.getOrDefault(Typeface.MONOSPACE)
+        runCatching { withFallbacks(context, "JetBrainsMonoNerdFont-$it.ttf") }.getOrDefault(Typeface.MONOSPACE)
     }
+    /** For text that asks for emoji (VS16): the system's colour emoji. */
+    private val emoji = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.DEFAULT }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply { typeface = fonts[0] }
     private val fill = Paint()
+    /** Box and Powerline shapes: anti-aliased for the triangles' diagonals (rects are pixel-snapped anyway). */
+    private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val widths = HashMap<String, Float>()
+    var theme: TermTheme = TermTheme.night
+        set(v) {
+            if (field === v) return
+            field = v
+            setBackgroundColor(0xFF000000.toInt() or v.background)
+            hint.color = 0x99000000.toInt() or v.foreground
+            edge.color = 0x55000000 or v.foreground
+            invalidate()
+        }
     private val hint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF969896.toInt()
         textAlign = Paint.Align.CENTER
@@ -69,7 +96,7 @@ class TerminalView(context: Context) : View(context) {
         pathEffect = DashPathEffect(floatArrayOf(4 * density, 4 * density), 0f)
     }
     /** The margin inside the pane, so text doesn't touch its border. */
-    private val pad = 6 * density
+    private val pad = (6 * density).roundToInt().toFloat()
     private val innerW get() = width - 2 * pad
     private val innerH get() = height - pad
     private var cellW = 1f
@@ -83,7 +110,7 @@ class TerminalView(context: Context) : View(context) {
     init {
         isFocusable = true
         isFocusableInTouchMode = true
-        setBackgroundColor(0xFF000000.toInt() or TermTheme.BACKGROUND)
+        setBackgroundColor(0xFF000000.toInt() or theme.background)
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
@@ -112,7 +139,7 @@ class TerminalView(context: Context) : View(context) {
     private fun requestLayoutMetrics() {
         if (width == 0) return
         // The phone's own size at a readable text size, for Fit to phone.
-        setTextSize(fittedTextPx)
+        setTextSize(fittedTextPx, wholeCells = true)
         val size = intArrayOf(max(20, floor(innerW / cellW).toInt()), max(5, floor(innerH / cellH).toInt()), cellW.toInt(), cellH.toInt())
         if (!size.contentEquals(phone)) { phone = size; onPhoneSize?.invoke(size[0], size[1], size[2], size[3]) }
         val f = frame
@@ -126,12 +153,22 @@ class TerminalView(context: Context) : View(context) {
         invalidate()
     }
 
-    private fun setTextSize(px: Float) {
+    /** Cells as the Mac sizes them (HiveRender/Font.swift): the font's own line, whole pixels high, no extra spacing. */
+    private fun setTextSize(px: Float, wholeCells: Boolean = false) {
         text.textSize = px
-        cellW = text.measureText("M")
+        emoji.textSize = px
+        text.letterSpacing = 0f
+        val advance = text.measureText("M")
+        cellW = advance
+        if (wholeCells) {
+            // Whole-pixel cells, as the Mac's: letter spacing (in ems) keeps a run of text on that grid.
+            cellW = advance.roundToInt().toFloat()
+            text.letterSpacing = (cellW - advance) / px
+        }
+        widths.clear()
         val fm = text.fontMetrics
-        cellH = (fm.descent - fm.ascent) * 1.12f
-        baseline = -fm.ascent + (cellH - (fm.descent - fm.ascent)) / 2
+        cellH = ceil(fm.descent - fm.ascent + fm.leading)
+        baseline = cellH - (fm.descent + fm.leading / 2).roundToInt()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -142,7 +179,8 @@ class TerminalView(context: Context) : View(context) {
         canvas.drawColor(bg)
         canvas.save()
         canvas.clipRect(pad, 0f, width - pad, height.toFloat())
-        canvas.translate(pad - panX, pad / 2)
+        // Whole pixels, so shapes and backgrounds snapped to them meet without seams.
+        canvas.translate(pad - panX.roundToInt(), (pad / 2).roundToInt().toFloat())
         val chars = CharArray(f.cols * 2)
         for (y in 0 until f.rows) {
             val row = f.cells.getOrNull(y) ?: continue
@@ -154,7 +192,7 @@ class TerminalView(context: Context) : View(context) {
                 val cbg = cellBg(c, f)
                 if (cbg != f.background) {
                     fill.color = 0xFF000000.toInt() or cbg
-                    canvas.drawRect(x * cellW, top, (x + 1) * cellW + if (c.wide == 1) cellW else 0f, top + cellH, fill)
+                    canvas.drawRect((x * cellW).roundToInt().toFloat(), top, ((x + 1) * cellW + if (c.wide == 1) cellW else 0f).roundToInt().toFloat(), top + cellH, fill)
                 }
             }
             var x = 0
@@ -181,7 +219,7 @@ class TerminalView(context: Context) : View(context) {
                     canvas.drawText(chars, 0, n, x * cellW, top + baseline, text)
                     x = e
                 } else {
-                    canvas.drawText(c.text, x * cellW, top + baseline, text)
+                    drawCell(canvas, c.text, c.wide == 1, x * cellW, top)
                     x++
                 }
             }
@@ -190,20 +228,23 @@ class TerminalView(context: Context) : View(context) {
         text.isUnderlineText = false
         // The cursor: a block, bar or underline, in the cursor color.
         if (f.cursorVisible && f.cursorY < f.rows) {
-            fill.color = 0xFF000000.toInt() or TermTheme.CURSOR
-            val cx = f.cursorX * cellW
+            fill.color = 0xFF000000.toInt() or theme.cursor
+            val cx = (f.cursorX * cellW).roundToInt().toFloat()
             val cy = f.cursorY * cellH
+            val under = f.cells.getOrNull(f.cursorY)?.getOrNull(f.cursorX)
+            val cw = if (under?.wide == 1) cellW * 2 else cellW
             when (f.cursorStyle) {
                 0 -> canvas.drawRect(cx, cy, cx + max(1f, 1.5f * density), cy + cellH, fill)
-                2 -> canvas.drawRect(cx, cy + cellH - 2 * density, cx + cellW, cy + cellH, fill)
-                3 -> { fill.style = Paint.Style.STROKE; fill.strokeWidth = density; canvas.drawRect(cx, cy, cx + cellW, cy + cellH, fill); fill.style = Paint.Style.FILL }
+                2 -> canvas.drawRect(cx, cy + cellH - 2 * density, cx + cw, cy + cellH, fill)
+                3 -> { fill.style = Paint.Style.STROKE; fill.strokeWidth = density; canvas.drawRect(cx, cy, cx + cw, cy + cellH, fill); fill.style = Paint.Style.FILL }
                 else -> {
-                    canvas.drawRect(cx, cy, cx + cellW, cy + cellH, fill)
-                    val under = f.cells.getOrNull(f.cursorY)?.getOrNull(f.cursorX)
-                    if (under != null && under.text.isNotBlank()) {
-                        text.typeface = fonts[0]
+                    canvas.drawRect(cx, cy, cx + cw, cy + cellH, fill)
+                    if (under != null && under.text.isNotBlank() && !under.spacer) {
+                        // The cell under the cursor, drawn as any cell is, in the background colour.
+                        text.typeface = fonts[(if (under.bold) 1 else 0) or (if (under.italic) 2 else 0)]
                         text.color = 0xFF000000.toInt() or f.background
-                        canvas.drawText(under.text, cx, cy + baseline, text)
+                        if (under.text.length == 1 && under.text[0].code < 0x7F) canvas.drawText(under.text, cx, cy + baseline, text)
+                        else drawCell(canvas, under.text, under.wide == 1, cx, cy)
                     }
                 }
             }
@@ -217,8 +258,41 @@ class TerminalView(context: Context) : View(context) {
         }
     }
 
+    /**
+     * One cell's text that isn't plain ASCII: box and block characters as
+     * shapes; other glyphs centred in their cells, and scaled down when a
+     * fallback font draws them wider (as the Mac's atlas does).
+     */
+    private fun drawCell(canvas: Canvas, s0: String, wide: Boolean, x: Float, top: Float, paint0: Paint = text) {
+        val span = if (wide) cellW * 2 else cellW
+        val cp = s0.codePointAt(0)
+        if (Character.charCount(cp) == s0.length && BoxDrawing.handles(cp)) {
+            shapePaint.color = paint0.color
+            BoxDrawing.draw(canvas, cp, x, top, span, cellH, max(1f, (cellW / 8).roundToInt().toFloat()), shapePaint)
+            return
+        }
+        val paint = if (Glyphs.colourEmoji(s0, wide)) emoji.also {
+            it.color = paint0.color
+            it.isUnderlineText = paint0.isUnderlineText
+            it.isStrikeThruText = paint0.isStrikeThruText
+        } else paint0
+        // Claude Code's ⏺ at the size the Mac shows it: the terminal font's own ●.
+        val s = if (s0 == "\u23FA") "\u25CF" else s0
+        // Widths are measured once per size and face: this runs for every symbol, every frame.
+        val key = if (paint === emoji) "e$s" else "${paint.typeface.hashCode()}$s"
+        val w = widths.getOrPut(key) { paint.measureText(s) }
+        if (w > span * 1.05f) {
+            canvas.save()
+            canvas.scale(span / w, span / w, x, top + baseline)
+            canvas.drawText(s, x, top + baseline, paint)
+            canvas.restore()
+        } else {
+            canvas.drawText(s, x + max(0f, (span - w) / 2), top + baseline, paint)
+        }
+    }
+
     private fun cellBg(c: xyz.matm.hive.vt.Cell, f: Frame): Int {
-        if (c.selected) return TermTheme.SELECTION
+        if (c.selected) return theme.selection
         if (c.inverse) return if (c.fg >= 0) c.fg else f.foreground
         return if (c.bg >= 0) c.bg else f.background
     }
@@ -228,10 +302,15 @@ class TerminalView(context: Context) : View(context) {
         return if (c.fg >= 0) c.fg else f.foreground
     }
 
+    /** libghostty works in whole-pixel cells: positions given to it are scaled onto a grid of those. */
+    private val gridCellW get() = max(1, cellW.roundToInt())
+
     private fun geometry(): Mirror.Geometry {
         val f = frame
-        return Mirror.Geometry(((f?.cols ?: 1) * cellW).toInt(), ((f?.rows ?: 1) * cellH).toInt(), cellW.toInt(), cellH.toInt())
+        return Mirror.Geometry((f?.cols ?: 1) * gridCellW, ((f?.rows ?: 1) * cellH).toInt(), gridCellW, cellH.toInt())
     }
+
+    private fun gridX(x: Float) = x / cellW * gridCellW
 
     // MARK: touch
 
@@ -246,7 +325,7 @@ class TerminalView(context: Context) : View(context) {
             val row = (y / cellH).toInt()
             if (row >= f.rows || y < 0) { showKeyboard(); return true }
             val s = stream ?: return true
-            s.tap(col, row, x, y, geometry()) { link ->
+            s.tap(col, row, gridX(x), y, geometry()) { link ->
                 if (link != null) onLink?.invoke(link) else showKeyboard()
             }
             return true
@@ -264,7 +343,7 @@ class TerminalView(context: Context) : View(context) {
             val rows = (scrollAccum / cellH).toInt()
             if (rows != 0) {
                 scrollAccum -= rows * cellH
-                stream?.scroll(rows, e2.x - pad + panX, e2.y - pad / 2, geometry())
+                stream?.scroll(rows, gridX(e2.x - pad + panX), e2.y - pad / 2, geometry())
             }
             return true
         }

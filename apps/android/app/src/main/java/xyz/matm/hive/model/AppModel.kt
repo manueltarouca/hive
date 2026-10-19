@@ -66,6 +66,20 @@ class AppModel(private val context: Context) : HostConnection.Listener {
     /** Compose state: the key bar, the size chip and the terminal follow it. */
     var stream by mutableStateOf<PaneStream?>(null)
         private set
+    /** The terminal's colours follow the system's Night or Day, as the Mac's follow its appearance. */
+    var termTheme by mutableStateOf(
+        if (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_NO)
+            xyz.matm.hive.vt.TermTheme.day else xyz.matm.hive.vt.TermTheme.night,
+    )
+        private set
+
+    fun setDark(dark: Boolean) {
+        val t = if (dark) xyz.matm.hive.vt.TermTheme.night else xyz.matm.hive.vt.TermTheme.day
+        if (t === termTheme) return
+        termTheme = t
+        stream?.setTheme(t)
+    }
+
     /** Whether the app is on screen: notifications are for when it isn't, as on the Mac. */
     var foreground = false
     var onNotify: ((HostConnection, Agent) -> Unit)? = null
@@ -363,7 +377,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         if (fitted) unfit()
         detach()
         if (c == null || b == null || !h.connected) return
-        val s = PaneStream(c, b) { f -> if (stream?.blockID == b) onFrame(f) }
+        val s = PaneStream(c, b, termTheme) { f -> if (stream?.blockID == b) onFrame(f) }
         stream = s
         s.start()
     }

@@ -61,6 +61,7 @@ fun shortPath(p: String): String {
 @Composable
 fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) {
     val p = LocalPalette.current
+    androidx.compose.runtime.SideEffect { model.setDark(p.night) }
     val h = model.current
     var phone by remember { mutableStateOf<IntArray?>(null) }
     var ctrl by remember { mutableStateOf(false) }
@@ -154,6 +155,7 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
                     factory = { ctx -> TerminalView(ctx).also { view = it } },
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     update = { v ->
+                        v.theme = model.termTheme
                         v.stream = model.stream
                         v.fitted = model.fitted
                         v.show(model.frame)

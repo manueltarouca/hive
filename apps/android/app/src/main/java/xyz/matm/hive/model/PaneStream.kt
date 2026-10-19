@@ -6,6 +6,7 @@ import xyz.matm.hive.net.BlockUpdate
 import xyz.matm.hive.net.HiveClient
 import xyz.matm.hive.vt.Frame
 import xyz.matm.hive.vt.Mirror
+import xyz.matm.hive.vt.TermTheme
 import java.util.concurrent.Executors
 
 /**
@@ -13,7 +14,8 @@ import java.util.concurrent.Executors
  * vt thread, frames handed to [sink] on the main thread. Only the pane on
  * screen is subscribed (a phone keeps one mirror, not a session's worth).
  */
-class PaneStream(val client: HiveClient, val blockID: String, private val sink: (Frame) -> Unit) {
+class PaneStream(val client: HiveClient, val blockID: String, theme: TermTheme, private val sink: (Frame) -> Unit) {
+    @Volatile private var theme = theme
     private val main = Handler(Looper.getMainLooper())
     private var mirror: Mirror? = null
     @Volatile private var framePending = false
@@ -49,7 +51,7 @@ class PaneStream(val client: HiveClient, val blockID: String, private val sink: 
         when (u) {
             is BlockUpdate.Snapshot -> {
                 mirror?.close()
-                mirror = Mirror.fromSnapshot(u.data)
+                mirror = Mirror.fromSnapshot(u.data, theme)
             }
             is BlockUpdate.Output -> mirror?.feed(u.data)
             is BlockUpdate.Resize -> {
@@ -75,6 +77,12 @@ class PaneStream(val client: HiveClient, val blockID: String, private val sink: 
             rows = f.rows
             main.post { if (!closed) sink(f) }
         }
+    }
+
+    /** Night or Day changed: the default colours follow, as on the Mac. */
+    fun setTheme(t: TermTheme) {
+        theme = t
+        vt.execute { mirror?.setTheme(t); redraw() }
     }
 
     /** Text the user typed (an input method's commit), as it is. */
