@@ -20,7 +20,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="site/static/img/hero-dark.webp">
-    <img alt="The hive app: an agents sidebar with one agent blocked on a permission prompt, and a session split into a shell, a Claude Code pane and a test run." src="site/static/img/hero-light.webp" width="880">
+    <img alt="The hive app: a session split into a shell, a Claude Code pane and a test run, and a badge for the two agents in other sessions that need you." src="site/static/img/hero-light.webp" width="880">
   </picture>
 </p>
 
