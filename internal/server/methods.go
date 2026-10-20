@@ -127,7 +127,7 @@ func (s *Server) registerMethods() {
 		ID        string `json:"id"`
 		SessionID string `json:"session_id,omitempty"`
 	}
-	api.Register(r, "target.resolve", "Resolve a target (ID, label, position, or ID suffix) to an ID.",
+	api.Register(r, "target.resolve", "Resolve a target (ID, label, position, or ID suffix) to an ID. A window position counts tabs as the apps show them, pinned first.",
 		func(ctx context.Context, in resolveIn) (resolveOut, error) {
 			s.mu.Lock()
 			defer s.mu.Unlock()
@@ -351,7 +351,7 @@ func (s *Server) registerMethods() {
 		WindowID  string `json:"window_id" required:"true"`
 		Index     int    `json:"index" required:"true" description:"The window's new 0-based position. Past the end means last."`
 	}
-	api.Register(r, "session.move_window", "Move a window to a new position in the session's tab order.",
+	api.Register(r, "session.move_window", "Move a window to a new position in the session's own order (pinned tabs still show first in the apps).",
 		func(ctx context.Context, in moveWindowIn) (revisionOut, error) {
 			if in.Index < 0 {
 				return revisionOut{}, api.BadRequest("index must be 0 or more")
@@ -858,7 +858,7 @@ func (s *Server) registerTerminalMethods() {
 			var out string
 			if a.Tail > 0 {
 				// The last lines are on screen: the scrollback is left unread.
-				out, err = r.b.FormatScreen(true)
+				out, err = r.b.FormatScreen(true, a.Unwrap)
 				out = tailLines(out, a.Tail)
 			} else {
 				out, err = r.b.Format(a.Format, a.Trim, a.Unwrap)

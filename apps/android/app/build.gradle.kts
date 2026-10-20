@@ -35,9 +35,10 @@ android {
         minSdk = 29
         targetSdk = 37
         // Releases: from the version, so each is above the last and above
-        // the dev builds (0.1.0 is 10000; X.Y.Z-rc.N one below X.Y.Z).
+        // the dev builds (0.1.0 is 10099; a pre-release such as 0.1.0-rc.1
+        // is 10001, below its release).
         versionCode = System.getenv("HIVE_VERSION")?.let { v ->
-            val m = Regex("""^(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?""").find(v) ?: error("HIVE_VERSION: not a version: $v")
+            val m = Regex("""^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z]+\.(\d+))?""").find(v) ?: error("HIVE_VERSION: not a version: $v")
             val (a, b, c, rc) = m.destructured
             a.toInt() * 1_000_000 + b.toInt() * 10_000 + c.toInt() * 100 + (if (rc.isEmpty()) 99 else rc.toInt().coerceAtMost(98))
         } ?: 8

@@ -52,7 +52,9 @@ func (s *Server) serveRemote() error {
 		for _, l := range ls {
 			s.addListener(l)
 			if spec.Kind == remote.TailnetServe {
+				s.mu.Lock()
 				s.removeOnStop = append(s.removeOnStop, spec.Path)
+				s.mu.Unlock()
 			}
 		}
 	}
@@ -100,7 +102,10 @@ func (s *Server) stopRemote() {
 	if s.node != nil {
 		_ = s.node.Close()
 	}
-	for _, p := range s.removeOnStop {
+	s.mu.Lock()
+	paths := append([]string(nil), s.removeOnStop...)
+	s.mu.Unlock()
+	for _, p := range paths {
 		_ = os.Remove(p)
 	}
 }
@@ -127,6 +132,7 @@ var listenRetry = 15 * time.Second
 func (s *Server) retryListen(spec remote.Spec, pol remote.Policy) {
 	t := time.NewTicker(s.listenRetry)
 	defer t.Stop()
+	last := ""
 	for {
 		select {
 		case <-s.quit:
@@ -135,7 +141,21 @@ func (s *Server) retryListen(spec remote.Spec, pol remote.Policy) {
 		}
 		ls, err := remote.Open(context.Background(), spec, pol)
 		if err != nil {
+			// Said once per kind of failure, not every 15 seconds.
+			if err.Error() != last {
+				last = err.Error()
+				s.log.Warn("listen: still not open", "path", spec.Path, "addr", spec.Addr, "err", err)
+			}
 			continue
+		}
+		// Stopped meanwhile: nothing is added to a server that's gone.
+		select {
+		case <-s.quit:
+			for _, l := range ls {
+				l.Close()
+			}
+			return
+		default:
 		}
 		for _, l := range ls {
 			s.addListener(l)

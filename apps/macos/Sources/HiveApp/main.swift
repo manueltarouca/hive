@@ -306,6 +306,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     // Hidden or back: panes stream only while you can see them.
     func applicationDidHide(_ notification: Notification) { model.windowChanged() }
     func applicationDidUnhide(_ notification: Notification) { model.windowChanged() }
+    // In the Dock, the panes stop streaming too; back, they attach again.
+    func windowDidMiniaturize(_ notification: Notification) { model.windowChanged() }
+    func windowDidDeminiaturize(_ notification: Notification) { model.windowChanged() }
 
     func windowDidChangeOcclusionState(_ notification: Notification) {
         // In view again: what's on screen is seen.

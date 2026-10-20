@@ -717,7 +717,7 @@ func cmdCapture(g globals, args []string) error {
 	a := map[string]any{"format": *format, "trim": *trim, "unwrap": *unwrap}
 	if *tail > 0 {
 		// Only the screen's last lines that show something, as text.
-		a = map[string]any{"trim": true, "tail": *tail}
+		a = map[string]any{"trim": true, "unwrap": *unwrap, "tail": *tail}
 	}
 	if err := x.terminal("format", bid, a, &out); err != nil {
 		return err

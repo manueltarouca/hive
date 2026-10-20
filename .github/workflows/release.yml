@@ -95,7 +95,7 @@ jobs:
   android:
     runs-on: ubuntu-24.04
     env:
-      HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.HIVE_RELEASE_PW != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.HAS_KEY == 'true'
@@ -117,7 +117,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/zig"
           tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
           echo "ZIG=$RUNNER_TEMP/zig/zig" >> "$GITHUB_ENV"
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" > /dev/null
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" > /dev/null || true
+          test -d "$ANDROID_HOME/ndk/28.2.13676358"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
       - name: Build and sign
@@ -127,6 +128,7 @@ jobs:
           HIVE_RELEASE_PW: ${{ secrets.HIVE_RELEASE_PW }}
         run: |
           make vt-android
+          trap 'rm -f "$RUNNER_TEMP/release.jks"' EXIT
           echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
           export HIVE_RELEASE_KEYSTORE="$RUNNER_TEMP/release.jks" HIVE_VERSION="${GITHUB_REF_NAME#v}"
           (cd apps/android && ./gradlew --no-daemon testReleaseUnitTest assembleRelease)

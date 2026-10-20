@@ -120,7 +120,9 @@ var Keys = []Key{
 				if sp.Kind == remote.Plain {
 					return fmt.Errorf("%s: only tailnet:// and tailnet-serve:// listeners can be a setting", l)
 				}
-				out = append(out, l)
+				if !slices.Contains(out, l) { // the same listener twice would fight over its port
+					out = append(out, l)
+				}
 			}
 			c.Listen = out
 			return nil

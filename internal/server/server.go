@@ -199,10 +199,15 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.serverID = loadServerID(cfg.StateDir, s.log)
 	s.conf, s.confDiags, s.confStamp = s.readConfig()
-	// Listeners from the settings file, when none were given as options: a
-	// server the Mac app starts at login still reaches your phone.
-	if s.cfg.Remote == nil && len(s.conf.Listen) > 0 {
-		rc := &RemoteConfig{Optional: true}
+	// Listeners from the settings file, when none were given as options
+	// (built-in Tailscale alone keeps them): a server the Mac app starts at
+	// login still reaches your phone.
+	if len(s.conf.Listen) > 0 && (s.cfg.Remote == nil || len(s.cfg.Remote.Listen) == 0) {
+		rc := &RemoteConfig{}
+		if s.cfg.Remote != nil {
+			rc = &RemoteConfig{Policy: s.cfg.Remote.Policy, Node: s.cfg.Remote.Node}
+		}
+		rc.Optional = true
 		for _, l := range s.conf.Listen {
 			if sp, err := remote.ParseSpec(l); err == nil {
 				rc.Listen = append(rc.Listen, sp)
