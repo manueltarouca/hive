@@ -13,6 +13,10 @@ VERSION     := 0.0.0-dev+$(shell git rev-parse --short HEAD 2>/dev/null || echo 
 endif
 # ZIG_TARGET (such as x86_64-linux-gnu.2.28) builds libghostty-vt and hive's C
 # parts for that target with Zig, so a Linux release runs on older glibc.
+# VT_CPU: the CPU libghostty-vt is built for. baseline runs on every CPU of
+# the target (its SIMD code picks the fast path at run time); native would
+# build for this machine's CPU, and a release could crash on older ones.
+VT_CPU      ?= baseline
 ifneq ($(ZIG_TARGET),)
 VT_TARGET   := -Dtarget=$(ZIG_TARGET)
 export CC   := $(ZIG) cc -target $(ZIG_TARGET)
@@ -41,7 +45,7 @@ $(VT_PREFIX)/lib/libghostty-vt.a:
 	  git -C third_party/ghostty remote add origin https://github.com/ghostty-org/ghostty.git; fi
 	git -C third_party/ghostty fetch -q --depth 1 origin $(GHOSTTY_REV)
 	git -C third_party/ghostty checkout -q FETCH_HEAD
-	cd third_party/ghostty && $(ZIG) build -Demit-lib-vt -Demit-xcframework=false -Doptimize=ReleaseFast $(VT_TARGET) --prefix $(VT_PREFIX)
+	cd third_party/ghostty && $(ZIG) build -Demit-lib-vt -Demit-xcframework=false -Doptimize=ReleaseFast $(VT_TARGET) -Dcpu=$(VT_CPU) --prefix $(VT_PREFIX)
 
 # libghostty-vt for the Android app (apps/android), from the same checkout.
 # The NDK comes from ANDROID_NDK_HOME, or the newest under the Android SDK.

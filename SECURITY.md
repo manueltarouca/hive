@@ -6,8 +6,9 @@ terminal and read every screen, so we take reports seriously.
 ## Reporting
 
 Report a problem privately through
-[GitHub's private vulnerability reporting](https://github.com/manueltarouca/hive/security/advisories/new).
-Please don't open a public issue. Say which version (`hive version`), what
+[GitHub's private vulnerability reporting](https://github.com/manueltarouca/hive/security/advisories/new),
+or by email to [security@matm.xyz](mailto:security@matm.xyz). Please don't
+open a public issue. Say which version (`hive version`), what
 an attacker needs (a tailnet login, a local account, a network position),
 and what they get.
 

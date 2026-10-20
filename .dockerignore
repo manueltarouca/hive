@@ -1,11 +1,16 @@
-# The tailnet test image builds hive from source; the Mac's build outputs
-# and caches don't belong in it.
-.git
-bin
-third_party/ghostty
-third_party/ghostty-vt
-apps/macos/.build
-apps/macos/build
-site/node_modules
-site/build
-bench/results
+# Built or fetched locally: the image builds its own.
+third_party/
+bin/
+dist/
+site/node_modules/
+site/build/
+site/.svelte-kit/
+apps/macos/.build/
+apps/macos/build/
+apps/android/.gradle/
+apps/android/app/build/
+apps/android/build/
+**/.DS_Store
+CLAUDE.local.md
+.claude/skill-backlog.md
+.claude/skills/hive-dev/
