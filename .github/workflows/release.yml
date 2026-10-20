@@ -93,11 +93,13 @@ jobs:
             dist/Hive-*
           if-no-files-found: error
 
-  # The Android app, signed with the release key from the repository's
-  # secrets (ANDROID_KEYSTORE_BASE64, HIVE_RELEASE_PW). Without them it's
-  # skipped, and the release has no APK.
+  # The Android app, signed with the release key. The key and its password
+  # (ANDROID_KEYSTORE_BASE64, HIVE_RELEASE_PW) are secrets of the `release`
+  # environment, which only v* tags may use: no branch or pull request
+  # reaches them. Without them the job is skipped, and the release has no APK.
   android:
     runs-on: ubuntu-24.04
+    environment: release
     timeout-minutes: 40
     env:
       HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.HIVE_RELEASE_PW != '' }}
