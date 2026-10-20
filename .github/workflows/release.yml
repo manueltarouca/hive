@@ -173,7 +173,10 @@ jobs:
 
       # Signed provenance: users can check a download was built here, from
       # this commit (gh attestation verify FILE --owner manueltarouca).
+      # GitHub keeps attestations only for public repositories (and
+      # organisations' private ones): a private user repo skips them.
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: ${{ !github.event.repository.private }}
         with:
           subject-path: |
             dist/hive-*
