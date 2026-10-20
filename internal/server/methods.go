@@ -749,9 +749,14 @@ func (s *Server) resolve(kind, target, sessionID, windowID string) (struct {
 		if err != nil {
 			return out{}, err
 		}
+		// Numbered as the apps show them: pinned first, so -w 1 is ⌘1's tab.
 		var items []session.Item
-		for _, w := range ss.Windows {
-			items = append(items, session.Item{ID: w.ID, Label: w.Label})
+		for _, pinned := range []bool{true, false} {
+			for _, w := range ss.Windows {
+				if w.Pinned == pinned {
+					items = append(items, session.Item{ID: w.ID, Label: w.Label})
+				}
+			}
 		}
 		got, err := session.Resolve("window", items, target)
 		return out{ID: got, SessionID: ss.ID}, conv(err)

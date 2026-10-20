@@ -411,3 +411,17 @@ func TestPinWindow(t *testing.T) {
 		t.Fatalf("not pinned after a restart: %v", view["windows"])
 	}
 }
+
+// Tabs are numbered as shown, pinned first: hive -w 1 is the tab ⌘1 picks.
+func TestWindowPositionsCountPinnedFirst(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	sid := created["session_id"].(string)
+	second := h.call("session.new_window", map[string]any{"session_id": sid, "layout": map[string]any{"command": []string{"cat"}}})["window_id"].(string)
+	h.call("session.pin_window", map[string]any{"session_id": sid, "window_id": second, "pinned": true})
+	res := h.call("target.resolve", map[string]any{"kind": "window", "target": "1", "session_id": sid})
+	if res["id"] != second {
+		t.Fatalf("window 1 = %v, want the pinned %s", res["id"], second)
+	}
+}

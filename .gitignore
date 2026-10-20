@@ -12,3 +12,5 @@ CLAUDE.local.md
 .DS_Store
 dist/
 .claude/skill-backlog.md
+__pycache__/
+.claude/skills/hive-dev/

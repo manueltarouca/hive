@@ -58,6 +58,11 @@ func TestEndToEnd(t *testing.T) {
 	defer hive("server", "stop")
 
 	must("new", "e2e", "--cwd", dir, "--", "cat")
+
+	// capture --tail: the screen's last lines that show something.
+	must("new", "tail", "--cwd", dir, "--", "sh", "-c", "printf 'one\\ntwo\\n\\nthree\\n'; exec cat")
+	eventually("tail", func() bool { out, _ := hive("-s", "tail", "capture", "--tail", "2"); return out == "two\nthree\n" })
+	must("kill", "tail")
 	payload := `{"session_id":"abc-123","cwd":"` + dir + `","hook_event_name":"SessionStart","source":"startup"}`
 	must("-s", "e2e", "split", "--label", "agent", "--keep-open", "--", "sh", "-c",
 		fmt.Sprintf("printf '%%s' '%s' | hive agent hook claude; echo hooked; exec cat", payload))

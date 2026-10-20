@@ -25,7 +25,7 @@ import (
 	"github.com/manueltarouca/hive/internal/server"
 )
 
-const helpText = `hive — a terminal multiplexer for agent-heavy work
+const helpText = `hive: a terminal multiplexer for agent-heavy work
 
 Sessions
   ls                         list sessions
@@ -49,7 +49,9 @@ Blocks
 Input and output
   send TEXT | -              type text (stdin with - or no TEXT)
   send-key KEY...            press keys: enter, ctrl+c, up, ...
-  capture [--trim] [--unwrap] [--format text|vt]
+  capture [--trim] [--unwrap] [--format text|vt] [--tail N]
+                             the screen and scrollback (--tail: the last N
+                             lines that show something)
   wait [--for DUR] [TARGET]  wait for a block's program to exit
   events [--all] [--since N] stream events
 
@@ -72,7 +74,7 @@ API
   api describe METHOD        a method's arguments and result
   api call METHOD [JSON|@FILE|-]
 
-Remote servers
+Remote hosts
   hosts [ls]                 the servers you've named
   hosts add LABEL URL [--always|--on-demand]
                              name one: hive -S LABEL ls (the app connects
@@ -85,7 +87,7 @@ Server
   server run [--fresh]       run in the foreground
   server start | stop | status
         listen on a tailnet: --tailscale, --extra-listen tailnet://:4483,
-        --extra-listen tailnet-serve:///PATH; see hive server run --help
+        --extra-listen tailnet-serve:///PATH; see the Remote hosts docs
   version
 
 Targets: -s/--session -w/--window -b/--block -S/--server, --json.
@@ -697,6 +699,7 @@ func cmdCapture(g globals, args []string) error {
 	trim := fs.Bool("trim", false, "")
 	unwrap := fs.Bool("unwrap", false, "")
 	format := fs.String("format", "text", "")
+	tail := fs.Int("tail", 0, "")
 	if err := parse(fs, args); err != nil {
 		return err
 	}
@@ -711,8 +714,16 @@ func cmdCapture(g globals, args []string) error {
 	var out struct {
 		Content string `json:"content"`
 	}
-	if err := x.terminal("format", bid, map[string]any{"format": *format, "trim": *trim, "unwrap": *unwrap}, &out); err != nil {
+	a := map[string]any{"format": *format, "trim": *trim, "unwrap": *unwrap}
+	if *tail > 0 {
+		// Only the screen's last lines that show something, as text.
+		a = map[string]any{"trim": true, "tail": *tail}
+	}
+	if err := x.terminal("format", bid, a, &out); err != nil {
 		return err
+	}
+	if *tail > 0 && out.Content != "" && !strings.HasSuffix(out.Content, "\n") {
+		out.Content += "\n"
 	}
 	if g.json {
 		return printJSON(os.Stdout, out)
