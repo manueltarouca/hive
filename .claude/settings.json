@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "hive": {
+      "source": { "source": "github", "repo": "manueltarouca/hive" }
+    }
+  },
+  "enabledPlugins": {
+    "hive@hive": true
+  }
+}

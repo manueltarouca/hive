@@ -1,7 +1,9 @@
 {
   "name": "hive",
+  "description": "Skills for hive, the terminal multiplexer for agent-heavy work",
   "owner": {
-    "name": "Manuel Tarouca"
+    "name": "Manuel Tarouca",
+    "url": "https://github.com/manueltarouca"
   },
   "metadata": {
     "description": "Skills for hive, the terminal multiplexer for agent-heavy work",
@@ -10,7 +12,14 @@
   "plugins": [
     {
       "name": "hive",
-      "description": "Drive hive from an agent, set it up, and move work over from tmux",
+      "description": "Drive hive from an agent: sessions, splits, sending keys, reading output, waiting on programs. Set hive up, and move work over from tmux.",
+      "version": "0.1.0",
+      "author": { "name": "Manuel Tarouca", "url": "https://github.com/manueltarouca" },
+      "homepage": "https://manueltarouca.github.io/hive/docs/agent-setup",
+      "repository": "https://github.com/manueltarouca/hive",
+      "license": "MIT",
+      "keywords": ["terminal", "multiplexer", "tmux", "agents", "sessions"],
+      "category": "development",
       "source": "./skills",
       "strict": false,
       "skills": [
