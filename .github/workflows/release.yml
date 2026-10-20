@@ -131,7 +131,7 @@ jobs:
           trap 'rm -f "$RUNNER_TEMP/release.jks"' EXIT
           echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
           export HIVE_RELEASE_KEYSTORE="$RUNNER_TEMP/release.jks" HIVE_VERSION="${GITHUB_REF_NAME#v}"
-          (cd apps/android && ./gradlew --no-daemon testReleaseUnitTest assembleRelease)
+          (cd apps/android && ./gradlew --no-daemon testDebugUnitTest assembleRelease)
           rm "$RUNNER_TEMP/release.jks"
           mkdir -p dist
           cp apps/android/app/build/outputs/apk/release/app-release.apk "dist/hive-$HIVE_VERSION-android.apk"
