@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/manueltarouca/hive/internal/remote"
 )
@@ -15,6 +16,9 @@ type RemoteConfig struct {
 	Listen []remote.Spec       // --extra-listen
 	Policy remote.Policy       // who gets in besides the owner
 	Node   *remote.NodeOptions // built-in Tailscale (--tailscale)
+	// Optional: from the settings file. A listener that can't open is
+	// logged and skipped, so the server still starts.
+	Optional bool
 }
 
 type listenerInfo struct {
@@ -35,6 +39,13 @@ func (s *Server) serveRemote() error {
 			return fmt.Errorf("%s: a plain listener can't tell callers apart; pass --allow-anonymous to let everyone who reaches it in", spec.Addr)
 		}
 		ls, err := remote.Open(context.Background(), spec, rc.Policy)
+		if err != nil && rc.Optional {
+			// Tailscale may not be up yet (the Mac app starts the server at
+			// login): try again until it opens or the server stops.
+			s.log.Warn("listen: not open yet, retrying", "path", spec.Path, "addr", spec.Addr, "err", err)
+			go s.retryListen(spec, rc.Policy)
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -108,4 +119,33 @@ func (s *Server) remoteInfo() (ls []listenerInfo, node *remote.NodeStatus) {
 		node = &n
 	}
 	return ls, node
+}
+
+// listenRetry is how often a listener from the settings file is tried again.
+var listenRetry = 15 * time.Second
+
+func (s *Server) retryListen(spec remote.Spec, pol remote.Policy) {
+	t := time.NewTicker(s.listenRetry)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.quit:
+			return
+		case <-t.C:
+		}
+		ls, err := remote.Open(context.Background(), spec, pol)
+		if err != nil {
+			continue
+		}
+		for _, l := range ls {
+			s.addListener(l)
+			if spec.Kind == remote.TailnetServe {
+				s.mu.Lock()
+				s.removeOnStop = append(s.removeOnStop, spec.Path)
+				s.mu.Unlock()
+			}
+		}
+		s.log.Info("listen: open", "path", spec.Path, "addr", spec.Addr)
+		return
+	}
 }

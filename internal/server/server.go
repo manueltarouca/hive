@@ -152,6 +152,8 @@ type Server struct {
 	serverID string
 	// unlockState lets go of the state directory, at the end of Shutdown.
 	unlockState func()
+	// listenRetry: how often a listener from the settings file is retried.
+	listenRetry time.Duration
 
 	dirty    chan struct{}
 	flushReq chan chan error
@@ -188,7 +190,7 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{attaches: map[*attachConn]struct{}{}, unlockState: unlock,
+	s := &Server{attaches: map[*attachConn]struct{}{}, unlockState: unlock, listenRetry: listenRetry,
 		cfg: cfg, log: cfg.Logger, reg: api.New(), bus: events.New(4096),
 		store:  persist.New(cfg.StateDir),
 		blocks: map[string]*rec{}, clients: map[string]*Client{}, exits: map[string]exitRec{}, started: time.Now(),
@@ -200,7 +202,7 @@ func New(cfg Config) (*Server, error) {
 	// Listeners from the settings file, when none were given as options: a
 	// server the Mac app starts at login still reaches your phone.
 	if s.cfg.Remote == nil && len(s.conf.Listen) > 0 {
-		rc := &RemoteConfig{}
+		rc := &RemoteConfig{Optional: true}
 		for _, l := range s.conf.Listen {
 			if sp, err := remote.ParseSpec(l); err == nil {
 				rc.Listen = append(rc.Listen, sp)

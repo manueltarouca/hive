@@ -1,12 +1,16 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/manueltarouca/hive/internal/remote"
 )
 
 func startWithConfig(t *testing.T, state, conf string, resume func(string, string) []string) *harness {
@@ -109,17 +113,72 @@ func TestNoConfigPath(t *testing.T) {
 }
 
 // A listener in the settings file is added at start, however the server was
-// started (the Mac app starts it without options).
+// started (the Mac app starts it without options). One that can't open is
+// logged and skipped: the server still starts (Tailscale may not be up yet
+// at login).
 func TestListenFromConfig(t *testing.T) {
-	conf := filepath.Join(t.TempDir(), "config")
-	if err := os.WriteFile(conf, []byte("listen = 127.0.0.1:0\n"), 0o644); err != nil {
+	needTailscale(t)
+	dir := t.TempDir()
+	sock := filepath.Join(dir, "serve.sock")
+	conf := filepath.Join(dir, "config")
+	setting := "listen = tailnet-serve://" + sock + " tailnet-serve:///nonexistent/dir/x.sock\n"
+	if err := os.WriteFile(conf, []byte(setting), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	h := startWithConfig(t, t.TempDir(), conf, nil)
 	defer h.stop()
 	v := h.call("server.version", nil)
-	ls, _ := v["listeners"].([]any)
-	if len(ls) == 0 {
-		t.Fatalf("listeners = %v, want the one from the settings file", v["listeners"])
+	raw, _ := json.Marshal(v["listeners"])
+	if !strings.Contains(string(raw), sock) {
+		t.Fatalf("listeners = %s, want %s from the settings file", raw, sock)
 	}
+}
+
+// A listener from the settings file that can't open at start (Tailscale not
+// up yet) opens once it can.
+func TestListenFromConfigRetries(t *testing.T) {
+	needTailscale(t)
+	defer func(d time.Duration) { listenRetry = d }(listenRetry)
+	listenRetry = 100 * time.Millisecond
+	// Short: a Unix socket's path has a length limit (104 bytes on macOS).
+	dir, err := os.MkdirTemp("/tmp", "hl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	later := filepath.Join(dir, "later")
+	sock := filepath.Join(later, "serve.sock")
+	conf := filepath.Join(dir, "config")
+	if err := os.WriteFile(conf, []byte("listen = tailnet-serve://"+sock+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := startWithConfig(t, t.TempDir(), conf, nil)
+	defer h.stop()
+	if err := os.Mkdir(later, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(3 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		raw, _ := json.Marshal(h.call("server.version", nil)["listeners"])
+		if strings.Contains(string(raw), sock) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("listeners = %s, never opened %s", raw, sock)
+		}
+	}
+}
+
+// needTailscale skips a test where Tailscale isn't running (CI): tailnet-serve
+// listeners ask it who connects.
+func needTailscale(t *testing.T) {
+	t.Helper()
+	sock := filepath.Join(os.TempDir(), fmt.Sprintf("hts-%d.sock", os.Getpid()))
+	ls, err := remote.Open(context.Background(), remote.Spec{Kind: remote.TailnetServe, Path: sock}, remote.Policy{})
+	if err != nil {
+		t.Skipf("tailscale isn't running here: %v", err)
+	}
+	for _, l := range ls {
+		l.Close()
+	}
+	os.Remove(sock)
 }

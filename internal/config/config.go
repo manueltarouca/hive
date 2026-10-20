@@ -111,8 +111,14 @@ var Keys = []Key{
 		set: func(c *Config, v string) error {
 			var out []string
 			for _, l := range strings.Fields(v) {
-				if _, err := remote.ParseSpec(l); err != nil {
+				sp, err := remote.ParseSpec(l)
+				if err != nil {
 					return fmt.Errorf("%s: %v", l, err)
+				}
+				// A plain listener lets in anyone who reaches it: an option
+				// for a test, never a standing setting.
+				if sp.Kind == remote.Plain {
+					return fmt.Errorf("%s: only tailnet:// and tailnet-serve:// listeners can be a setting", l)
 				}
 				out = append(out, l)
 			}
