@@ -15,6 +15,10 @@ version, and the
 [changelog](https://github.com/manueltarouca/hive/blob/main/CHANGELOG.md)
 lists every change.
 
+A command acts on the session and pane it runs in. `-s`, `-w` and `-b` choose
+another session, tab or pane; [Sessions, tabs and panes](./sessions#choosing-what-a-command-acts-on)
+says how they match. Every command takes these, and `-S` for another server.
+
 ## Sessions
 
 | Command | Does |
@@ -24,7 +28,9 @@ lists every change.
 | `hive session inspect` | Show a session's windows, layout and blocks |
 | `hive kill SESSION` | Close a session and everything in it |
 
-## Blocks
+## Panes
+
+The CLI calls a pane a block and a tab a window.
 
 | Command | Does |
 | --- | --- |
@@ -57,6 +63,7 @@ lists every change.
 | `hive send TEXT` | Types text. Reads stdin with `-` or no text. |
 | `hive send-key KEY…` | Presses keys: `enter`, `ctrl+c`, `up`, `shift+tab`… |
 | `hive capture [--trim] [--unwrap] [--format text\|vt]` | Prints the screen and scrollback |
+| `hive capture --tail N` | Prints the screen's last N lines that show something |
 | `hive wait [--for DUR] [TARGET]` | Waits for a program to exit, or a window or session to close |
 | `hive events [--all] [--since N]` | Streams events |
 
@@ -79,9 +86,14 @@ lists every change.
 | `hive server run [--fresh]` | Run the server in the foreground |
 | `hive server start` / `stop` / `status` | Manage a background server |
 | `hive version` | Print the version. It doesn't start a server. |
+| `hive config path\|default\|check\|show\|set\|reload` | The settings file; see [Settings](./settings#commands) |
 | `hive help` | List the commands |
 
 Every command takes `--json` for output a script can parse.
+
+Some things have no command of their own and go through `hive api call`:
+pinning a tab (`session.pin_window`), for example. See [the server
+API](./api).
 
 ## Remote hosts
 

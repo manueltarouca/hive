@@ -32,7 +32,13 @@ curl --unix-socket "$HIVE_SERVER" http://hive/v1/call \
 The server accepts only JSON, and refuses requests from browsers (any
 `Origin` or `Sec-Fetch-*` header), so a web page can't drive your terminals.
 
-A server can also listen on your tailnet.
+A server can also listen on your tailnet, with the same paths:
+
+```sh
+curl https://box.example.ts.net/v1/call \
+  -H 'content-type: application/json' -d '{"method":"session.list"}'
+```
+
 The API is the same on every listener; only who gets in differs. Every
 request is identified before it reaches a method, and `whoami` says how:
 
@@ -75,7 +81,12 @@ Terminal methods take the block and their own arguments separately:
 
 ```sh
 hive api call hive.terminal.format '{"block_id":"block:…","args":{"trim":true}}'
+hive api call hive.terminal.format '{"block_id":"block:…","args":{"tail":2}}'
 ```
+
+`format` takes `format` (`text` or `vt`), `trim`, `unwrap`, and `tail`: the
+screen's last N lines that show something. `hive api describe METHOD` shows
+every method's arguments.
 
 ## Events
 
@@ -90,7 +101,12 @@ hive api call hive.terminal.format '{"block_id":"block:…","args":{"trim":true}
 
 Every event has a number. A client that reconnects passes the last number it
 saw and misses nothing, unless the gap is older than the server keeps. Then it
-gets `resync_required` and should read the state again.
+gets `resync_required` and should read the state again. A `heartbeat` comes
+every 15 seconds, so a client can tell a quiet server from a lost connection.
+
+With `?all=1`, server events come too: `client_joined` and `client_left`
+when an app or a phone connects or goes, and `tailscale_status_changed` for
+built-in Tailscale (its state, and the sign-in link when it needs one).
 
 A terminal event arrives inside a session event:
 
@@ -100,7 +116,8 @@ A terminal event arrives inside a session event:
   "creator_name":"hive.terminal","name":"child_exited","payload":{"exit_code":2}}}}}
 ```
 
-Session events include `window_created`, `window_closed`, `window_pinned`, `block_created`,
+Session events include `window_created`, `window_closed`, `window_pinned`,
+`window_label_changed`, `session_label_changed`, `block_created`,
 `block_closed`, `session_view_changed` and `active_window_changed`. Terminal
 events include `child_exited`, `title_changed`, `pwd_changed`, `bell`,
 `process_changed`, `size_changed`, `desktop_notification`,
