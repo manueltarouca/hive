@@ -979,9 +979,13 @@ func (s *Server) restore() error {
 				// A resumed agent runs in the user's shell, as one started by
 				// hand: when it quits, or fails to resume, the pane is at a
 				// prompt in the same place, with its last words above.
+				saved := argv
 				if argv != nil {
 					if wrapped, ok := inShell(argv); ok {
 						opts.Command = wrapped
+						// The pane is a shell that started the agent: once the agent
+						// ends, a later restore isn't "was claude --resume".
+						saved = nil
 					} else {
 						// A shell that can't run it this way: the agent alone, kept
 						// open so a failed resume stays visible.
@@ -989,7 +993,7 @@ func (s *Server) restore() error {
 					}
 				}
 				// The new program is a shell or an agent, never the old command.
-				st.Command, st.Exited, st.ExitCode = argv, false, 0
+				st.Command, st.Exited, st.ExitCode = saved, false, 0
 				st.Status = nil
 				if st.Agent != nil && st.Agent.State != "ended" {
 					if argv == nil {

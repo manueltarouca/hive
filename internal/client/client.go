@@ -279,5 +279,9 @@ func (c *Client) Events(ctx context.Context, sessionID string, all bool, since i
 	if ctx.Err() != nil {
 		return nil
 	}
-	return sc.Err()
+	if err := sc.Err(); err != nil {
+		return err
+	}
+	// Not stopped by us: the server went away (stopped, restarted, unreachable).
+	return errors.New("events: the server closed the stream")
 }

@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"encoding/json"
 	"errors"
 	"io"
@@ -189,5 +190,26 @@ func TestProbeNothing(t *testing.T) {
 	defer cancel()
 	if _, err := Probe(ctx, addr); err == nil || !strings.Contains(err.Error(), addr) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// The server going away ends the stream with an error, not a quiet exit 0.
+func TestEventsEndingIsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		fmt.Fprintln(w, `{"seq":1,"type":"heartbeat"}`)
+	}))
+	defer srv.Close()
+	c, err := NewURL(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Events(context.Background(), "", true, -1, func(Event) bool { return true })
+	if err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Fatalf("Events = %v, want an error saying the server closed the stream", err)
+	}
+	// Stopped by the caller: no error.
+	if err := c.Events(context.Background(), "", true, -1, func(Event) bool { return false }); err != nil {
+		t.Fatalf("stopped by the caller: %v", err)
 	}
 }
