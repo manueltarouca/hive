@@ -305,3 +305,18 @@ func TestCursorStyleBlink(t *testing.T) {
 		t.Fatalf("json = %s", b)
 	}
 }
+
+// listen: the listeners a server adds when it starts, checked as
+// --extra-listen checks them.
+func TestListen(t *testing.T) {
+	c, d := Parse("listen = tailnet://:4483 127.0.0.1:4500\n")
+	if len(d) != 0 || len(c.Listen) != 2 || c.Listen[0] != "tailnet://:4483" {
+		t.Fatalf("listen = %q %v", c.Listen, d)
+	}
+	if c, d := Parse("listen = nonsense://x\n"); len(d) != 1 || len(c.Listen) != 0 {
+		t.Fatalf("bad listen = %q %v", c.Listen, d)
+	}
+	if len(Defaults().Listen) != 0 {
+		t.Fatal("a server listens only on its socket by default")
+	}
+}

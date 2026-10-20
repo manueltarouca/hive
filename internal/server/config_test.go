@@ -107,3 +107,19 @@ func TestNoConfigPath(t *testing.T) {
 		t.Fatalf("config.get = %v", got)
 	}
 }
+
+// A listener in the settings file is added at start, however the server was
+// started (the Mac app starts it without options).
+func TestListenFromConfig(t *testing.T) {
+	conf := filepath.Join(t.TempDir(), "config")
+	if err := os.WriteFile(conf, []byte("listen = 127.0.0.1:0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := startWithConfig(t, t.TempDir(), conf, nil)
+	defer h.stop()
+	v := h.call("server.version", nil)
+	ls, _ := v["listeners"].([]any)
+	if len(ls) == 0 {
+		t.Fatalf("listeners = %v, want the one from the settings file", v["listeners"])
+	}
+}

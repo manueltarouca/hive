@@ -6,6 +6,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/manueltarouca/hive/internal/remote"
 	"math"
 	"os"
 	"path/filepath"
@@ -26,6 +27,8 @@ type Config struct {
 	CursorStyleBlink *bool  `json:"cursor-style-blink"`
 	ScrollbackLimit  uint64 `json:"scrollback-limit"`
 	ResumeAgents     bool   `json:"resume-agents"`
+	// Listeners the server adds when it starts, as --extra-listen takes them.
+	Listen []string `json:"listen"`
 }
 
 // Level is how bad a diagnostic is: an error keeps the default.
@@ -104,6 +107,18 @@ var Keys = []Key{
 		}},
 	{Name: "resume-agents", Default: "true", Server: true, Help: "resume agents' sessions when the server starts again",
 		set: boolean(func(c *Config, b bool) { c.ResumeAgents = b })},
+	{Name: "listen", Default: "", Server: true, Help: "listeners to add when the server starts, separated by spaces, such as tailnet://:4483 (see the Remote hosts docs). Read at start; listener options to hive server start replace it",
+		set: func(c *Config, v string) error {
+			var out []string
+			for _, l := range strings.Fields(v) {
+				if _, err := remote.ParseSpec(l); err != nil {
+					return fmt.Errorf("%s: %v", l, err)
+				}
+				out = append(out, l)
+			}
+			c.Listen = out
+			return nil
+		}},
 }
 
 func oneOf(apply func(*Config, string), allowed ...string) func(*Config, string) error {
