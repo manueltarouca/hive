@@ -1,6 +1,6 @@
 # hive brand
 
-![hive's mark, app icon, colours and type in Hive Day and Hive Night](.github/assets/brand/sheet.webp)
+![hive's mark, app icon, colours and type in Hive Day and Hive Night](assets/brand/sheet.webp)
 
 The idea in one shape: **many sessions, one needs you.** hive keeps a lot of
 work running side by side, and shows you the one that's waiting.

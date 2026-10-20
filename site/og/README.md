@@ -14,5 +14,5 @@ pixel ratio of 2, take a screenshot, and scale it down:
 
 The layout uses viewport units, so the same file works at both sizes.
 
-`brand-sheet.html` is the image at the top of `BRAND.md`. Capture it the
+`brand-sheet.html` is the image at the top of `.github/BRAND.md`. Capture it the
 same way at 1600×848, then save it as `.github/assets/brand/sheet.webp`.

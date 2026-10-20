@@ -30,7 +30,7 @@ import xyz.matm.hive.R
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** hive's tokens (BRAND.md): Night is Tomorrow Night, Day is paper; honey is the one accent. */
+/** hive's tokens (.github/BRAND.md): Night is Tomorrow Night, Day is paper; honey is the one accent. */
 data class Palette(
     val bg: Color,
     val surface: Color,

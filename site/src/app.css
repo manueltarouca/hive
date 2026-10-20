@@ -21,7 +21,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Tomorrow Night, as in the app's dark mode (see BRAND.md). */
+    /* Tomorrow Night, as in the app's dark mode (see .github/BRAND.md). */
     --paper: #1d1f21;
     --card: #282c34;
     --ink: #e2e3e1;

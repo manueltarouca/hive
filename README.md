@@ -4,9 +4,9 @@
 </h1>
 
 <p align="center">
-  A terminal multiplexer for agent-heavy work.
+  A terminal multiplexer for coding agents.
   <br>
-  Sessions that survive restarts, agents you can see, and an API for everything.
+  Run many agents at once, and see the one that needs you.
   <br><br>
   <a href="#install">Install</a>
   &nbsp;&nbsp;&nbsp;
@@ -14,7 +14,7 @@
   &nbsp;&nbsp;&nbsp;
   <a href="#let-your-agent-set-it-up">Agent setup</a>
   &nbsp;&nbsp;&nbsp;
-  <a href="ARCHITECTURE.md">Architecture</a>
+  <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
@@ -31,10 +31,10 @@ tasks, a dev server, tests. Close the window and the work stops. Restart the
 computer and you set it all up again by hand. And an agent can wait an hour
 for your answer, in a tab you don't see.
 
-hive is built for this. Your sessions keep running when you close the app,
-and they come back after a restart. You see every agent in one place, and the
-ones waiting for you come first. Everything you can do in the app, a script or
-an agent can do through the same API.
+With hive, your sessions keep running when you close the app, and they come
+back after a restart. You see every agent in one place, and the ones waiting
+for you come first. Everything you can do in the app, a script or an agent
+can do through the same API.
 
 - **Keeps your sessions.** Close the app, stop the server, or reboot. Layouts,
   scrollback and working directories come back.
@@ -44,37 +44,27 @@ an agent can do through the same API.
   your agents all use one self-describing API.
 - **Feels like a normal terminal.** It draws terminals with Ghostty's
   terminal engine. Scrolling and selection are native, with no copy mode.
-- **Stays on your computer.** It connects to nothing. There is no account
-  and no telemetry.
+- **Reaches your other machines.** Run hive on a Linux box or another Mac,
+  and its sessions sit next to yours. It connects over Tailscale.
+- **Comes with you.** hive for Android shows the same sessions on your
+  phone, and you can answer an agent from a notification.
+- **Talks only to your machines.** There is no account and no telemetry.
 
 ## Install
 
-Download `hive` for macOS (Apple Silicon) or Linux (x86_64), and `Hive.app`,
-from [Releases](https://github.com/manueltarouca/hive/releases).
-[Installation](https://manueltarouca.github.io/hive/docs/installation) shows
-how to check the download, and how to open the app, which isn't signed with
-an Apple Developer ID yet.
+Download from [Releases](https://github.com/manueltarouca/hive/releases):
 
-To build from source, you need Go 1.27 and Zig **0.16** exactly (Ghostty's
-build refuses other versions). The Mac app needs macOS 14 to run, and
-Xcode 27 to build.
+| File | For |
+| --- | --- |
+| `hive-VERSION-macos-arm64.tar.gz` | The server and the CLI, on macOS with Apple Silicon |
+| `hive-VERSION-linux-amd64.tar.gz` | The server and the CLI, on Linux x86_64 with glibc 2.28 or later |
+| `Hive-VERSION-macos-arm64.zip` | Hive.app, for macOS 14 or later |
+| `hive-VERSION-android.apk` | hive for Android 10 or later |
+| `SHA256SUMS` | Checksums of the files |
 
-```sh
-brew install go zig@0.16
-git clone https://github.com/manueltarouca/hive && cd hive
-make vt       # once: builds Ghostty's terminal library
-make build    # ./bin/hive
-```
-
-The Mac app carries its own copy of `hive`:
-
-```sh
-apps/macos/script/bundle.sh && open apps/macos/build/Hive.app
-```
-
-The server and CLI also run on Linux. See
-[Installation](https://manueltarouca.github.io/hive/docs/installation) for the
-details.
+Hive.app isn't signed with an Apple Developer ID yet, so macOS asks you to
+approve its first launch. [Installation](https://manueltarouca.github.io/hive/docs/installation)
+shows how, how to check a download, and how to build from source.
 
 ## Let your agent set it up
 
@@ -86,27 +76,39 @@ https://manueltarouca.github.io/hive/agent-setup/prompt.md
 to set me up with hive.
 ```
 
-The agent installs hive's skills, builds hive, connects Claude Code, and can
-move your tmux sessions over one window at a time. In Claude Code you can
-install the skills yourself:
+The agent installs hive and its skills, connects Claude Code, and can move
+your tmux sessions over one window at a time. In Claude Code you can add the
+skills as a plugin yourself:
 
 ```sh
 claude plugin marketplace add manueltarouca/hive
 claude plugin install hive@hive
 ```
 
+Then `/hive:hive` drives hive, `/hive:hive-setup` sets it up, and
+`/hive:hive-from-tmux` moves tmux sessions over. Update them with
+`claude plugin update hive@hive`.
+
 ## Quick start
 
 ```sh
 hive new work --cwd ~/src/app                 # a session; starts the server if needed
-hive -s work split --split below -- htop      # a pane beside the current one
+hive -s work split --split below -- htop      # a pane under the current one
 hive -s work run --label tests --wait -- go test ./...   # exits with the tests' status
-hive -b tests capture --trim                  # screen and scrollback, as text
+hive -b tests capture --tail 5                # the last lines it printed
 hive ls                                       # every session
 ```
 
 Inside a hive terminal, commands act on that terminal's own session and pane,
 so you rarely need `-s` or `-b`.
+
+## Restarts
+
+A stopped server, a crash or a reboot ends the programs, but not the
+sessions. The next `hive` command brings back every session with its layout
+and labels. Each pane gets its screen and scrollback, a `── restored ──` line,
+then a shell in its last directory, or its agent, resumed in that shell.
+Other programs are not run again.
 
 ## Agents
 
@@ -122,57 +124,84 @@ working  claude   hive-demo    agent   ~/src/hive   2m ago
 ```
 
 `hive agent uninstall claude` removes the hooks again. After a restart, each
-agent pane runs its harness's resume command with the latest session: `claude --resume`, `codex resume`, `opencode -s`,
-`gemini --resume` or `grok --resume`.
+agent pane resumes its conversation: `claude --resume`, `codex resume`,
+`opencode -s`, `gemini --resume` or `grok --resume`.
 [More about agents](https://manueltarouca.github.io/hive/docs/agents).
 
 ## Scripting
 
-The CLI wraps a JSON API on a Unix socket, and the server describes it:
+The CLI wraps a JSON API, on a Unix socket and on your tailnet, and the server
+describes it:
 
 ```sh
 hive api list                                # every method
 hive api describe session.new_split          # its arguments, as JSON Schema
 hive events -s work --json                   # a live stream of what happens
-curl --unix-socket "$HIVE_SERVER" http://hive/v1/call \
-  -H 'content-type: application/json' -d '{"method":"session.list"}'
 ```
 
 Command names, method names and exit codes are stable: they break only in a
-new major version (see the [changelog](CHANGELOG.md)). See [the CLI](https://manueltarouca.github.io/hive/docs/cli)
+new major version. See [the CLI](https://manueltarouca.github.io/hive/docs/cli)
 and [the server API](https://manueltarouca.github.io/hive/docs/api).
 
-## Restarts
+## Other machines and your phone
 
-A stopped server, a crash or a reboot ends the programs, but not the
-sessions. The next `hive` command brings back every session with its layout
-and labels. Each pane gets its screen and scrollback, a `── restored ──` line,
-then a shell in its last directory, or its agent, resumed. Other programs are
-not run again. State lives in `~/.local/state/hive`.
+A hive server on another machine works like the one on your Mac. Start it
+with a listener on your tailnet, then add it:
+
+```sh
+hive server start --tailscale --tailscale-hostname box   # on the other machine
+hive hosts add box https://box.example.ts.net            # here; your tailnet's name
+hive -S box ls                                           # any command, on that machine
+```
+
+Hive.app shows every host's sessions in one list. On Android, add your hosts
+by scanning the code from **Hive → Share Hosts with Phone**.
+[Remote hosts](https://manueltarouca.github.io/hive/docs/remote) and
+[hive on your phone](https://manueltarouca.github.io/hive/docs/android) have
+the details.
 
 ## How it works
 
-One Go program, `hive`, is both the server and the CLI. The server owns
-every terminal: a PTY plus a headless copy of Ghostty's terminal engine
+One Go program, `hive`, is both the server and the CLI. The server owns every
+terminal: a PTY plus a headless copy of Ghostty's terminal engine
 ([libghostty-vt](https://github.com/ghostty-org/ghostty)). It saves layouts
-and terminal snapshots to disk. The Mac app is native (Swift, AppKit, Metal).
-It mirrors each terminal through an ordered byte stream and draws it on the
-GPU. [ARCHITECTURE.md](ARCHITECTURE.md) has the details and the decisions.
+and terminal snapshots to disk. The Mac app (Swift, AppKit, Metal) and the
+Android app mirror each terminal through an ordered byte stream and draw it
+themselves. [ARCHITECTURE.md](ARCHITECTURE.md) has the details.
+
+## Build from source
+
+You need Go 1.27 and Zig **0.16** exactly (Ghostty's build refuses other
+versions). The Mac app needs Xcode 27 to build.
+
+```sh
+brew install go zig@0.16
+git clone https://github.com/manueltarouca/hive && cd hive
+make vt       # once: builds Ghostty's terminal library
+make build    # ./bin/hive
+apps/macos/script/bundle.sh && open apps/macos/build/Hive.app
+```
+
+[Installation](https://manueltarouca.github.io/hive/docs/installation) covers
+Linux and the Android app.
 
 ## Status
 
-hive is young. The server, CLI and Mac app work, and Claude Code has the
-deepest integration. Planned next: Lua configuration, then remote machines.
+hive is young. The server, the CLI, the Mac app, remote hosts and the Android
+app work, and Claude Code has the deepest integration. Planned next: scripts
+and key bindings that run inside hive.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately,
+as [SECURITY.md](SECURITY.md) says.
 
 ## Thanks
 
-hive stands on [Ghostty](https://ghostty.org)'s terminal engine, and uses
-[JetBrains Mono](https://www.jetbrains.com/lp/mono/) and
-[Inter](https://rsms.me/inter/).
-
-## Brand
-
-The mark, colours, type and voice are in [BRAND.md](BRAND.md).
+hive stands on [Ghostty](https://ghostty.org)'s terminal engine and
+[Tailscale](https://tailscale.com), and uses
+[JetBrains Mono](https://www.jetbrains.com/lp/mono/),
+[Inter](https://rsms.me/inter/) and [Noto](https://fonts.google.com/noto).
 
 ## License
 

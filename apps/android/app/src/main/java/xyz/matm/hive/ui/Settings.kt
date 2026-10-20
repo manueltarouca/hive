@@ -75,7 +75,7 @@ fun Settings(model: AppModel, close: () -> Unit) {
             Section("Terminal") {
                 Toggle("Ask before pasting several lines", "When the program didn't ask for pasted text, each line may run as a command.",
                     model.confirmPaste, model::chooseConfirmPaste)
-                Toggle("Open panes fitted to the phone", "Instead of at the size another device gave them, zoomed. Back to … gives it back.",
+                Toggle("Open panes fitted to the phone", "A pane opens at the phone's size, not zoomed out to another device's. The button at the top gives the size back.",
                     model.openFitted, model::chooseOpenFitted)
             }
             Section("Agents") {

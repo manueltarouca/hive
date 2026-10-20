@@ -1,0 +1,46 @@
+name: Something doesn't work
+description: A bug in hive, the Mac app, the Android app or the docs.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: The smallest steps that show it, with the commands you ran.
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part
+      options:
+        - The CLI or the server
+        - Hive.app (Mac)
+        - hive for Android
+        - Remote hosts
+        - Agents and hooks
+        - The docs or the site
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `hive version`, and the app's version if it's the app.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: System
+      description: macOS, Linux distribution or Android version, and the agent you use (Claude Code 2.x, Codex, ...).
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The end of `~/.local/state/hive/server.log`, if it helps. Remove anything private first.
+      render: text
