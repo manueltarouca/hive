@@ -89,7 +89,7 @@ func TestResumedAgentLeavesAShell(t *testing.T) {
 	h2.waitScreen(sid, bid, "resumed s-9")
 	// The agent quit: the shell under it answers.
 	h2.call("hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{"data": "echo $((40+2))\r"}})
-	h2.waitScreen(sid, bid, "\n42")
+	h2.waitScreen(sid, bid, "42") // the answer: the command itself reads 40+2
 }
 
 // A resume that fails leaves the shell in front: once the shell has had
@@ -192,7 +192,7 @@ func TestResumedAgentRunsPastTheGrace(t *testing.T) {
 		}
 	}
 	h2.call("hive.terminal.write", map[string]any{"block_id": bid, "args": map[string]any{"data": "echo $((40+2))\r"}})
-	h2.waitScreen(sid, bid, "\n42")
+	h2.waitScreen(sid, bid, "42") // the answer: the command itself reads 40+2
 }
 
 // Shells that don't take the wrapper's command line run the agent alone.

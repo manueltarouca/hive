@@ -141,7 +141,7 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         let server = try Server(); defer { server.stop() }
         let rig = Rig(server)
         try await rig.connect()
-        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; printf ready; head -c 10 | od -An -c"], "cols": 80, "rows": 24])
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; printf ready; head -c 10 | od -An -c; sleep 30"], "cols": 80, "rows": 24])
         let block = try #require(created["block_ids"][0].string)
         await rig.onQueue { rig.engine.attach(block: block) { _ in } }
         // Input before stty raw would be echoed: the test would read the echo.
@@ -171,7 +171,7 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         let server = try Server(); defer { server.stop() }
         let rig = Rig(server)
         try await rig.connect()
-        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; printf ready; head -c 18 | od -An -c"], "cols": 80, "rows": 24])
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; printf ready; head -c 18 | od -An -c; sleep 30"], "cols": 80, "rows": 24])
         let block = try #require(created["block_ids"][0].string)
         await rig.onQueue { rig.engine.attach(block: block) { _ in } }
         try await rig.waitForScreen(block, "ready")
@@ -228,7 +228,7 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         let rig = Rig(server)
         try await rig.connect()
         // The program reads exactly the bytes it was sent and prints them in hex.
-        let created = try await rig.call("session.create", ["command": ["sh", "-c", "stty raw -echo; printf ready; head -c 6 | od -An -tx1; stty sane; head -c 18 | od -An -c"], "cols": 80, "rows": 24])
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "stty raw -echo; printf ready; head -c 6 | od -An -tx1; stty sane; head -c 18 | od -An -c; sleep 30"], "cols": 80, "rows": 24])
         let block = try #require(created["block_ids"][0].string)
         await rig.onQueue { rig.engine.attach(block: block) { _ in } }
         // Input before stty raw would be echoed and held for a newline.
