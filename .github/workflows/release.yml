@@ -13,6 +13,8 @@ permissions:
 jobs:
   build:
     strategy:
+      # One system failing still shows the other's result.
+      fail-fast: false
       matrix:
         include:
           # Apple Silicon: hive and Hive.app, with the Xcode used locally.

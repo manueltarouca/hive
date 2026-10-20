@@ -47,6 +47,16 @@ final class Rig: @unchecked Sendable {
             queue.async { self.client.connect(name: "engine-tests", version: "0.0.0-test") { c.resume(with: $0) } }
         }
     }
+    /// Waits until the block's screen shows text: a program saying it's ready.
+    func waitForScreen(_ block: String, _ text: String) async throws {
+        for _ in 0..<250 {
+            let screen = try await call("hive.terminal.format", ["block_id": .string(block), "args": ["trim": true]])["content"].string ?? ""
+            if screen.contains(text) { return }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        Issue.record("the screen never showed \(text)")
+    }
+
     func call(_ method: String, _ params: JSON = [:]) async throws -> JSON {
         try await withCheckedThrowingContinuation { c in
             queue.async { self.client.call(method, params) { c.resume(with: $0.mapError { $0 as Error }) } }
@@ -131,9 +141,11 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         let server = try Server(); defer { server.stop() }
         let rig = Rig(server)
         try await rig.connect()
-        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; head -c 10 | od -An -c"], "cols": 80, "rows": 24])
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; printf ready; head -c 10 | od -An -c"], "cols": 80, "rows": 24])
         let block = try #require(created["block_ids"][0].string)
         await rig.onQueue { rig.engine.attach(block: block) { _ in } }
+        // Input before stty raw would be echoed: the test would read the echo.
+        try await rig.waitForScreen(block, "ready")
         // Wait until the mirror has seen the mode switches.
         let geo = PointerGeometry(cellWidth: 10, cellHeight: 20, paneWidth: 800, paneHeight: 480)
         let report = Data("\u{1b}[<64;3;3M".utf8)
@@ -146,7 +158,7 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         var out = ""
         for _ in 0..<150 {
             out = try await rig.call("hive.terminal.format", ["block_id": .string(block), "args": ["trim": true]])["content"].string ?? ""
-            if out.contains("M") { break }
+            if out.contains("033") { break }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         // od -c shows ESC as 033: the SGR report for wheel-up at column 3, row 3.
@@ -159,9 +171,10 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         let server = try Server(); defer { server.stop() }
         let rig = Rig(server)
         try await rig.connect()
-        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; head -c 18 | od -An -c"], "cols": 80, "rows": 24])
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "printf '\\033[?1049h\\033[?1000h\\033[?1006h'; stty raw -echo; printf ready; head -c 18 | od -An -c"], "cols": 80, "rows": 24])
         let block = try #require(created["block_ids"][0].string)
         await rig.onQueue { rig.engine.attach(block: block) { _ in } }
+        try await rig.waitForScreen(block, "ready")
         let geo = PointerGeometry(cellWidth: 10, cellHeight: 20, paneWidth: 800, paneHeight: 480)
         for _ in 0..<100 {
             // Stateless probe: the wheel goes to the program once tracking is on.
@@ -215,10 +228,11 @@ func randomVT(seed: UInt64, count: Int) -> Data {
         let rig = Rig(server)
         try await rig.connect()
         // The program reads exactly the bytes it was sent and prints them in hex.
-        let created = try await rig.call("session.create", ["command": ["sh", "-c", "stty raw -echo; head -c 6 | od -An -tx1; stty sane; head -c 18 | od -An -c"], "cols": 80, "rows": 24])
+        let created = try await rig.call("session.create", ["command": ["sh", "-c", "stty raw -echo; printf ready; head -c 6 | od -An -tx1; stty sane; head -c 18 | od -An -c"], "cols": 80, "rows": 24])
         let block = try #require(created["block_ids"][0].string)
         await rig.onQueue { rig.engine.attach(block: block) { _ in } }
-        try await Task.sleep(nanoseconds: 300_000_000)
+        // Input before stty raw would be echoed and held for a newline.
+        try await rig.waitForScreen(block, "ready")
         await rig.onQueue {
             rig.engine.key(block: block, KeyInput(key: .c, mods: [.ctrl], unshifted: "c"))
             rig.engine.text(block: block, "hi")
