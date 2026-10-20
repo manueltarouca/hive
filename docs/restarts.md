@@ -1,22 +1,23 @@
 ---
-title: Persistence and restore
-section: Persistence
-order: 5
+title: Restarts
+section: Use hive
+order: 13
 description: What hive keeps on disk, and what comes back after a restart or a reboot.
 ---
 
-# Persistence and restore
+# Restarts
 
 Quit the app and your programs keep running in the server. Stop the server,
 or restart the machine, and your sessions come back the next time it starts.
 
 ## What comes back
 
-- Every session, window and layout, with the same IDs and labels.
+- Every session, tab and layout, with the same IDs and labels.
 - Each terminal's screen and scrollback, followed by a `── restored ──` line.
 - A shell in each terminal's last working directory.
 - Agents, resumed with their latest session, in your shell: quit one and the
-  pane is at a prompt in the same place. See [Agents](./agents).
+  pane is at a prompt in the same place. With nu, csh or tcsh, the agent runs
+  alone. See [Agents](./agents).
 
 Other programs are not run again. A pane that ran `htop` comes back with a
 shell, and the restored line says what it was running.
@@ -25,10 +26,12 @@ shell, and the restored line says what it was running.
 
 | Path | Holds |
 | --- | --- |
-| `~/.local/state/hive/state.json` | Sessions, layouts, and what each block was doing |
-| `~/.local/state/hive/blocks/` | A snapshot of each terminal: screen, scrollback, modes |
+| `~/.local/state/hive/state.json` | Sessions, layouts, and what each pane was doing |
+| `~/.local/state/hive/blocks/ID.snap` | A snapshot of each terminal: screen, scrollback, modes |
+| `~/.local/state/hive/server.log` | What the server did, and why something failed |
+| `~/.local/state/hive/tailscale/` | With `--tailscale`: the server's Tailscale login and device key. Keep it private |
 | `~/.local/state/hive/server.lock` | Held by the running server: a second server on the same directory won't start |
-| `~/.local/state/hive/server-id` | This install's ID, for clients telling servers apart |
+| `~/.local/state/hive/server-id` | This state folder's ID, for clients telling servers apart |
 
 `HIVE_STATE_DIR` or `XDG_STATE_HOME` moves it.
 

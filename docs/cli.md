@@ -1,7 +1,7 @@
 ---
 title: The CLI
-section: Reference
-order: 6
+section: Automate
+order: 20
 description: Every hive command, its options, and its exit codes.
 ---
 
@@ -83,12 +83,12 @@ lists every change.
 
 Every command takes `--json` for output a script can parse.
 
-## Remote servers
+## Remote hosts
 
 Any command runs against another machine's server with `-S`. The server
 there must listen on your tailnet (`hive server start --tailscale`, or
 `--extra-listen tailnet://:4483`), and let you in: by default only the
-Tailscale user who owns that machine. [Remote servers](./remote) has the
+Tailscale user who owns that machine. [Remote hosts](./remote) has the
 listeners and who they let in.
 
 ```sh

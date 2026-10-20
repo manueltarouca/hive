@@ -1,7 +1,7 @@
 ---
 title: Remote hosts
-section: Start
-order: 3.7
+section: Use hive
+order: 14
 description: Run hive on other machines and use them from your Mac or phone over your tailnet.
 ---
 
@@ -33,10 +33,10 @@ hive server start --extra-listen tailnet://:4483
 ```
 
 Stopping a server ends its programs. Shells and agents come back when it
-starts; other programs don't (see [Persistence and restore](./restore)).
+starts; other programs don't (see [Restarts](./restarts)).
 
 To keep a listener whoever starts the server (the Mac app starts it at
-login, without options), put it in the [settings file](./config):
+login, without options), put it in the [settings file](./settings):
 
 ```sh
 hive config set listen tailnet://:4483

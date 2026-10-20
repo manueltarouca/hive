@@ -1,7 +1,7 @@
 ---
 title: Privacy
-section: Reference
-order: 10
+section: Help
+order: 32
 description: What hive collects (nothing), and what it connects to.
 ---
 
@@ -26,7 +26,7 @@ control them.
 ## What stays on disk
 
 - Your sessions and each terminal's screen and scrollback, in the state
-  directory (`~/.local/state/hive`). See [Persistence and restore](./restore).
+  directory (`~/.local/state/hive`). See [Restarts](./restarts).
 - With `--tailscale`, the server's Tailscale node key, in
   `~/.local/state/hive/tailscale`. Anyone who can read it can act as that
   device on your tailnet.

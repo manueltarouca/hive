@@ -1,15 +1,18 @@
 ---
 title: Settings
-section: Start
-order: 3.5
+section: Use hive
+order: 16
 description: The settings file, what each setting does, and how the app applies changes.
 ---
 
 # Settings
 
 hive's settings live in one file: `~/.config/hive/config`, or
-`$XDG_CONFIG_HOME/hive/config`. The app and the server read it, and the
-app applies it as soon as you save it.
+`$XDG_CONFIG_HOME/hive/config`. The Mac app and the server read it, and the
+app applies it as soon as you save it. hive for Android has its own
+settings, on the phone (see [hive on your phone](./android#settings)).
+
+The hosts you add are in `hosts.json`, next to the file.
 
 You don't need the file: everything has a default. To create it with every
 setting listed and commented out, run:
@@ -48,9 +51,11 @@ comment.
 | `cursor-style-blink` | empty | Whether the cursor blinks, with Ghostty's name: empty or `true` blinks (Ghostty's default), `false` keeps it steady. It blinks only in the focused pane, and typing or output shows it again at once. Programs can still choose with `CSI Ps SP q` or DEC mode 12 |
 | `scrollback-limit` | `16m` | History kept per terminal, in bytes (`k`, `m`, `g`), at least `64k`. Read by the server; lowering it drops old lines at once |
 | `resume-agents` | `true` | Resume agents' sessions when the server starts again. Read when the server starts |
+| `listen` | empty | Listeners the server adds when it starts, separated by spaces, such as `tailnet://:4483`. Only `tailnet://` and `tailnet-serve://`. One that can't open is tried again every 15 seconds. Listener options to `hive server start` replace it. See [Remote hosts](./remote) |
 
 ## Changing settings
 
+- In the Mac app: **Hive → Settings…** (⌘,).
 - Edit the file in any editor. The app picks up the change when you save.
 - Choose a theme from **View** or the command palette: hive writes it into
   the file and keeps the rest of the file as it was.

@@ -1,7 +1,7 @@
 ---
 title: Program status
-section: Reference
-order: 9
+section: Automate
+order: 23
 description: How programs tell hive what they are doing, with OSC 7501.
 ---
 

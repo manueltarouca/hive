@@ -1,15 +1,16 @@
 ---
 title: hive on your phone
-section: Start
-order: 3.8
+section: Use hive
+order: 15
 description: hive for Android: your sessions and agents on the phone, over your tailnet.
 ---
 
 # hive on your phone
 
-hive for Android is the Mac app, small: the same servers, sessions, tabs and
-agents, live. Answer an agent that needs you from the lock screen, read what
-it did, or type into any pane.
+hive for Android shows the same hosts, sessions, tabs and agents as the Mac.
+Answer an agent that needs you from a notification, read what it did, or type
+into any pane. Install it from the release's APK: see
+[Installation](./installation#hive-for-android).
 
 The phone reaches your hosts through the Tailscale app, as your computer does.
 Sign in to Tailscale on the phone with the same account.
@@ -28,14 +29,15 @@ would change the address of one you saved, starts unchecked. The code carries
 labels and addresses only: who may connect comes from your tailnet.
 
 Your Mac is in the code when its server listens on the tailnet (see
-[Remote servers](./remote)).
+[Remote hosts](./remote)).
 
 ## The session
 
 The app opens the session you were last in. Its title is at the top, with
 its host; tap it for the switcher: every host's sessions, **Connect** for a
 host that isn't connected yet, **New session**, and **Add remote host**.
-Long press a host for **Stay connected**, **Disconnect** and **Forget**.
+Long press a host for **Stay connected**, **Disconnect** and **Forget**, or
+open **Hosts** from the switcher.
 
 Below the title are the session's tabs, each with its agents' state, then
 one pane at a time. The dots under it are the panes of a split: tap them, or
@@ -59,12 +61,12 @@ programs that use the mouse and opens links.
 
 A pane has one size, set by the device you use. Under the pane the phone
 says who that is: "Sized by Hive.app on studio", "Sized by this phone", or
-nobody. A pane sized by another device is zoomed to fit the phone's width,
+"Nobody holds this pane's size." A pane sized by another device is zoomed to fit the phone's width,
 so it doesn't reflow there; pinch to read closer.
 
 **Fit to phone** gives the pane the phone's size (the other device shows
 the rest of the pane empty). **Back to studio** gives it back to whoever
-had it. Using the other device takes it back too: typing or clicking in the
+had it, or **Give back** when nobody did. Using the other device takes it back too: typing or clicking in the
 pane, or bringing its window to the front. A device showing the pane
 without using it never takes it.
 
@@ -78,10 +80,37 @@ In the background, hive notifies you when an agent needs you or is done,
 naming the session and host. On a question, **Allow**, **Deny** and
 **Reply** answer from the notification, if the agent is still waiting.
 
-To notify while the phone is in your pocket, hive keeps its connected hosts
-open with a quiet ongoing notification ("Connected to 2 hosts"). When the
-phone sleeps deeply, the system cuts the network: hive reconnects when it
-wakes and tells you what changed meanwhile.
+By default a host is used on demand: 30 seconds after you leave hive, it
+lets go, and nothing runs in the background. To be notified with the phone
+in your pocket, turn on **Stay connected** for a host (on **Hosts**). hive
+then keeps it open, with a quiet ongoing notification ("Connected to 1
+host") whose **Disconnect** lets go of everything. When the phone sleeps
+deeply, the system cuts the network: hive reconnects when it wakes and tells
+you what changed meanwhile.
+
+## Hosts
+
+**Hosts**, from the switcher, lists every host with its state. For each:
+
+- **Connect** or **Disconnect**. A disconnected host stays saved, and its
+  sessions keep running on the server.
+- **Stay connected**: keep it open in the background, for notifications.
+- **Rename**: the label the phone uses for it.
+- **Forget**: remove it from the phone, after asking.
+
+**Add a host** and **Scan the code** are at the bottom.
+
+## Settings
+
+**Settings**, from the switcher, has what's about the phone itself:
+
+| Setting | Does |
+| --- | --- |
+| Theme | System, Night or Day |
+| Text size | The size of a pane fitted to the phone |
+| Ask before pasting several lines | As on the Mac, when the program didn't ask for pasted text |
+| Open panes fitted to the phone | A pane opens at the phone's size, instead of zoomed out to another device's |
+| Notifications | When an agent needs you or is done: when hive is in the background, always, or never |
 
 ## When a host is away
 

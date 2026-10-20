@@ -2,7 +2,7 @@
 title: Installation
 section: Start
 order: 1
-description: Download hive for macOS or Linux, or build it from source.
+description: Download hive for macOS, Linux or Android, or build it from source.
 ---
 
 # Installation
@@ -60,6 +60,14 @@ time:
 macOS remembers your choice. Or, from a terminal:
 `xattr -dr com.apple.quarantine /Applications/Hive.app`.
 
+### hive for Android
+
+Download `hive-$V-android.apk` on the phone and open it. Android asks to
+allow installs from the app that downloaded it, the first time. It needs
+Android 10 or later, and isn't on Google Play. To update, install the newer
+file over it: your hosts and settings stay. Then add your hosts: see
+[hive on your phone](./android).
+
 ## Build from source
 
 ### Requirements
@@ -98,6 +106,19 @@ open apps/macos/build/Hive.app
 `Hive.app` carries its own copy of `hive`. When it starts and no server is
 running, it starts one.
 
+### The Android app
+
+It needs the Android SDK with NDK 28.2, and JDK 21 (Android Studio's own
+works).
+
+```sh
+make vt-android
+cd apps/android && ./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+The debug build installs beside a release as **hive dev**.
+
 ## Check it works
 
 ```sh
@@ -107,3 +128,24 @@ running, it starts one.
 
 Any `hive` command starts a server if none is running. `hive server stop`
 stops it. Your sessions come back the next time it starts.
+
+## Update
+
+Download the new release and replace the files: `hive` in `~/.local/bin`,
+`Hive.app` in `/Applications`. Then restart the server so it runs the new
+version, at a moment that suits you: `hive server stop`, then any `hive`
+command. Stopping the server ends its programs; shells and agents come back.
+
+## Uninstall
+
+```sh
+hive agent uninstall claude    # take hive's hooks out of Claude Code
+hive server stop
+rm ~/.local/bin/hive
+rm -rf /Applications/Hive.app
+rm -rf ~/.local/state/hive     # your sessions and their scrollback
+rm -rf ~/.config/hive          # settings and saved hosts
+```
+
+If you added the plugin: `claude plugin uninstall hive@hive`.
+

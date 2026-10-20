@@ -1,7 +1,7 @@
 ---
 title: Agents
-section: Agents
-order: 4
+section: Use hive
+order: 12
 description: Claude Code and other agents in hive, their status, and how they come back after a restart.
 ---
 
@@ -64,13 +64,16 @@ blocked  claude   api-gateway  …a29f3  ~/src/api    now     Claude needs your 
 working  claude   hive-demo    agent   ~/src/hive   2m ago
 ```
 
-The app shows the same in the agents sidebar, and sends a notification when an
-agent becomes blocked or finishes while the app is in the background.
+The Mac app shows the same in its tabs, the sidebar (⇧⌘S) and the menu bar.
+It sends a notification when an agent becomes blocked or finishes; the
+`notify` setting chooses when (in the background, always, or never). hive
+for Android notifies too, and can answer from the notification.
 
 ## Resume
 
 When the server starts again after a stop, a crash or a reboot, each agent's
-pane runs its harness's resume command with the latest session ID:
+pane runs its harness's resume command with the latest session ID, in your
+login shell. Quit the agent and you're at a prompt in the same folder.
 
 | Harness | Command |
 | --- | --- |
@@ -81,11 +84,15 @@ pane runs its harness's resume command with the latest session ID:
 | Grok | `grok --resume <id>` |
 
 An agent whose session ended is not resumed, and neither is one whose pane
-was back at the shell prompt when the server stopped. If a resume fails, the pane stays
-open so you can read why.
+was back at the shell prompt when the server stopped. If a resume fails, its
+error stays above the prompt. With nu, csh or tcsh as your shell, the agent
+runs alone, and its pane stays open after it. `resume-agents = false` in the
+[settings file](./settings) turns resuming off.
 
 To change a command, set `HIVE_RESUME_<HARNESS>` to a JSON list in the
-server's environment. `{id}` is replaced by the session ID:
+server's environment. `{id}` is replaced by the session ID. A server that
+Hive.app started doesn't see your shell's variables: stop it, then start it
+from a shell that has them.
 
 ```sh
 export HIVE_RESUME_CLAUDE='["claude","--resume","{id}","--model","opus"]'

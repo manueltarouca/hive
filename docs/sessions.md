@@ -1,7 +1,7 @@
 ---
 title: Sessions, tabs and panes
-section: Start
-order: 2
+section: Use hive
+order: 10
 description: What a session, a tab and a pane are, and how commands choose which one to act on.
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Server API
-section: Reference
-order: 7
+section: Automate
+order: 21
 description: The methods the server offers, how to call them, and the events it sends.
 ---
 
@@ -68,7 +68,7 @@ lists every change.
 | Blocks | `session.new_split`, `session.move_block`, `session.describe_block`, `session.focus_block`, `session.focus_direction`, `session.focus_next_pane`, `session.focus_previous_pane`, `session.zoom_block`, `session.resize_pane`, `session.set_block_label`, `block.close`, `block.method` |
 | Terminals, as `hive.terminal.NAME` | `format`, `write`, `send_key`, `resize`, `size`, `title`, `pwd`, `process`, `program_status`, `list_dir`, `wait` |
 | Agents | `agent.report`, `agent.list` |
-| Settings | `config.get`, `config.set`, `config.reload` (the server's own settings file; see [Settings](./config)) |
+| Settings | `config.get`, `config.set`, `config.reload` (the server's own settings file; see [Settings](./settings)) |
 | Server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `target.resolve`, `client.list`, `whoami` |
 
 Terminal methods take the block and their own arguments separately:

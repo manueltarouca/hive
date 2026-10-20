@@ -1,7 +1,7 @@
 ---
 title: Attach protocol
-section: Reference
-order: 8
+section: Automate
+order: 22
 description: How a client mirrors terminals: snapshots, ordered output, resizes, and resyncs.
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Agent setup
 section: Start
-order: 1.5
+order: 3
 description: Let your coding agent install hive, learn its commands, and move your tmux work over.
 ---
 
