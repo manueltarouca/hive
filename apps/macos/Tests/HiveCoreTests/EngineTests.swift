@@ -27,11 +27,32 @@ final class Server {
     func stop() { process.terminate(); process.waitUntilExit() }
 }
 
+struct TimedOut: Error, CustomStringConvertible {
+    let seconds: Double
+    var description: String { "no answer in \(seconds) s" }
+}
+
+/// Runs a callback-style call, failing after `seconds` instead of waiting
+/// forever: a stalled server fails the test, it doesn't hang the run.
+func within<T>(_ seconds: Double, _ start: @escaping (@escaping (Result<T, Error>) -> Void) -> Void) async throws -> T {
+    try await withCheckedThrowingContinuation { (c: CheckedContinuation<T, Error>) in
+        let once = Box(false)
+        let finish: (Result<T, Error>) -> Void = { r in
+            let first: Bool = once.swap(true) == false
+            if first { c.resume(with: r) }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { finish(.failure(TimedOut(seconds: seconds))) }
+        start(finish)
+    }
+}
+
 final class Box<T>: @unchecked Sendable {
     private let lock = NSLock()
     private var v: T
     init(_ v: T) { self.v = v }
     var value: T { get { lock.lock(); defer { lock.unlock() }; return v } set { lock.lock(); v = newValue; lock.unlock() } }
+    /// Sets a new value and returns the old one, in one step.
+    func swap(_ n: T) -> T { lock.lock(); defer { lock.unlock() }; let o = v; v = n; return o }
 }
 
 final class Rig: @unchecked Sendable {
@@ -43,8 +64,8 @@ final class Rig: @unchecked Sendable {
         engine = Engine(client: client)
     }
     func connect() async throws {
-        _ = try await withCheckedThrowingContinuation { (c: CheckedContinuation<String, Error>) in
-            queue.async { self.client.connect(name: "engine-tests", version: "0.0.0-test") { c.resume(with: $0) } }
+        _ = try await within(15) { (done: @escaping (Result<String, Error>) -> Void) in
+            self.queue.async { self.client.connect(name: "engine-tests", version: "0.0.0-test") { done($0.mapError { $0 as Error }) } }
         }
     }
     /// Waits until the block's screen shows text: a program saying it's ready.
@@ -58,8 +79,8 @@ final class Rig: @unchecked Sendable {
     }
 
     func call(_ method: String, _ params: JSON = [:]) async throws -> JSON {
-        try await withCheckedThrowingContinuation { c in
-            queue.async { self.client.call(method, params) { c.resume(with: $0.mapError { $0 as Error }) } }
+        try await within(15) { done in
+            self.queue.async { self.client.call(method, params) { done($0.mapError { $0 as Error }) } }
         }
     }
     func onQueue<T>(_ f: @escaping () -> T) async -> T {
