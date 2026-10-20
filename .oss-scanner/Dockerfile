@@ -13,7 +13,11 @@ RUN curl -fsSL -o /tmp/zig.tar.xz https://ziglang.org/download/0.16.0/zig-x86_64
     && echo "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  /tmp/zig.tar.xz" | sha256sum -c - \
     && mkdir -p /opt/zig && tar -xJf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 && rm /tmp/zig.tar.xz
 # A fixed target, as the Linux release uses: not the build machine's CPU.
-ENV ZIG=/opt/zig/zig PATH=/opt/zig:$PATH ZIG_TARGET=x86_64-linux-gnu.2.28
+# CC and PKG_CONFIG_PATH as the Makefile sets them, so plain `go build` and
+# `go test` work in the image too, not only through make.
+ENV ZIG=/opt/zig/zig PATH=/opt/zig:$PATH ZIG_TARGET=x86_64-linux-gnu.2.28 \
+    CC="/opt/zig/zig cc -target x86_64-linux-gnu.2.28" \
+    PKG_CONFIG_PATH=/src/third_party/ghostty-vt/share/pkgconfig
 
 WORKDIR /src
 COPY . .
