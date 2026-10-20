@@ -54,12 +54,12 @@
       </p>
       <p>
         tmux helps with some of this, and many of us still use it. But it draws a terminal inside your
-        terminal. You need a special mode to scroll. And programs can't easily control it.
+        terminal. You need a special mode to scroll. And a program that wants to drive it has to read its screen.
       </p>
       <p>
         hive is a terminal multiplexer for this kind of work. Your sessions keep running when you close
         the app, and they come back after a restart. Scrolling and selecting text work like in any Mac
-        app. Programs can control everything. Coding agents are part of the design.
+        app. Programs can drive everything through an API. And hive knows which panes run an agent, and which agents wait for you.
       </p>
     </section>
 
@@ -72,14 +72,16 @@
         <li><span>2</span><div><b>Knows your agents.</b> Claude Code tells hive what it is doing and when it needs you. You see every agent in one list, the waiting ones first. After a restart, each agent continues its conversation.</div></li>
         <li><span>3</span><div><b>Lets programs control it.</b> Everything you do in the app is also an API call. The command line, your scripts and your agents all use the same API.</div></li>
         <li><span>4</span><div><b>Feels like a normal terminal.</b> hive uses Ghostty's terminal engine. Scrolling, scrollback and text selection are native. There is no copy mode.</div></li>
+        <li><span>5</span><div><b>Reaches your other machines.</b> Run hive on a Linux box or another Mac, and its sessions sit next to yours in the app. It connects over Tailscale, which also tells hive who you are.</div></li>
+        <li><span>6</span><div><b>Works from your phone.</b> hive for Android shows the same sessions. Answer an agent from a notification. A pane takes the size of the device you type on.</div></li>
       </ol>
     </section>
 
     <section class="essay">
       <p class="label">Your data</p>
       <p>
-        hive runs on your computer and connects to nothing else. There is no account and no
-        telemetry. There is nothing to sign up for.
+        hive runs on your computers. It talks only to the hive servers you add, over your own
+        tailnet. There is no account and no telemetry. There is nothing to sign up for.
       </p>
     </section>
 
@@ -88,7 +90,8 @@
 <pre><code>git clone https://github.com/manueltarouca/hive && cd hive
 make vt build
 ./bin/hive new work</code></pre>
-      <p class="more"><a href={resolve('/docs/[slug]', { slug: 'installation' })}>Installation</a> <a href={resolve('/docs/[slug]', { slug: 'agents' })}>Agents</a> <a href={resolve('/docs/[slug]', { slug: 'cli' })}>The CLI</a></p>
+      <p>Or download hive, Hive.app and the Android app from <a href="https://github.com/manueltarouca/hive/releases">the releases</a>.</p>
+      <p class="more"><a href={resolve('/docs/[slug]', { slug: 'installation' })}>Installation</a> <a href={resolve('/docs/[slug]', { slug: 'agents' })}>Agents</a> <a href={resolve('/docs/[slug]', { slug: 'remote' })}>Remote hosts</a> <a href={resolve('/docs/[slug]', { slug: 'android' })}>Android</a></p>
     </section>
 
     <footer>

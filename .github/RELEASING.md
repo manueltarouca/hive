@@ -19,6 +19,11 @@ Run these from a hive session.
 4. Pushing the tag starts `.github/workflows/release.yml`:
    - It checks that the tag is semver and has a changelog section.
    - It tests and builds on macOS (Xcode 27.1) and Linux (glibc 2.28).
+   - It builds and signs the Android app, when the repository has its
+     secrets: `ANDROID_KEYSTORE_BASE64` (the release keystore, base64) and
+     `HIVE_RELEASE_PW`. The APK takes the release's version, and its version
+     code comes from it (0.1.0 is 10099; 0.1.0-rc.1 is 10001). Without the
+     secrets, the release has no APK.
    - It creates a draft release, uploads the files, `SHA256SUMS` and the
      provenance attestations, then publishes.
 

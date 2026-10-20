@@ -24,8 +24,8 @@ The first release.
   first launch until you approve it in System Settings; with `curl`, it opens
   normally. See
   [Installation](https://manueltarouca.github.io/hive/docs/installation).
-- `hive-0.1.0-android.apk`, hive for Android 10 or later, when the release
-  has one. Install it from the file; it isn't on Google Play.
+- `hive-0.1.0-android.apk`, hive for Android 10 or later. Install it from
+  the file; it isn't on Google Play.
 - `SHA256SUMS`, and a signed build provenance attestation for every file.
 
 ### Added
@@ -37,18 +37,24 @@ The first release.
   `hive agents` lists them. After a restart, agents resume their
   conversation (Claude Code, Codex, OpenCode, Gemini, Grok) in your login
   shell, so quitting one leaves a prompt.
-- **One API for everything:** JSON over a Unix socket that describes
-  itself (`hive api list`, `hive api describe`). There is an event stream,
-  and an attach protocol for clients.
-- **The CLI:** `new`, `run`, `split`, `send`, `send-key`, `capture`,
-  `wait`, `events`, `agents`, and more, with `--json` everywhere and stable
-  exit codes.
+- **One API for everything:** JSON over a Unix socket and your tailnet,
+  that describes itself (`hive api list`, `hive api describe`). There is an
+  event stream, and an attach protocol for clients.
+- **The CLI:** `new`, `run`, `split`, `send`, `send-key`, `capture`
+  (with `--tail`), `wait`, `events`, `agents`, `client ls`, and more, with
+  `--json` everywhere and stable exit codes.
+- **Settings** in one file, `~/.config/hive/config`, with `hive config` to
+  show, check and change them, and a Settings window in the Mac app (⌘,).
+  `listen` keeps a server reachable on your tailnet however it starts.
+- **Program status:** programs that report their state with OSC 7501 show
+  it, as agents do. Links and paths in a terminal open with ⌘-click.
 - **Remote hosts:** a server on another machine, reached over Tailscale.
   Listeners for Tailscale built in (`--tailscale`), Tailscale Serve, a
   tailnet address, or plain HTTP with `--allow-anonymous`. The server knows
   who each caller is from Tailscale and lets in only its owner unless told
   otherwise. `hive hosts` saves them, `-S NAME` runs any command on one, and
-  `hive whoami` says who the server thinks you are. See
+  `hive whoami` says who the server thinks you are. Hosts connect when you
+pick them, or with `--always` at launch. See
   [Remote hosts](https://manueltarouca.github.io/hive/docs/remote).
 - **Hive.app**, a native macOS client drawn with Metal on Ghostty's terminal
   engine:

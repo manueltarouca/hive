@@ -1,4 +1,4 @@
-import { marked } from 'marked';
+import { Marked } from 'marked';
 
 // The docs are plain Markdown at the repository root: docs/*.md.
 const files = import.meta.glob('../../../docs/*.md', { query: '?raw', import: 'default', eager: true });
@@ -26,7 +26,31 @@ export const sections = [...new Set(docs.map((d) => d.section))].map((name) => (
   name, pages: docs.filter((d) => d.section === name)
 }));
 
-export function render(md) {
+// Headings get GitHub's ids, so a link like ./remote#who-can-connect works
+// on the site as it does on GitHub.
+export function slugify(text) {
+  return text.toLowerCase().trim().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s/g, '-');
+}
+
+function withIds() {
+  let seen = new Map();
+  return {
+    hooks: { preprocess: (md) => { seen = new Map(); return md; } },
+    renderer: {
+      heading({ tokens, depth, text }) {
+        const base = slugify(text);
+        const n = seen.get(base) ?? 0;
+        seen.set(base, n + 1);
+        const id = n ? `${base}-${n}` : base;
+        return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
+      }
+    }
+  };
+}
+
+const md = new Marked({ gfm: true }, withIds());
+
+export function render(src) {
   // Drop the page's own h1: the layout shows the title.
-  return marked.parse(md.replace(/^\s*# .*\n/, ''), { gfm: true });
+  return md.parse(src.replace(/^\s*# .*\n/, ''));
 }

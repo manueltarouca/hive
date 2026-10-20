@@ -46,7 +46,7 @@ can do through the same API.
   terminal engine. Scrolling and selection are native, with no copy mode.
 - **Reaches your other machines.** Run hive on a Linux box or another Mac,
   and its sessions sit next to yours. It connects over Tailscale.
-- **Comes with you.** hive for Android shows the same sessions on your
+- **Works from your phone.** hive for Android shows the same sessions on your
   phone, and you can answer an agent from a notification.
 - **Talks only to your machines.** There is no account and no telemetry.
 
