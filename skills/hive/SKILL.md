@@ -42,7 +42,7 @@ program exits and returns its exit status, so you can read the output:
 ```sh
 hive run --label tests --focus=false --wait -- go test ./...
 echo "exit $?"
-hive -b tests capture --trim | tail -50
+hive -b tests capture --tail 50          # the last 50 lines that show something
 hive -b tests close
 ```
 
@@ -53,7 +53,7 @@ exits. Its output goes with it, but `hive wait` still reports the status.
 
 ```sh
 hive run --label web --keep-open --focus=false -- pnpm dev
-hive -b web capture --trim | tail -20     # check it came up
+hive -b web capture --tail 20            # check it came up
 ```
 
 **Put it beside the user's pane** instead of in a new tab:
@@ -70,7 +70,7 @@ get a shell.
 ```sh
 hive -b repl send 'print(1 + 1)'      # types text; does not press enter
 hive -b repl send-key enter           # keys: enter, ctrl+c, up, shift+tab, esc...
-hive -b repl capture --trim | tail -5
+hive -b repl capture --tail 5
 ```
 
 `send -` reads the text from stdin. Programs take time to react, so sleep
@@ -94,6 +94,23 @@ hive events -s SESSION --json        # NDJSON, one event per line
 ```sh
 hive agents
 hive agents --json
+```
+
+**Another machine.** `-S` runs any command on a saved host, or on a server
+by URL. The server must let you in; `whoami` says who it thinks you are:
+
+```sh
+hive hosts                           # the saved hosts
+hive -S box ls
+hive -S box whoami
+```
+
+`HIVE_SERVER` is always this machine's socket; use `-S` for others.
+
+**Pin a tab** (pinned tabs come first in every app):
+
+```sh
+hive api call session.pin_window '{"session_id":"session:…","window_id":"window:…","pinned":true}'
 ```
 
 **Look around:**
@@ -133,6 +150,7 @@ curl --unix-socket "$HIVE_SERVER" http://hive/v1/call \
 | 2 | bad command line |
 | 3 | target not found or ambiguous |
 | 4 | server unreachable |
+| 5 | the server refused you |
 | 130 | interrupted |
 
 `wait` and `run --wait` pass through the program's own status.

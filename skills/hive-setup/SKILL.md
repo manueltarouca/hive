@@ -87,13 +87,16 @@ Use a throwaway server, so the check doesn't touch the user's real state:
 
 ```sh
 D=$(mktemp -d)
-HIVE_SERVER=$D/s.sock HIVE_STATE_DIR=$D/state hive new check --cwd /tmp
-HIVE_SERVER=$D/s.sock HIVE_STATE_DIR=$D/state hive -s check run --wait -- echo ok
-HIVE_SERVER=$D/s.sock HIVE_STATE_DIR=$D/state hive server stop
+export HIVE_SERVER=$D/s.sock HIVE_STATE_DIR=$D/state HIVE_CONFIG=$D/config
+hive new check --cwd /tmp
+hive -s check run --wait -- echo ok
+hive server stop
+unset HIVE_SERVER HIVE_STATE_DIR HIVE_CONFIG
 ```
 
-Set both variables on each command. With `HIVE_SERVER` alone, the server
-writes to the real state directory.
+Set all three variables. A server refuses to start on a state folder another
+server holds, so a check without `HIVE_STATE_DIR` fails while the user's own
+server runs.
 
 ## 4. The macOS app (optional, macOS 14+)
 
@@ -122,8 +125,9 @@ hive agent install claude
   terminal. Elsewhere they exit at once.
 - **Folder trust:** Claude Code runs hooks only in folders the user trusts.
 
-Other harnesses (Codex, OpenCode, Gemini, Grok) have no hooks. hive resumes
-them when they report a session through `agent.report`.
+Grok runs Claude Code's hooks, so it reports too. Codex, OpenCode and Gemini
+have no hooks; hive resumes them when they report a session through
+`agent.report`.
 
 ## 6. Tell the user
 
@@ -142,7 +146,17 @@ Docs:   https://manueltarouca.github.io/hive/docs
 If they use tmux, mention that the `hive-from-tmux` skill can move their
 windows over, one at a time.
 
+Also worth mentioning, if it fits what they do:
+
+- **Another machine:** a hive server on a Linux box or another Mac, over
+  Tailscale. See https://manueltarouca.github.io/hive/docs/remote.
+- **Their phone:** hive for Android, the `hive-VERSION-android.apk` on the
+  releases page. See https://manueltarouca.github.io/hive/docs/android.
+
 ## Updating
+
+Installed from a release: download the new one and replace `hive` (and
+`Hive.app`) as in step 1. Built from source:
 
 ```sh
 cd ~/src/hive && git pull && make build
@@ -163,4 +177,8 @@ hive server stop
 rm ~/.local/bin/hive               # the link
 rm -r ~/src/hive                   # the clone
 rm -r ~/.local/state/hive          # saved sessions and scrollback, only if they agree
+rm -r ~/.config/hive               # settings and saved hosts, only if they agree
+rm -r /Applications/Hive.app       # if they installed the app
 ```
+
+If they added hive's Claude Code plugin: `claude plugin uninstall hive@hive`.

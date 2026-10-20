@@ -83,9 +83,8 @@ Codex, OpenCode, Gemini and Grok have their own resume commands
 first, then their own session files. Ask when in doubt.
 
 **Start the hive server outside the agent's environment if you can.** hive
-drops Claude's own session variables from terminals (since cadd056), but an
-older hive passes `CLAUDECODE` to every pane, and a `claude` started there
-thinks it is nested.
+drops Claude's own session variables from the terminals it starts, so a
+`claude` started there doesn't think it is nested.
 
 ## 3. Build the hive side
 
@@ -179,4 +178,5 @@ export HIVE_RESUME_CLAUDE='["claude","--resume","{id}","--dangerously-skip-permi
 ```
 
 Then restart the server once with `hive server stop`, so it picks the change
-up.
+up. A server that Hive.app started doesn't see the shell profile: stop it,
+and let the next `hive` command in a shell start it.
