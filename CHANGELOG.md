@@ -38,6 +38,17 @@ patch, and this file lists it under "Changed" or "Removed".
 - `GET /v1/events?types=a,b` streams only events of those types. Some
   events, such as a script's log lines, reach only a stream that names them,
   so they never crowd the apps' stream or its history.
+- Notifications and badges: `notify.send` reaches every app, and the server
+  keeps notifications for a day (`notification.list`, `notification.ack`),
+  so an app that was closed shows what it missed. `status.set`,
+  `status.clear` and `status.list` put badges on panes; event
+  `status_changed`.
+- Scripts can watch agents (`h.agents.on_state`), offer one-tap answers to
+  blocked agents (`h.agents.rule`, through the new `agent.act`, which acts
+  only if the agent is still blocked on what was seen), react to what
+  terminals print (`h.trigger`, `h.wait_output`), and register actions
+  (`action.list`, `action.run`). `hive.terminal.search` finds lines in a
+  terminal's screen and scrollback.
 - `agent_changed` and `agent.list` carry `kind` (what a blocked agent's
   notification is about: `permission_prompt`, `elicitation_dialog`),
   `revision` (moves on whenever state, message or kind change),

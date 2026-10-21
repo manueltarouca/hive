@@ -35,7 +35,7 @@ declare global {
       readonly session_id?: SessionId;
       readonly block_id?: BlockId;
       readonly client_id?: string;
-      readonly origin: "cli" | "event" | "timer";
+      readonly origin: "cli" | "event" | "timer" | "trigger" | "api" | "notification" | "palette" | "key" | "script";
       readonly principal: string;
       readonly server: string;
       readonly run_id?: string;
@@ -56,6 +56,68 @@ declare global {
     }
 
     interface Subscription { cancel(): void }
+
+    type AgentState = "idle" | "working" | "blocked" | "done" | "ended";
+    interface AgentRow {
+      block_id: BlockId; session_id: SessionId; session_label?: string; window_id?: string; label?: string; title?: string;
+      agent: { harness: string; session_id?: string; cwd?: string; state: AgentState; message?: string;
+        kind?: string; revision: number; updated_at: string };
+      foreground?: { pid: number; name: string; cwd?: string; program?: string };
+    }
+    interface Rule {
+      /** Lowercase letters, digits, - and _. */
+      name: string;
+      when: {
+        state?: AgentState;
+        /** For blocked agents: permission_prompt unless you name another kind. */
+        kind?: string;
+        harness?: string;
+        /** A pattern (RE2) the agent's message must match. */
+        message?: string;
+        /** The agent's folder starts with this (~ is your home). */
+        cwd?: string;
+      };
+      /** What the button does: press keys, or type text. */
+      do: { send_key: string[] } | { write: string };
+      /** A pattern (RE2) the pane's last 10 lines must match when the button is pressed. */
+      confirm?: string;
+      filter?(row: AgentRow): boolean | Promise<boolean>;
+      /** Only suggest for now: a notification with a button. */
+      mode?: "suggest";
+      title?: string;
+      button?: string;
+    }
+    interface ActionSpec<A> {
+      /** Lowercase letters, digits, - and _. */
+      name: string;
+      title?: string;
+      description?: string;
+      category?: string;
+      keywords?: string[];
+      /** Other scripts may run it. */
+      public?: boolean;
+      run(ctx: Context, args: A): unknown | Promise<unknown>;
+    }
+    interface ActionInfo { name: string; title?: string; description?: string; script: string; public?: boolean }
+    interface TriggerSpec {
+      /** RE2: no look-behind or back-references. */
+      pattern: string;
+      flags?: "i" | "m" | "s" | "im" | "is" | "ms" | "ims";
+      name?: string;
+      /** One block's or one session's output (IDs). Default: every terminal the script hears. */
+      block?: BlockId;
+      session?: SessionId;
+      /** main (default), alt (full-screen programs) or any. */
+      screen?: "main" | "alt" | "any";
+      /** lines (default), or snapshot: the visible screen, for full-screen programs. */
+      mode?: "lines" | "snapshot";
+      once?: boolean;
+      min_interval?: Duration;
+    }
+    interface OutputMatch {
+      block_id: BlockId; session_id: SessionId; trigger: string;
+      match: string; groups: string[]; line: string; screen: "main" | "alt";
+    }
     interface Timer { cancel(): void; active(): boolean }
 
     /** Event fields to match: a value, or a list of values (any of them). */
@@ -106,7 +168,23 @@ declare global {
       block: ((target?: Target) => Promise<Block>) & Generated["block"];
       session_of(target?: Target): Promise<Session>;
       sessions(): Promise<Session[]>;
-      agents: { list(): Promise<Record<string, any>[]> };
+      agents: {
+        list(): Promise<AgentRow[]>;
+        /** fn(ctx, row) whenever an agent reaches one of these states. */
+        on_state(state: AgentState | AgentState[], fn: (ctx: Context, row: AgentRow) => unknown): Subscription;
+        /** Watch for agents blocked on something you'd answer the same way every time, and offer a one-tap answer. */
+        rule(r: Rule): Subscription;
+      };
+      actions: {
+        register<A = Record<string, any>>(a: ActionSpec<A>): void;
+        list(): Promise<ActionInfo[]>;
+        /** Run an action: this script's, or another script's public one. */
+        run(name: string, args?: Record<string, unknown>): Promise<any>;
+      };
+      /** fn(ctx, match) for each line a terminal prints that matches. Needs screen. */
+      trigger(t: TriggerSpec, fn: (ctx: Context, m: OutputMatch) => unknown): Subscription;
+      /** The next line a terminal prints that matches. Needs screen. */
+      wait_output(t: TriggerSpec & { timeout?: Duration }): Promise<OutputMatch>;
 
       /** Run fn for every event of this name ("*": all). */
       on(event: string, fn: (ctx: Context, ev: Event) => unknown): Subscription;

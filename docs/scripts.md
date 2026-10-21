@@ -116,6 +116,113 @@ try {
 }
 ```
 
+## Agents, notifications and badges
+
+A script can tell you things, and mark panes:
+
+```ts
+await h.notify.send({ title: "Tests failed", body: "3 failures in api", target: h.ctx.block_id, level: "error" });
+await h.status.set({ target: h.ctx.block_id!, id: "tests", state: "error", msg: "3 failing" });
+```
+
+Notifications reach every app, and the server keeps them for a day, so an
+app that was closed shows what it missed. A script can send 10 a minute.
+Its badges go away when it stops. Both need the `ui` permission.
+
+`h.agents.on_state` runs when an agent reaches a state, with its row from
+`agent.list` (its folder, its label, what it's doing):
+
+```ts
+export default hive.script({
+  name: "nag-when-blocked",
+  permissions: ["ui"],
+  setup(h) {
+    h.agents.on_state("blocked", async (ctx, row) => {
+      await h.sleep("10m");
+      const now = (await h.agents.list()).find((a) => a.block_id === row.block_id);
+      if (now && now.agent.revision === row.agent.revision) {
+        await h.notify.send({ title: "Still waiting for you", body: now.agent.message ?? "", target: row.block_id });
+      }
+    });
+  },
+});
+```
+
+A rule answers what you'd answer the same way every time. When an agent
+is blocked on what the rule describes, you get a notification with a
+button; pressing it sends the answer, but only if the agent is still
+waiting on the same thing:
+
+```ts
+export default hive.script({
+  name: "approve-reads",
+  permissions: ["input", "ui"],
+  setup(h) {
+    h.agents.rule({
+      name: "approve-reads",
+      when: { state: "blocked", message: "permission to use (Read|Grep|Glob)\\b", cwd: "~/src" },
+      do: { send_key: ["enter"] },
+    });
+  },
+});
+```
+
+A rule only answers permission prompts, unless its `when` names another
+`kind`: a question an agent asks you is blocked too, and never matches by
+accident. Rules don't act on their own; they only offer the button.
+
+## Watching what terminals print
+
+`h.trigger` runs for every line a terminal prints that matches a pattern.
+Patterns are RE2, matched by the server; colors and other escape codes are
+left out, and a spinner's redraws count as one line:
+
+```ts
+export default hive.script({
+  name: "red-on-fail",
+  permissions: ["screen", "ui"],
+  setup(h) {
+    h.trigger({ pattern: "^(FAIL|panic:)" }, async (ctx, m) => {
+      await h.status.set({ target: m.block_id, id: "fail", state: "error", msg: m.line });
+    });
+    h.trigger({ pattern: "Listening on :(\\d+)" }, async (ctx, m) => {
+      await h.status.set({ target: m.block_id, id: "port", state: "done", msg: "port " + m.groups[0] });
+    });
+  },
+});
+```
+
+`h.wait_output({ pattern, timeout })` waits for one line. A trigger can
+name a `block` or a `session`, `screen: "alt"` for full-screen programs, or
+`mode: "snapshot"` to match what a full-screen program shows instead of
+lines. `hive.terminal.search` finds lines printed before a script started.
+Triggers need the `screen` permission.
+
+## Actions
+
+An action is something a script does when asked: by `hive api call
+action.run`, by a notification's button, or by another script.
+
+```ts
+export default hive.script({
+  name: "scratch",
+  permissions: ["control"],
+  setup(h) {
+    h.actions.register({
+      name: "scratch",
+      title: "Open a scratch window",
+      run: async (ctx) => {
+        await h.session.new_window({ session_id: ctx.session_id!, label: "scratch" });
+      },
+    });
+  },
+});
+```
+
+An action runs with its script's permissions. Another script can run it
+only when it's `public: true` and that script already has those
+permissions itself.
+
 ## Permissions
 
 A script can only do what it was allowed. Without `--allow`, it can read:
@@ -127,7 +234,8 @@ list sessions, describe blocks, hear events.
 | `screen` | What terminals show: `format`, and the folders `list_dir` reads |
 | `control` | Arrange, label, focus and close; new panes with your shell, in any folder |
 | `spawn` | New panes that run a command. Includes `control`. |
-| `input` | Typing into terminals: `write` and `send_key` |
+| `input` | Typing into terminals: `write` and `send_key`, and answering agents |
+| `ui` | Notifications, badges and actions |
 | `config` | Changing settings, except `listen` and those starting with `script` |
 | `server` | Stopping the server, saving now, and the settings `config` can't change |
 

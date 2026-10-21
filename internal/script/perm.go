@@ -81,3 +81,22 @@ func PermsFrom(ctx context.Context) Perms {
 	p, _ := ctx.Value(permsKey{}).(Perms)
 	return p
 }
+
+type callerKey struct{}
+
+// Caller is the script making a call.
+type Caller struct {
+	Name  string
+	RunID string
+}
+
+// WithCaller marks ctx as a call by a script.
+func WithCaller(ctx context.Context, c Caller) context.Context {
+	return context.WithValue(ctx, callerKey{}, c)
+}
+
+// CallerFrom is the script making a call, if one is.
+func CallerFrom(ctx context.Context) (Caller, bool) {
+	c, ok := ctx.Value(callerKey{}).(Caller)
+	return c, ok
+}

@@ -74,6 +74,7 @@ type Run struct {
 	lastCall    uint64 // bus seq when the latest call started
 	teardown    goja.Callable
 	gotManifest bool
+	hasActions  bool
 	depth       int // the cause depth of the handler running now
 	store       *store
 
@@ -237,7 +238,8 @@ func (r *Run) loop() {
 		if r.isEnded() {
 			return
 		}
-		if r.opts.Resident == nil && r.mainDone && r.pending == 0 && len(r.timers) == 0 && len(r.subs) == 0 && len(r.tasks) == 0 {
+		if r.opts.Resident == nil && r.mainDone && r.pending == 0 && len(r.timers) == 0 && len(r.subs) == 0 && !r.hasActions &&
+			len(r.tasks) == 0 && r.host.trig.countRun(r) == 0 {
 			r.end()
 			return
 		}
@@ -435,6 +437,8 @@ func (r *Run) finish() {
 	r.rt = nil
 	r.imu.Unlock()
 	r.timers, r.subs, r.history, r.teardown = nil, nil, nil, nil
+	r.host.dropActions(r)
+	r.host.trig.removeRun(r)
 	close(r.done)
 	r.host.ended(r)
 	in := r.Info(false)
@@ -448,6 +452,9 @@ func (r *Run) finish() {
 		payload["result_truncated"] = true
 	}
 	r.host.cfg.Backend.Bus().Scoped("script_ended", payload)
+	if f := r.host.cfg.OnEnded; f != nil {
+		f(r.Name)
+	}
 }
 
 // residentFailed: a resident script's load or setup failed; it stops and
@@ -518,6 +525,17 @@ func (r *Run) install() error {
 		r.imu.Unlock()
 	})
 	set("manifest", r.jsManifest)
+	set("registerAction", r.jsRegisterAction)
+	set("trigger", r.jsTrigger)
+	set("untrigger", r.jsUntrigger)
+	set("home", func() string { d, _ := os.UserHomeDir(); return d })
+	set("re2", func(pattern, text string) bool {
+		re, err := compileRE2(pattern)
+		if err != nil {
+			panic(r.rt.NewTypeError("%v", err))
+		}
+		return re.MatchString(text)
+	})
 	set("storeGet", func(key string) string { return r.st().get(key) })
 	set("storeSet", func(key, value string) {
 		if err := r.st().set(key, value); err != nil {

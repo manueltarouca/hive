@@ -44,6 +44,9 @@ type Config struct {
 	HeapLimit uint64
 	// watchEvery is how often the heap is sampled (tests).
 	watchEvery time.Duration
+	// OnEnded hears that a script's run ended, to clear what it left on
+	// screen (badges).
+	OnEnded func(name string)
 }
 
 // Host runs scripts.
@@ -54,8 +57,10 @@ type Host struct {
 
 	res    *residents
 	causes *causes
+	trig   *triggerSet
 
 	mu        sync.Mutex
+	actions   map[string]*action
 	watchQuit chan struct{}
 	runs      map[string]*Run
 	finished  []*Run // the latest, for script.result and script.list
@@ -72,6 +77,7 @@ func New(cfg Config) *Host {
 		log = slog.Default()
 	}
 	h := &Host{cfg: cfg, log: log, runs: map[string]*Run{}, causes: newCauses()}
+	h.trig = newTriggerSet(h)
 	if cfg.StateDir != "" {
 		h.audit = &auditLog{path: filepath.Join(cfg.StateDir, "scripts", "audit.jsonl")}
 	}
@@ -219,6 +225,7 @@ func (h *Host) List() []RunInfo {
 
 // Close stops every run, for the server's shutdown.
 func (h *Host) Close() {
+	h.trig.close()
 	h.mu.Lock()
 	h.closed = true
 	if h.watchQuit != nil {
@@ -290,7 +297,7 @@ func (h *Host) call(r *Run, method, argsJSON string, depth int) (string, error) 
 		return "", &api.Error{Status: 409, Code: "loop_suspected",
 			Message: fmt.Sprintf("%s refused: scripts have been waking each other %d times in a row", method, depth)}
 	}
-	ctx := WithPerms(r.ctx, perms)
+	ctx := WithCaller(WithPerms(r.ctx, perms), Caller{Name: r.Name, RunID: r.ID})
 	// A call that changes something opens a window: events in it are its.
 	var callID, start uint64
 	bus := h.cfg.Backend.Bus()

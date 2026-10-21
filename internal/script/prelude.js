@@ -61,6 +61,7 @@
   function sleep(d) { return new Promise((res) => host.timer(ms(d), false, res)); }
 
   function on(event, a, b, opts) {
+    if (typeof a === "function" && b && typeof b === "object") { opts = b; b = undefined; }
     let filter = {}, fn = a;
     if (typeof a !== "function") { filter = a || {}; fn = b; }
     let jsFilter = null;
@@ -85,6 +86,34 @@
       if (timeout > 0) timer = host.timer(timeout, false, () => {
         host.unsubscribe(id);
         reject(new HiveError({ status: 408, code: "timeout", message: "no " + event + " within " + opts.timeout }));
+      });
+    });
+  }
+
+  // Output triggers: fn(ctx, match) for each line a terminal prints that
+  // matches pattern (RE2).
+  function triggerSpec(t) {
+    const spec = Object.assign({}, t);
+    if (spec.min_interval !== undefined) spec.min_interval_ms = ms(spec.min_interval);
+    delete spec.min_interval;
+    delete spec.timeout;
+    return JSON.stringify(spec);
+  }
+  function trigger(t, fn) {
+    const id = host.trigger(triggerSpec(t), (m) => guard(fn, ctxFor("trigger"), m));
+    return { cancel: () => host.untrigger(id) };
+  }
+  function wait_output(t) {
+    const timeout = t && t.timeout !== undefined ? ms(t.timeout) : 0;
+    return new Promise((resolve, reject) => {
+      let timer = 0;
+      const id = host.trigger(triggerSpec(Object.assign({}, t, { once: true })), (m) => {
+        if (timer) host.cancel(timer);
+        resolve(m);
+      });
+      if (timeout > 0) timer = host.timer(timeout, false, () => {
+        host.untrigger(id);
+        reject(new HiveError({ status: 408, code: "timeout", message: "no output matching " + t.pattern + " within " + t.timeout }));
       });
     });
   }
@@ -132,13 +161,88 @@
     };
   }
 
+  function errText(e) { return e instanceof Error ? (e.stack || String(e)) : String(e); }
+
+  // ---- actions ----
+  const actions = {
+    register(spec) {
+      if (!spec || typeof spec.run !== "function") throw new TypeError("an action needs a name and a run function");
+      const info = Object.assign({}, spec);
+      delete info.run;
+      host.registerAction(JSON.stringify(info), (args, meta, ok, fail) => {
+        const c = Object.freeze(Object.assign({}, ctx, { origin: meta.origin || "api" },
+          meta.block_id ? { block_id: meta.block_id } : {}, meta.session_id ? { session_id: meta.session_id } : {},
+          meta.client_id ? { client_id: meta.client_id } : {}));
+        Promise.resolve().then(() => spec.run(c, args)).then(
+          (v) => ok(v === undefined ? "" : JSON.stringify(v)),
+          (e) => fail(errText(e), (e && e.code) || "error"));
+      });
+    },
+    list: () => call("action.list", {}).then((r) => r.actions),
+    run: (name, args) => call("action.run", { name, args: args || {} }),
+  };
+
+  // ---- agents ----
+  function on_state(state, fn) {
+    const states = Array.isArray(state) ? state : [state];
+    return on("terminal.agent_changed", { state: states }, async (c, ev) => {
+      const row = (await h.agents.list()).find((a) => a.block_id === ev.block_id);
+      if (row) await fn(c, row);
+    });
+  }
+
+  function stepText(d) {
+    if (d.send_key) return "Press " + d.send_key.join(", then ") + " in the agent's pane";
+    return "Type " + JSON.stringify(d.write) + " in the agent's pane";
+  }
+
+  // A rule watches agents and, when one is blocked on what it describes,
+  // sends a notification whose button answers it. The button acts only if
+  // the agent is still blocked on the same thing.
+  function rule(r) {
+    if (!r || !/^[a-z0-9][a-z0-9_-]*$/.test(r.name || "")) throw new TypeError("a rule needs a name: lowercase letters, digits, - and _");
+    if ((r.mode || "suggest") !== "suggest") throw new TypeError("rules only suggest for now: mode \"act\" isn't available yet");
+    const d = r.do || {};
+    if (!Array.isArray(d.send_key) && typeof d.write !== "string") throw new TypeError("a rule's do needs send_key: [...] or write: \"...\"");
+    const when = r.when || {};
+    const filter = { state: when.state || "blocked" };
+    // A question (elicitation_dialog) is blocked too: a rule only answers
+    // the kind it names, permission prompts unless it says otherwise.
+    if (filter.state === "blocked") filter.kind = when.kind || "permission_prompt";
+    else if (when.kind) filter.kind = when.kind;
+    if (when.harness) filter.harness = when.harness;
+    if (when.message) host.re2(when.message, ""); // check the pattern now
+    const cwd = when.cwd ? when.cwd.replace(/^~(?=\/|$)/, host.home()) : "";
+    const action = "rule:" + r.name;
+    actions.register({
+      name: action, title: r.title || "Answer: " + r.name,
+      run: (c, a) => call("agent.act", { block_id: a.block_id, revision: a.revision, send_key: d.send_key, write: d.write, confirm: r.confirm }),
+    });
+    const seen = new Map();
+    return on("terminal.agent_changed", filter, async (c, ev) => {
+      if (when.message && !host.re2(when.message, ev.message || "")) return;
+      if (cwd && !(ev.cwd || "").startsWith(cwd)) return;
+      if (seen.get(ev.block_id) === ev.revision) return;
+      seen.set(ev.block_id, ev.revision);
+      if (typeof r.filter === "function") {
+        const row = (await h.agents.list()).find((a) => a.block_id === ev.block_id);
+        if (!row || !(await r.filter(row))) return;
+      }
+      await call("notify.send", {
+        title: r.title || "An agent is waiting",
+        body: ev.message || "", target: ev.block_id, level: "warn",
+        actions: [{ title: r.button || "Approve", action, args: { block_id: ev.block_id, revision: ev.revision }, step: stepText(d) }],
+      });
+    }, { self: true });
+  }
+
   const ctx = Object.freeze(JSON.parse(host.ctx));
   const h = {
     ctx,
     args: Object.freeze(JSON.parse(host.args)),
     call,
     log: (level, ...a) => log(level, a),
-    after, every, sleep, on, wait,
+    after, every, sleep, on, wait, trigger, wait_output,
     once: (event, filter) => wait(event, filter),
     stop: (code) => host.stop(code === undefined ? 0 : code),
     block: (target) => {
@@ -156,7 +260,8 @@
       return call("target.resolve", { kind: "session", target: String(target) }).then((r) => session(r.id));
     },
     sessions: () => call("session.list", {}).then((r) => r.sessions.map((s) => session(s.session_id))),
-    agents: { list: () => call("agent.list", {}).then((r) => r.agents || []) },
+    agents: { list: () => call("agent.list", {}).then((r) => r.agents || []), on_state, rule },
+    actions,
     // This script's own storage: JSON values by key, kept across reloads
     // and restarts (1 MB).
     store: {

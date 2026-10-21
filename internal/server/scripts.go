@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/manueltarouca/hive/internal/api"
+	"github.com/manueltarouca/hive/internal/block"
 	"github.com/manueltarouca/hive/internal/remote"
 	"github.com/manueltarouca/hive/internal/script"
 )
@@ -158,4 +159,38 @@ func nonNilRuns(rs []script.RunInfo) []script.RunInfo {
 		return []script.RunInfo{}
 	}
 	return rs
+}
+
+// Blocks lists every block, for output triggers.
+func (s *Server) Blocks() []script.BlockRef {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]script.BlockRef, 0, len(s.blocks))
+	for id, r := range s.blocks {
+		out = append(out, script.BlockRef{ID: id, SessionID: r.st.SessionID})
+	}
+	return out
+}
+
+// Tap reads a block's output from now on, for output triggers.
+func (s *Server) Tap(blockID string) (*block.Sub, func(), error) {
+	s.mu.Lock()
+	r := s.blocks[blockID]
+	s.mu.Unlock()
+	if r == nil {
+		return nil, nil, api.NotFound("no block %s", blockID)
+	}
+	sub := r.b.Tap(256)
+	return sub, func() { r.b.Detach(sub) }, nil
+}
+
+// FormatScreen is a block's visible screen as text, for snapshot triggers.
+func (s *Server) FormatScreen(blockID string) (string, error) {
+	s.mu.Lock()
+	r := s.blocks[blockID]
+	s.mu.Unlock()
+	if r == nil {
+		return "", api.NotFound("no block %s", blockID)
+	}
+	return r.b.FormatScreen(true, false)
 }

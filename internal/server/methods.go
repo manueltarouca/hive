@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -1006,6 +1007,38 @@ func (s *Server) registerTerminalMethods() {
 				}
 			}
 			return map[string]any{"path": path, "entries": out}, nil
+		}, api.Perm("screen"))
+	s.terminal("search", "Find lines in the screen and scrollback that match a pattern (RE2). args: {pattern, limit} (default 100 matches, the latest).",
+		func(r *rec, raw json.RawMessage) (any, error) {
+			a, err := args[struct {
+				Pattern string `json:"pattern"`
+				Limit   int    `json:"limit"`
+			}](raw)
+			if err != nil {
+				return nil, err
+			}
+			re, err := regexp.Compile(a.Pattern)
+			if err != nil || a.Pattern == "" {
+				return nil, api.BadRequest("pattern: %v (RE2)", err)
+			}
+			if a.Limit <= 0 || a.Limit > 1000 {
+				a.Limit = 100
+			}
+			text, err := r.b.Format("text", true, true)
+			if err != nil {
+				return nil, err
+			}
+			lines := strings.Split(text, "\n")
+			matches := []map[string]any{}
+			for i, l := range lines {
+				if g := re.FindStringSubmatch(l); g != nil {
+					matches = append(matches, map[string]any{"line_no": i + 1, "line": l, "match": g[0], "groups": g[1:]})
+				}
+			}
+			if len(matches) > a.Limit {
+				matches = matches[len(matches)-a.Limit:]
+			}
+			return map[string]any{"matches": matches, "lines": len(lines)}, nil
 		}, api.Perm("screen"))
 	s.terminal("program_status", "Return the status records programs have reported (OSC 7501).",
 		func(r *rec, _ json.RawMessage) (any, error) {

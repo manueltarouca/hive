@@ -146,7 +146,9 @@ type Server struct {
 	scripts *script.Host
 	// agentsResumed counts the agents restore started again.
 	agentsResumed int
-	store         *persist.Store
+	// ui holds notifications and badges.
+	ui    uiState
+	store *persist.Store
 
 	mu       sync.Mutex
 	sessions []*session.Session
@@ -234,9 +236,11 @@ func New(cfg Config) (*Server, error) {
 	if !s.conf.Scripts {
 		scriptsDir = "" // scripts = false, read at start
 	}
-	s.scripts = script.New(script.Config{Backend: s, StateDir: cfg.StateDir, Logger: s.log, ScriptsDir: scriptsDir, Poll: cfg.ConfigPoll, HandlerBudget: cfg.scriptBudget})
+	s.scripts = script.New(script.Config{Backend: s, StateDir: cfg.StateDir, Logger: s.log, ScriptsDir: scriptsDir, Poll: cfg.ConfigPoll, HandlerBudget: cfg.scriptBudget, OnEnded: s.scriptEnded})
 	s.registerMethods()
 	s.registerScriptMethods()
+	s.registerUIMethods()
+	s.registerActionMethods()
 	if cfg.ConfigPath != "" {
 		go s.watchConfig()
 	}
@@ -595,6 +599,7 @@ func (s *Server) closeBlock(blockID string) error {
 	<-r.b.EventsDone()
 	s.mu.Lock()
 	delete(s.blocks, blockID)
+	s.badgesGone(blockID)
 	s.mu.Unlock()
 	s.store.RemoveSnapshot(blockID)
 	s.markDirty()

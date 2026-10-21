@@ -75,8 +75,10 @@ lists every change.
 | Sessions | `session.list`, `session.create`, `session.view`, `session.list_blocks`, `session.set_label`, `session.close` |
 | Windows | `session.new_window`, `session.close_window`, `session.focus_window`, `session.focus_next_window`, `session.focus_previous_window`, `session.move_window`, `session.set_window_label`, `session.pin_window` |
 | Blocks | `session.new_split`, `session.move_block`, `session.describe_block`, `session.focus_block`, `session.focus_direction`, `session.focus_next_pane`, `session.focus_previous_pane`, `session.zoom_block`, `session.resize_pane`, `session.set_block_label`, `block.close`, `block.method` |
-| Terminals, as `hive.terminal.NAME` | `format`, `write`, `send_key`, `resize`, `size`, `title`, `pwd`, `process`, `program_status`, `list_dir`, `wait` |
-| Agents | `agent.report`, `agent.list` |
+| Terminals, as `hive.terminal.NAME` | `format`, `search`, `write`, `send_key`, `resize`, `size`, `title`, `pwd`, `process`, `program_status`, `list_dir`, `wait` |
+| Agents | `agent.report`, `agent.list`, `agent.act` |
+| Notifications and badges | `notify.send`, `notification.list`, `notification.ack`, `status.set`, `status.clear`, `status.list` |
+| Actions | `action.list`, `action.run` |
 | Settings | `config.get`, `config.set`, `config.reload` (the server's own settings file; see [Settings](./settings)) |
 | Server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `target.resolve`, `client.list`, `whoami` |
 | Scripts | `script.run`, `script.stop`, `script.list`, `script.result`, `script.grant`, `script.revoke`, `script.enable`, `script.disable`, `script.reload`, `script.logs`, `audit.list` (see [Scripts](./scripts)) |
@@ -118,8 +120,9 @@ Scripts' events, `script_started`, `script_log`, `script_ended`,
 `script_quarantined`, come only to a stream that names them with
 `?types=`, so a busy script never crowds the apps' stream.
 
-With `?all=1`, the server also sends `server_started`, `restore_finished`
-and `config_changed`.
+With `?all=1`, the server also sends `server_started`, `restore_finished`,
+`config_changed`, `notification`, `notification_acked` and `action_run`.
+A pane's badges change with the terminal event `status_changed`.
 
 With `?all=1`, server events come too: `client_joined` and `client_left`
 when an app or a phone connects or goes, and `tailscale_status_changed` for

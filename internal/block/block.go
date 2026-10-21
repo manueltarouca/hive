@@ -558,6 +558,19 @@ func (b *Block) Attach(buffer int) (*Sub, []byte, uint64, error) {
 	return s, snap, b.seq, nil
 }
 
+// Tap subscribes to the block's output from now on, without a snapshot:
+// for reading what programs print (output triggers), not for mirroring.
+func (b *Block) Tap(buffer int) *Sub {
+	if buffer < 1 {
+		buffer = 1
+	}
+	b.pubMu.Lock()
+	defer b.pubMu.Unlock()
+	s := &Sub{C: make(chan Frame, buffer)}
+	b.subs[s] = struct{}{}
+	return s
+}
+
 // Detach removes a subscriber.
 func (b *Block) Detach(s *Sub) {
 	b.pubMu.Lock()
