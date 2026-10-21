@@ -85,3 +85,34 @@ func TestSinceOlderThanRingIsAGap(t *testing.T) {
 		t.Fatal("no gap when everything after since is in the ring")
 	}
 }
+
+// Scoped events (script logs) reach only subscribers that name their type,
+// so they don't flood the apps' all-events stream or push events out of
+// its replay history.
+func TestScopedEvents(t *testing.T) {
+	b := New(2)
+	b.Server("client_joined", nil)
+	b.Scoped("script_log", map[string]any{"text": "a"})
+	b.Scoped("script_ended", map[string]any{"ok": true})
+	b.Scoped("script_log", map[string]any{"text": "b"})
+
+	all := b.Subscribe(Filter{All: true}, 0, 16)
+	defer b.Unsubscribe(all)
+	if got := drain(all); len(got) != 1 || got[0].Type != "client_joined" || all.Gap {
+		t.Fatalf("all = %+v gap=%v", got, all.Gap)
+	}
+	logs := b.Subscribe(Filter{Types: []string{"script_log", "script_ended"}}, 0, 16)
+	defer b.Unsubscribe(logs)
+	got := drain(logs)
+	if len(got) != 3 || got[0].Seq != 2 || got[2].Payload["text"] != "b" {
+		t.Fatalf("logs = %+v", got)
+	}
+	live := b.Subscribe(Filter{Types: []string{"script_ended"}}, Live, 16)
+	defer b.Unsubscribe(live)
+	b.Scoped("script_log", nil)
+	b.Scoped("script_ended", nil)
+	b.Server("script_ended", nil) // a plain event of a named type counts too
+	if got := drain(live); len(got) != 2 {
+		t.Fatalf("live = %+v", got)
+	}
+}

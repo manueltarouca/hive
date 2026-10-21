@@ -17,6 +17,9 @@ patch, and this file lists it under "Changed" or "Removed".
   `screen`, `control`, `spawn`, `input`, `ui`, `config` or `server`.
   `api list` and `api describe` show it, with a note for methods whose
   arguments decide it (a layout that runs a command needs `spawn`).
+- `GET /v1/events?types=a,b` streams only events of those types. Some
+  events, such as a script's log lines, reach only a stream that names them,
+  so they never crowd the apps' stream or its history.
 - Error codes `permission_denied`, `timeout` and `script_unloaded`, for
   scripts.
 

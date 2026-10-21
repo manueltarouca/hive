@@ -5,6 +5,8 @@
 package events
 
 import (
+	"cmp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -20,21 +22,28 @@ type Event struct {
 	Payload map[string]any `json:"payload"`
 
 	sessionID string
+	scoped    bool
 }
 
 // Creator is the name of hive's terminal block kind.
 const Creator = "hive.terminal"
 
-// Filter chooses events. With neither field set, a subscriber hears session
+// Filter chooses events. With no field set, a subscriber hears session
 // lifecycle only: server events whose type starts with "session_", such as
-// session_created and session_destroyed.
+// session_created and session_destroyed. Types, when set, chooses by type
+// alone, and is the only way to hear scoped events.
 type Filter struct {
 	SessionID string
 	All       bool
+	Types     []string
 }
 
 func (f Filter) match(e Event) bool {
 	switch {
+	case len(f.Types) > 0:
+		return slices.Contains(f.Types, e.Type)
+	case e.scoped:
+		return false
 	case f.All:
 		return true
 	case f.SessionID != "":
@@ -73,25 +82,32 @@ type Bus struct {
 	seq  uint64
 	ring []Event
 	size int
-	subs map[*Sub]struct{}
+	// Scoped events have their own history, so a chatty script can't push
+	// the apps' events out of theirs.
+	sring []Event
+	subs  map[*Sub]struct{}
 }
+
+// scopedRing is how many scoped events are kept for replay.
+const scopedRing = 1024
 
 // New makes a bus that keeps the last ringSize events for replay.
 func New(ringSize int) *Bus {
 	return &Bus{size: ringSize, subs: map[*Sub]struct{}{}}
 }
 
-func (b *Bus) publish(sessionID, typ string, payload map[string]any) Event {
+func (b *Bus) publish(sessionID, typ string, payload map[string]any, scoped bool) Event {
 	if payload == nil {
 		payload = map[string]any{}
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.seq++
-	e := Event{Seq: b.seq, Time: time.Now().UTC(), Type: typ, Payload: payload, sessionID: sessionID}
-	b.ring = append(b.ring, e)
-	if len(b.ring) > b.size {
-		b.ring = b.ring[len(b.ring)-b.size:]
+	e := Event{Seq: b.seq, Time: time.Now().UTC(), Type: typ, Payload: payload, sessionID: sessionID, scoped: scoped}
+	if scoped {
+		b.sring = keep(append(b.sring, e), scopedRing)
+	} else {
+		b.ring = keep(append(b.ring, e), b.size)
 	}
 	for s := range b.subs {
 		if !s.filter.match(e) {
@@ -106,6 +122,13 @@ func (b *Bus) publish(sessionID, typ string, payload map[string]any) Event {
 	return e
 }
 
+func keep(ring []Event, n int) []Event {
+	if len(ring) > n {
+		return ring[len(ring)-n:]
+	}
+	return ring
+}
+
 func (b *Bus) cut(s *Sub) {
 	delete(b.subs, s)
 	s.mu.Lock()
@@ -116,7 +139,13 @@ func (b *Bus) cut(s *Sub) {
 
 // Server publishes an event about the server as a whole.
 func (b *Bus) Server(typ string, payload map[string]any) Event {
-	return b.publish("", typ, payload)
+	return b.publish("", typ, payload, false)
+}
+
+// Scoped publishes a server event only subscribers naming its type hear,
+// such as a script's log lines.
+func (b *Bus) Scoped(typ string, payload map[string]any) Event {
+	return b.publish("", typ, payload, true)
 }
 
 // Session publishes an event about one session.
@@ -127,7 +156,7 @@ func (b *Bus) Session(sessionID, typ string, payload map[string]any) Event {
 	return b.publish(sessionID, "session_event", map[string]any{
 		"session_id": sessionID,
 		"event":      Inner{Type: typ, Payload: payload},
-	})
+	}, false)
 }
 
 // Block publishes an event a block reported.
@@ -156,13 +185,23 @@ func (b *Bus) Subscribe(f Filter, since int64, buffer int) *Sub {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	var backlog []Event
-	gap := since >= 0 && len(b.ring) > 0 && uint64(since)+1 < b.ring[0].Seq
+	gap := false
 	if since >= 0 {
-		for _, e := range b.ring {
-			if e.Seq > uint64(since) && f.match(e) {
-				backlog = append(backlog, e)
+		// A gap is judged on the history the filter mostly reads: scoped
+		// events for a filter by type, the rest otherwise.
+		rings, judged := [][]Event{b.ring}, b.ring
+		if len(f.Types) > 0 {
+			rings, judged = append(rings, b.sring), b.sring
+		}
+		gap = len(judged) > 0 && uint64(since)+1 < judged[0].Seq
+		for _, ring := range rings {
+			for _, e := range ring {
+				if e.Seq > uint64(since) && f.match(e) {
+					backlog = append(backlog, e)
+				}
 			}
 		}
+		slices.SortFunc(backlog, func(a, b Event) int { return cmp.Compare(a.Seq, b.Seq) })
 	}
 	s := &Sub{C: make(chan Event, max(buffer, len(backlog)+1)), filter: f, Gap: gap}
 	for _, e := range backlog {

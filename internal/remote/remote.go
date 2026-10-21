@@ -208,6 +208,12 @@ func ConnContext(ctx context.Context, c net.Conn) context.Context {
 	return context.WithValue(ctx, identityKey{}, &Identity{Principal: p, Via: Local.String()})
 }
 
+// WithIdentity is ctx speaking for id: for work a request starts that
+// outlives it, such as a script it runs.
+func WithIdentity(ctx context.Context, id Identity) context.Context {
+	return context.WithValue(ctx, identityKey{}, &id)
+}
+
 // IdentityOf is who a request speaks for, once Authorize let it in.
 func IdentityOf(ctx context.Context) Identity {
 	if id, ok := ctx.Value(identityKey{}).(*Identity); ok {

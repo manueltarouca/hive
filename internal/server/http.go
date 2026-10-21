@@ -78,12 +78,17 @@ func (s *Server) handleCall(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleEvents streams events as JSON lines. ?session=ID follows one
-// session, ?all=1 everything; ?since=N replays what came after event N.
+// session, ?all=1 everything, ?types=a,b only those types (the only way to
+// hear scoped events, such as script logs); ?since=N replays what came
+// after event N.
 // A heartbeat line is sent every 15 seconds. When the subscriber falls
 // behind, a resync_required line is sent and the stream ends.
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	f := events.Filter{SessionID: q.Get("session"), All: q.Get("all") == "1" || q.Get("all") == "true"}
+	if t := q.Get("types"); t != "" {
+		f.Types = strings.Split(t, ",")
+	}
 	since := int64(events.Live)
 	if v := q.Get("since"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)

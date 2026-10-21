@@ -240,6 +240,16 @@ func (c *Client) Events(ctx context.Context, sessionID string, all bool, since i
 	if all {
 		q.Set("all", "1")
 	}
+	return c.events(ctx, q, since, fn)
+}
+
+// EventsOf streams only events of the given types, scoped ones included
+// (such as script_log).
+func (c *Client) EventsOf(ctx context.Context, types []string, since int64, fn func(Event) bool) error {
+	return c.events(ctx, url.Values{"types": {strings.Join(types, ",")}}, since, fn)
+}
+
+func (c *Client) events(ctx context.Context, q url.Values, since int64, fn func(Event) bool) error {
 	if since >= 0 {
 		q.Set("since", fmt.Sprint(since))
 	}
