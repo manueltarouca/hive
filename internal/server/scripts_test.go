@@ -160,7 +160,7 @@ export default async () => {
 	}
 	// A manifest declares the permissions.
 	out = h.runScript(`export default hive.script({ name: "m", permissions: ["control"],
-  async setup(h) { await h.session.set_label({ label: "set by m" }); } })`, map[string]any{"session_id": sid})
+  async setup(h) { await h.session.set_label({ label: "set by m" }); } })`, map[string]any{"session_id": sid, "name": "m"})
 	if !out.OK {
 		t.Fatalf("manifest: %+v", out)
 	}

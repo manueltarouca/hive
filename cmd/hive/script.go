@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -143,6 +144,9 @@ func cmdScriptRun(g globals, args []string) error {
 		return err
 	}
 	params := map[string]any{"code": js, "args": scriptArgs, "all": *all}
+	if n := runName(positional, *code); n != "" {
+		params["name"] = n
+	}
 	if *allow != "" {
 		params["allow"] = strings.Split(*allow, ",")
 	}
@@ -464,4 +468,26 @@ func cmdScriptTypes(g globals, args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "wrote %s (%d methods)\n", *out, len(methods))
 	return nil
+}
+
+// runName names a run after its file (tests.ts: tests), when the name is
+// one hive takes.
+func runName(positional []string, code string) string {
+	if code != "" || len(positional) == 0 || positional[0] == "-" {
+		return ""
+	}
+	base := filepath.Base(positional[0])
+	if base == "index.ts" || base == "index.js" {
+		base = filepath.Base(filepath.Dir(positional[0]))
+	}
+	name, _, _ := strings.Cut(strings.ToLower(base), ".")
+	for _, r := range name {
+		if !(r == '-' || r == '_' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9') {
+			return ""
+		}
+	}
+	if name == "" || len(name) > 64 || name[0] == '-' || name[0] == '_' {
+		return ""
+	}
+	return name
 }

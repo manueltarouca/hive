@@ -66,8 +66,10 @@ func (s *Server) registerScriptMethods() {
 				return nil, api.BadRequest("for must be positive")
 			}
 			seq := s.bus.Seq()
+			parent, _ := script.CallerFrom(ctx)
 			r, err := s.scripts.Start(script.RunOptions{
-				Name: in.Name, JS: in.Code, Args: in.Args, Perms: perms, Limit: script.PermsFrom(ctx),
+				Parent: parent.RunID,
+				Name:   in.Name, JS: in.Code, Args: in.Args, Perms: perms, Limit: script.PermsFrom(ctx),
 				Context:  script.Context{SessionID: in.SessionID, BlockID: in.BlockID},
 				Identity: id, For: time.Duration(in.For * float64(time.Second)), All: in.All,
 			})

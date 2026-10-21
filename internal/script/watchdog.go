@@ -17,6 +17,7 @@ const (
 	defaultHeapLimit = 1 << 30
 	watchEvery       = time.Second
 	cpuWindow        = time.Minute
+	killGap          = 10 * time.Second // at most one script stopped this often
 )
 
 func heapBytes() uint64 {
@@ -35,6 +36,7 @@ func (h *Host) watchHeap(quit <-chan struct{}) {
 	}
 	runtime.GC()
 	base := heapBytes()
+	var lastKill time.Time
 	t := time.NewTicker(h.watchEvery())
 	defer t.Stop()
 	for {
@@ -53,8 +55,15 @@ func (h *Host) watchHeap(quit <-chan struct{}) {
 		}
 		victim := h.busiest()
 		if victim == nil {
+			// No script ran: the server itself grew (scrollback, sessions).
+			// That's the new baseline.
+			base = used
 			continue
 		}
+		if time.Since(lastKill) < killGap {
+			continue
+		}
+		lastKill = time.Now()
 		why := fmt.Sprintf("the server's memory grew by %d MB while it was the busiest script", (used-base)>>20)
 		h.log.Warn("script stopped for memory", "script", victim.Name, "heap_mb", used>>20)
 		if res := victim.opts.Resident; res != nil && h.res != nil {
@@ -62,8 +71,15 @@ func (h *Host) watchHeap(quit <-chan struct{}) {
 		} else {
 			victim.stop(why)
 		}
-		<-victim.done
+		select {
+		case <-victim.done:
+		case <-time.After(5 * time.Second):
+		}
 		runtime.GC()
+		if after := heapBytes(); after >= base+limit {
+			// Its memory wasn't the problem: what's left is the baseline.
+			base = after
+		}
 	}
 }
 

@@ -35,6 +35,8 @@ const (
 	logCap     = 16 << 10    // one log line
 	stopGrace  = time.Second // a stopping run's teardown
 	readyWait  = 30 * time.Second
+	loadBudget = 10 * time.Second // a one-shot's top level, before its first await
+	maxHold    = 2 * time.Second  // events wait for a script's change at most this long
 )
 
 // Run is one running script: a goja runtime owned by one goroutine (its
@@ -73,6 +75,11 @@ type Run struct {
 	history     []event
 	lastCall    uint64 // bus seq when the latest call started
 	teardown    goja.Callable
+	local       []func() // work the loop queued for itself
+	heldSince   time.Time
+	loading     bool // the script's top level is running
+	forTimer    *time.Timer
+	children    []*Run // runs it started, stopped with it
 	gotManifest bool
 	hasActions  bool
 	depth       int // the cause depth of the handler running now
@@ -171,10 +178,6 @@ func (r *Run) start() error {
 	if _, err := r.rt.RunProgram(prog); err != nil {
 		return api.Internal("prelude: %v", err)
 	}
-	bundle, err := r.rt.RunString(r.opts.JS)
-	if err != nil {
-		return api.BadRequest("script: %v", err)
-	}
 	main, ok := goja.AssertFunction(r.rt.Get("__main"))
 	if !ok {
 		return api.Internal("prelude: no __main")
@@ -182,10 +185,29 @@ func (r *Run) start() error {
 	r.lastCall = r.host.cfg.Backend.Bus().Seq()
 	go r.pump(r.lastCall)
 	if r.opts.For > 0 {
-		time.AfterFunc(r.opts.For, func() { r.stop("its time ran out (--for)") })
+		r.forTimer = time.AfterFunc(r.opts.For, func() { r.stop("its time ran out (--for)") })
 	}
+	// The script's own code runs on the loop, under a budget, so stop and
+	// the budget reach even a top level that never returns.
+	r.loading = true
 	r.post(func() {
-		_, err := main(goja.Undefined(), bundle,
+		r.loading = false
+		bundle, err := r.rt.RunString(r.opts.JS)
+		if err != nil {
+			r.mainDone = true
+			if r.opts.Resident != nil {
+				r.residentFailed(jsError(err))
+				return
+			}
+			r.failErr(err)
+			return
+		}
+		if _, ok := goja.AssertFunction(bundle); !ok {
+			r.mainDone = true
+			r.fail("the code isn't a bundle: run it with hive script run", "bad_request")
+			return
+		}
+		_, err = main(goja.Undefined(), bundle,
 			r.rt.ToValue(func(out string) {
 				r.mainDone = true
 				r.setResult(out)
@@ -213,11 +235,13 @@ func (r *Run) start() error {
 	return nil
 }
 
-// post hands work to the loop. After the run ended it's dropped.
+// post hands work to the loop from another goroutine. After the run
+// ended or stopped it's dropped.
 func (r *Run) post(f func()) {
 	select {
 	case r.tasks <- f:
 	case <-r.done:
+	case <-r.ctx.Done():
 	}
 }
 
@@ -234,6 +258,13 @@ func (r *Run) loop() {
 			r.deliver()
 		case <-r.ctx.Done():
 			return
+		}
+		// Work the loop gave itself: run here, never through the channel,
+		// which the loop alone drains.
+		for len(r.local) > 0 && r.ctx.Err() == nil {
+			f := r.local[0]
+			r.local = r.local[1:]
+			r.exec(f)
 		}
 		if r.isEnded() {
 			return
@@ -288,7 +319,11 @@ func (r *Run) exec(f func()) {
 	began := time.Now()
 	defer func() { r.addCPU(time.Since(began)) }()
 	var t *time.Timer
-	if b := r.opts.Budget; b > 0 {
+	b := r.opts.Budget
+	if r.loading && b == 0 {
+		b = loadBudget
+	}
+	if b > 0 {
 		r.imu.Lock()
 		gen := r.gen
 		r.imu.Unlock()
@@ -439,7 +474,20 @@ func (r *Run) finish() {
 	r.timers, r.subs, r.history, r.teardown = nil, nil, nil, nil
 	r.host.dropActions(r)
 	r.host.trig.removeRun(r)
+	if r.forTimer != nil {
+		r.forTimer.Stop()
+	}
+	r.pmu.Lock()
+	kids := r.children
+	r.pmu.Unlock()
+	for _, k := range kids {
+		k.stop("the script that started it stopped")
+	}
 	close(r.done)
+	if res := r.opts.Resident; res != nil && r.host.res != nil {
+		in := r.Info(false)
+		r.host.res.runEnded(res, r, in.OK, in.Error)
+	}
 	r.host.ended(r)
 	in := r.Info(false)
 	payload := map[string]any{"run_id": r.ID, "name": r.Name, "ok": in.OK}
@@ -638,7 +686,7 @@ func (r *Run) jsSubscribe(name, filterJSON string, fn goja.Callable, self bool) 
 		}
 	}
 	if len(replay) > 0 {
-		r.post(func() {
+		r.local = append(r.local, func() {
 			for _, ev := range replay {
 				if r.subs[id] == s {
 					r.dispatch(s, ev)
@@ -686,14 +734,15 @@ func (r *Run) jsManifest(manifestJSON string) bool {
 	}
 	r.pmu.Lock()
 	r.perms = p.Intersect(r.opts.Limit)
-	if m.Name != "" && r.opts.Name == "script" {
-		r.Name = m.Name
-	}
 	r.pmu.Unlock()
 	return true
 }
 
 // ---- events ----
+
+// scriptEvents are the scoped events scripts hear: other scripts starting,
+// ending, loading and failing. Not their log lines.
+var scriptEvents = []string{"script_started", "script_ended", "script_loaded", "script_unloaded", "script_failed", "script_quarantined"}
 
 // pump copies bus events into the run's queue. It never runs script code,
 // so it keeps up with the bus; if the bus cuts it anyway, it subscribes
@@ -702,7 +751,7 @@ func (r *Run) pump(since uint64) {
 	bus := r.host.cfg.Backend.Bus()
 	last := int64(since)
 	for r.ctx.Err() == nil {
-		sub := bus.Subscribe(events.Filter{All: true}, last, 1024)
+		sub := bus.Subscribe(events.Filter{All: true, Scoped: scriptEvents}, last, 1024)
 		gap := sub.Gap
 	read:
 		for {
@@ -751,6 +800,13 @@ func (r *Run) deliver() {
 			JSON: fmt.Sprintf(`{"dropped":%d}`, dropped)}}, q...)
 	}
 	hold, holding := r.host.causes.holdAfter()
+	if !holding {
+		r.heldSince = time.Time{}
+	} else if r.heldSince.IsZero() {
+		r.heldSince = time.Now()
+	} else if time.Since(r.heldSince) > maxHold {
+		holding = false // a slow change doesn't stall everyone: deliver, untagged
+	}
 	for i, ev := range q {
 		if holding && ev.Seq > hold {
 			// A script's change is still running: wait for it to end, so
@@ -758,6 +814,13 @@ func (r *Run) deliver() {
 			r.emu.Lock()
 			r.queue = append(q[i:len(q):len(q)], r.queue...)
 			r.emu.Unlock()
+			// Look again once it can't be held any longer.
+			time.AfterFunc(maxHold, func() {
+				select {
+				case r.evReady <- struct{}{}:
+				default:
+				}
+			})
 			return
 		}
 		if !r.inScope(ev) {
@@ -822,7 +885,11 @@ func (r *Run) st() *store {
 		if dir == "" {
 			dir = os.TempDir()
 		}
-		r.store = openStore(dir, r.Name)
+		name := r.Name
+		if r.opts.Resident == nil {
+			name = "oneshot/" + name // never a resident's storage
+		}
+		r.store = openStore(dir, name)
 	}
 	return r.store
 }

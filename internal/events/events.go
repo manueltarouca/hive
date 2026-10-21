@@ -36,6 +36,9 @@ type Filter struct {
 	SessionID string
 	All       bool
 	Types     []string
+	// Scoped names scoped events an All subscriber hears too (scripts
+	// hear other scripts end, but not their every log line).
+	Scoped []string
 }
 
 func (f Filter) match(e Event) bool {
@@ -43,7 +46,7 @@ func (f Filter) match(e Event) bool {
 	case len(f.Types) > 0:
 		return slices.Contains(f.Types, e.Type)
 	case e.scoped:
-		return false
+		return f.All && slices.Contains(f.Scoped, e.Type)
 	case f.All:
 		return true
 	case f.SessionID != "":
@@ -190,7 +193,7 @@ func (b *Bus) Subscribe(f Filter, since int64, buffer int) *Sub {
 		// A gap is judged on the history the filter mostly reads: scoped
 		// events for a filter by type, the rest otherwise.
 		rings, judged := [][]Event{b.ring}, b.ring
-		if len(f.Types) > 0 {
+		if len(f.Types) > 0 || len(f.Scoped) > 0 {
 			rings, judged = append(rings, b.sring), b.sring
 		}
 		gap = len(judged) > 0 && uint64(since)+1 < judged[0].Seq

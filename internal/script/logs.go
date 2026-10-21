@@ -87,22 +87,27 @@ func (h *Host) Audit(name string, n int) []Entry {
 	}
 	h.audit.mu.Lock()
 	defer h.audit.mu.Unlock()
-	f, err := os.Open(h.audit.path)
-	if err != nil {
-		return out
-	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 64<<10), 8<<20)
-	for sc.Scan() {
-		var e Entry
-		if json.Unmarshal(sc.Bytes(), &e) != nil {
+	for _, p := range []string{h.audit.path + ".1", h.audit.path} {
+		f, err := os.Open(p)
+		if err != nil {
 			continue
 		}
-		if name != "" && strings.TrimPrefix(e.Principal, "script:") != name {
-			continue
+		sc := bufio.NewScanner(f)
+		sc.Buffer(make([]byte, 64<<10), 8<<20)
+		for sc.Scan() {
+			var e Entry
+			if json.Unmarshal(sc.Bytes(), &e) != nil {
+				continue
+			}
+			if name != "" && strings.TrimPrefix(e.Principal, "script:") != name {
+				continue
+			}
+			out = append(out, e)
+			if n > 0 && len(out) > 2*n {
+				out = out[len(out)-n:]
+			}
 		}
-		out = append(out, e)
+		f.Close()
 	}
 	if n > 0 && len(out) > n {
 		out = out[len(out)-n:]

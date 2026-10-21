@@ -19,9 +19,9 @@ import (
 // makes from each block's output; only matches reach the script.
 
 const (
-	maxTriggers   = 64              // per script
-	triggerRate   = 1000            // matches a minute, per trigger
-	dedupeWindow  = time.Second     // the same line again is the same match
+	maxTriggers   = 64          // per script
+	triggerRate   = 1000        // matches a minute, per trigger
+	dedupeWindow  = time.Second // the same line again is the same match
 	idleFlush     = 250 * time.Millisecond
 	snapshotEvery = 500 * time.Millisecond
 	tapBuffer     = 256

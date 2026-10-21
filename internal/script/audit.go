@@ -14,6 +14,10 @@ import (
 // that changes something.
 var audited = map[string]bool{"control": true, "spawn": true, "input": true, "config": true, "server": true}
 
+// auditCap is when the audit log starts over (the previous one is kept as
+// audit.jsonl.1).
+const auditCap = 8 << 20
+
 // Entry is one line of the audit log.
 type Entry struct {
 	Time       time.Time      `json:"t"`
@@ -44,6 +48,9 @@ func (a *auditLog) write(e Entry) {
 	defer a.mu.Unlock()
 	if err := os.MkdirAll(filepath.Dir(a.path), 0o700); err != nil {
 		return
+	}
+	if st, err := os.Stat(a.path); err == nil && st.Size() > auditCap {
+		_ = os.Rename(a.path, a.path+".1") // the one before is kept, the rest goes
 	}
 	f, err := os.OpenFile(a.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {

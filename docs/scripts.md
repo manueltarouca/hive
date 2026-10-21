@@ -294,7 +294,7 @@ permissions does.
 
 | Command | Does |
 | --- | --- |
-| `hive script ls` | Every script in the folder: running, pending, failed, disabled or quarantined |
+| `hive script ls` | Every script in the folder: running, pending (waiting for a grant), stopped (it called `h.stop()`), failed, disabled or quarantined |
 | `hive script grant NAME` / `revoke NAME` | Allow what it asks for, or take it back |
 | `hive script disable NAME` / `enable NAME` | Turn it off or on, without removing it |
 | `hive script reload [NAME]` | Load it again now |
@@ -332,9 +332,11 @@ These events help scripts in the folder: `server_started`, then
 - An error in a handler is logged, and the script keeps running.
 - A handler that runs for more than 5 seconds without a break is stopped.
   Five of those in 5 minutes, and the script is quarantined: stopped until
-  you `hive script enable` it.
+  you `hive script enable` it, even if you edit it meanwhile.
 - If the server's memory grows by more than 1 GB, the busiest script is
   quarantined.
+- At most 64 scripts run at once. A script that starts another stops it
+  when it stops.
 - A script's own changes don't wake its own `h.on` handlers (pass
   `{ self: true }` as a fourth argument to hear them). Scripts that keep
   waking each other are stopped after 8 rounds: the call fails with

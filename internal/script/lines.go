@@ -18,11 +18,11 @@ type line struct {
 type escState int
 
 const (
-	escNone  escState = iota
-	escStart          // after ESC
-	escCSI            // ESC [
-	escStr            // OSC, DCS, SOS, PM, APC: until BEL or ESC \
-	escStrEsc         // ESC inside a string
+	escNone   escState = iota
+	escStart           // after ESC
+	escCSI             // ESC [
+	escStr             // OSC, DCS, SOS, PM, APC: until BEL or ESC \
+	escStrEsc          // ESC inside a string
 )
 
 type assembler struct {

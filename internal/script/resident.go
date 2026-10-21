@@ -29,6 +29,7 @@ const (
 	StateFailed      = "failed"      // didn't load, or setup threw
 	StateDisabled    = "disabled"    // hive script disable
 	StateQuarantined = "quarantined" // stopped for overrunning its budget
+	StateStopped     = "stopped"     // it ended on its own (h.stop)
 )
 
 var nameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
@@ -56,8 +57,9 @@ type Resident struct {
 	Overruns    int       `json:"overruns" desc:"Handlers stopped for running over their budget, in the last 5 minutes."`
 	LoadedAt    time.Time `json:"loaded_at,omitzero"`
 
-	sig      string // the files' sizes and times when last loaded
-	pending  string // a newer signature waiting to hold still
+	life     *sync.Mutex // one unload-and-start at a time
+	sig      string      // the files' sizes and times when last loaded
+	pending  string      // a newer signature waiting to hold still
 	seen     int
 	run      *Run
 	overruns []time.Time
@@ -223,7 +225,7 @@ func (rs *residents) check(first bool) {
 		sig := rs.signature(entry)
 		r := rs.all[name]
 		if r == nil {
-			r = &Resident{Name: name, Path: entry, State: StateFailed, Permissions: []string{}}
+			r = &Resident{Name: name, Path: entry, State: StateFailed, Permissions: []string{}, life: &sync.Mutex{}}
 			rs.all[name] = r
 			r.pending, r.seen = sig, stableChecks
 			if !first {
@@ -283,9 +285,10 @@ func (rs *residents) load(r *Resident) {
 	rs.mu.Lock()
 	same := js == r.bundle && r.run != nil
 	r.bundle = js
+	held := r.State == StateQuarantined
 	rs.mu.Unlock()
-	if same {
-		return
+	if same || held {
+		return // a quarantined script waits for hive script enable, edited or not
 	}
 	if disabled {
 		rs.unload(r, "disabled")
@@ -300,25 +303,48 @@ func (rs *residents) load(r *Resident) {
 // restart stops a script's run, if any, and starts a new one from its
 // bundle.
 func (rs *residents) restart(r *Resident) {
+	r.life.Lock()
+	defer r.life.Unlock()
 	rs.unload(r, "reloaded")
 	rs.mu.Lock()
 	js := r.bundle
 	rs.mu.Unlock()
-	run, err := rs.h.Start(RunOptions{
+	_, err := rs.h.Start(RunOptions{
 		Name: r.Name, JS: js, Perms: Perms{}, Resident: r, Budget: rs.budget(),
 		Identity: ownerIdentity(),
+		// Recorded before the loop starts, so a failure it reports at once
+		// isn't overwritten here.
+		OnStart: func(run *Run) {
+			rs.mu.Lock()
+			r.run, r.RunID, r.Error, r.Errors, r.overruns, r.LoadedAt = run, run.ID, "", 0, nil, time.Now().UTC()
+			r.State = StateRunning
+			rs.mu.Unlock()
+			rs.h.cfg.Backend.Bus().Scoped("script_loaded", map[string]any{"name": r.Name, "run_id": run.ID})
+		},
 	})
+	if err != nil {
+		rs.mu.Lock()
+		r.State, r.Error = StateFailed, err.Error()
+		rs.mu.Unlock()
+	}
+}
+
+// runEnded hears that a script's run ended. If it's still the script's
+// current run, nobody stopped it: it stopped itself, or failed.
+func (rs *residents) runEnded(r *Resident, run *Run, ok bool, msg string) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	if err != nil {
-		r.State, r.Error = StateFailed, err.Error()
-		return
+	if r.run != run {
+		return // unloaded on purpose: its state is already said
 	}
-	r.run, r.RunID, r.Error, r.Errors, r.overruns, r.LoadedAt = run, run.ID, "", 0, nil, time.Now().UTC()
-	if r.State != StatePending {
-		r.State = StateRunning
+	r.run = nil
+	switch {
+	case r.State == StatePending, r.State == StateFailed, r.State == StateQuarantined:
+	case ok:
+		r.State, r.Error = StateStopped, ""
+	default:
+		r.State, r.Error = StateFailed, firstLineOf(msg)
 	}
-	rs.h.cfg.Backend.Bus().Scoped("script_loaded", map[string]any{"name": r.Name, "run_id": run.ID})
 }
 
 func (rs *residents) unload(r *Resident, why string) {
@@ -393,6 +419,8 @@ func (rs *residents) overrun(r *Resident) bool {
 }
 
 func (rs *residents) quarantine(r *Resident, why string) {
+	r.life.Lock()
+	defer r.life.Unlock()
 	rs.unload(r, "quarantined: "+why)
 	rs.mu.Lock()
 	r.State, r.Error = StateQuarantined, why
@@ -446,6 +474,21 @@ func (h *Host) Grant(name string) (Resident, error) {
 	r, err := rs.get(name)
 	if err != nil {
 		return Resident{}, err
+	}
+	rs.mu.Lock()
+	known := r.State == StatePending || r.State == StateRunning
+	rs.mu.Unlock()
+	if !known {
+		// It never said what it asks for (it failed, or never ran): run it
+		// once to read its manifest.
+		rs.restart(r)
+		rs.settle(r)
+		rs.mu.Lock()
+		known = r.State == StatePending || r.State == StateRunning
+		rs.mu.Unlock()
+		if !known {
+			return h.resident(name)
+		}
 	}
 	rs.mu.Lock()
 	asks := r.Asks
@@ -531,10 +574,15 @@ func (h *Host) Enable(name string, on bool) (Resident, error) {
 		return Resident{}, api.Internal("disabled: %v", err)
 	}
 	if on {
+		rs.mu.Lock()
+		r.State = StateFailed // not quarantined any more; restart says what it is
+		rs.mu.Unlock()
 		rs.restart(r)
 		rs.settle(r)
 	} else {
+		r.life.Lock()
 		rs.unload(r, "disabled")
+		r.life.Unlock()
 		rs.mu.Lock()
 		r.State, r.Error = StateDisabled, ""
 		rs.mu.Unlock()

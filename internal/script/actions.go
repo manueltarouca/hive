@@ -116,7 +116,9 @@ func (h *Host) RunAction(ctx context.Context, name string, args json.RawMessage,
 		r.depth = 0
 		_, err = a.fn(goja.Undefined(), argv, m,
 			r.rt.ToValue(func(out string) { finish(out, nil) }),
-			r.rt.ToValue(func(msg, code string) { finish("", &api.Error{Status: 500, Code: orDefault(code, "error"), Message: msg}) }))
+			r.rt.ToValue(func(msg, code string) {
+				finish("", &api.Error{Status: 500, Code: orDefault(code, "error"), Message: msg})
+			}))
 		if err != nil {
 			r.handlerErr(err)
 			finish("", api.Internal("%s: %s", name, jsError(err)))

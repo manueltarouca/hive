@@ -141,6 +141,10 @@ type RunOptions struct {
 	// Resident is set for a script from the folder: it runs until
 	// unloaded, and its manifest needs a grant.
 	Resident *Resident
+	// Parent is the run that started this one: stopping it stops this.
+	Parent string
+	// OnStart runs once the run is registered, before its loop starts.
+	OnStart func(*Run)
 }
 
 func newRunID() string {
@@ -161,17 +165,37 @@ func (h *Host) Start(o RunOptions) (*Run, error) {
 	if o.Name == "" {
 		o.Name = "script"
 	}
+	if !nameRE.MatchString(o.Name) || len(o.Name) > 64 {
+		return nil, api.BadRequest("script name %q: lowercase letters, digits, - and _", o.Name)
+	}
 	r := newRun(h, o)
 	if err := r.start(); err != nil {
 		return nil, err
 	}
 	h.mu.Lock()
+	if len(h.runs) >= maxRuns {
+		h.mu.Unlock()
+		r.cancel()
+		return nil, api.Conflict("%d scripts are running already", maxRuns)
+	}
 	h.runs[r.ID] = r
+	parent := h.runs[o.Parent]
 	h.mu.Unlock()
+	if parent != nil {
+		parent.pmu.Lock()
+		parent.children = append(parent.children, r)
+		parent.pmu.Unlock()
+	}
+	if o.OnStart != nil {
+		o.OnStart(r) // before the loop: nothing the run decides can come first
+	}
 	h.cfg.Backend.Bus().Scoped("script_started", map[string]any{"run_id": r.ID, "name": r.Name})
 	go r.loop()
 	return r, nil
 }
+
+// maxRuns caps how many scripts run at once.
+const maxRuns = 64
 
 // Stop ends a run.
 func (h *Host) Stop(runID string) error {
