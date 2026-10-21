@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -29,8 +30,20 @@ type Backend interface {
 // Config for a Host.
 type Config struct {
 	Backend  Backend
-	StateDir string // audit log and, later, scripts' storage
+	StateDir string // grants, storage, logs and the audit log
 	Logger   *slog.Logger
+	// ScriptsDir holds resident scripts; empty means none.
+	ScriptsDir string
+	// Poll is how often the folder is checked (default 2s).
+	Poll time.Duration
+	// HandlerBudget is how long a resident script's handler may run
+	// (default 5s).
+	HandlerBudget time.Duration
+	// HeapLimit is how far the server's heap may grow over its baseline
+	// before the busiest script is stopped (default 1 GiB).
+	HeapLimit uint64
+	// watchEvery is how often the heap is sampled (tests).
+	watchEvery time.Duration
 }
 
 // Host runs scripts.
@@ -39,10 +52,14 @@ type Host struct {
 	log   *slog.Logger
 	audit *auditLog
 
-	mu       sync.Mutex
-	runs     map[string]*Run
-	finished []*Run // the latest, for script.result and script.list
-	closed   bool
+	res    *residents
+	causes *causes
+
+	mu        sync.Mutex
+	watchQuit chan struct{}
+	runs      map[string]*Run
+	finished  []*Run // the latest, for script.result and script.list
+	closed    bool
 }
 
 // keepFinished is how many ended runs are remembered.
@@ -54,11 +71,37 @@ func New(cfg Config) *Host {
 	if log == nil {
 		log = slog.Default()
 	}
-	h := &Host{cfg: cfg, log: log, runs: map[string]*Run{}}
+	h := &Host{cfg: cfg, log: log, runs: map[string]*Run{}, causes: newCauses()}
 	if cfg.StateDir != "" {
 		h.audit = &auditLog{path: filepath.Join(cfg.StateDir, "scripts", "audit.jsonl")}
 	}
+	if cfg.ScriptsDir != "" {
+		poll := cfg.Poll
+		if poll == 0 {
+			poll = defaultPollTime
+		}
+		h.res = &residents{h: h, dir: cfg.ScriptsDir, all: map[string]*Resident{}, poll: poll, quit: make(chan struct{})}
+	}
 	return h
+}
+
+// StartResidents loads the scripts folder and watches it. The server calls
+// it once its sessions are restored.
+func (h *Host) StartResidents() {
+	h.mu.Lock()
+	if h.watchQuit == nil {
+		h.watchQuit = make(chan struct{})
+		go h.watchHeap(h.watchQuit)
+	}
+	h.mu.Unlock()
+	if h.res != nil {
+		h.res.start()
+	}
+}
+
+// ownerIdentity is who resident scripts act for: the server's own account.
+func ownerIdentity() remote.Identity {
+	return remote.Identity{Principal: fmt.Sprintf("peer:%d", os.Getuid()), Via: remote.Local.String()}
 }
 
 // Context is what a script runs in: the pane and session it started from.
@@ -89,6 +132,9 @@ type RunOptions struct {
 	// Budget caps how long one piece of JS may run before it is
 	// interrupted (0: no cap).
 	Budget time.Duration
+	// Resident is set for a script from the folder: it runs until
+	// unloaded, and its manifest needs a grant.
+	Resident *Resident
 }
 
 func newRunID() string {
@@ -175,6 +221,18 @@ func (h *Host) List() []RunInfo {
 func (h *Host) Close() {
 	h.mu.Lock()
 	h.closed = true
+	if h.watchQuit != nil {
+		close(h.watchQuit)
+		h.watchQuit = nil
+	}
+	if h.res != nil {
+		h.res.mu.Lock()
+		if !h.res.off {
+			h.res.off = true
+			close(h.res.quit)
+		}
+		h.res.mu.Unlock()
+	}
 	var rs []*Run
 	for _, r := range h.runs {
 		rs = append(rs, r)
@@ -207,7 +265,7 @@ const maxPayload = 4 << 20
 
 // call runs one method for a script: fill IDs, check the permission, call,
 // audit.
-func (h *Host) call(r *Run, method, argsJSON string) (string, error) {
+func (h *Host) call(r *Run, method, argsJSON string, depth int) (string, error) {
 	reg := h.cfg.Backend.Registry()
 	if len(argsJSON) > maxPayload {
 		return "", api.BadRequest("arguments over %d bytes", maxPayload)
@@ -228,8 +286,23 @@ func (h *Host) call(r *Run, method, argsJSON string) (string, error) {
 	if !perms.Has(need) {
 		return "", api.PermissionDenied("%s needs the %s permission, which this script doesn't have", method, need)
 	}
+	if depth >= maxDepth {
+		return "", &api.Error{Status: 409, Code: "loop_suspected",
+			Message: fmt.Sprintf("%s refused: scripts have been waking each other %d times in a row", method, depth)}
+	}
 	ctx := WithPerms(r.ctx, perms)
+	// A call that changes something opens a window: events in it are its.
+	var callID, start uint64
+	bus := h.cfg.Backend.Bus()
+	if audited[need] {
+		start = bus.Seq()
+		callID = h.causes.begin(start)
+	}
 	out, err := reg.Call(ctx, method, raw)
+	if audited[need] {
+		h.causes.end(callID, window{start: start, end: bus.Seq(), sessions: sessionsOf(raw, out), run: r.ID, depth: depth})
+		h.wake()
+	}
 	if audited[need] {
 		res := "ok"
 		if err != nil {
@@ -312,4 +385,37 @@ func asAPI(err error) *api.Error {
 		return api.ScriptUnloaded("the script stopped")
 	}
 	return api.Internal("%v", err)
+}
+
+// sessionsOf names the sessions a call acted on: from its arguments and
+// its result (a new session).
+func sessionsOf(raw []byte, out any) []string {
+	var ids []string
+	var args struct {
+		SessionID string `json:"session_id"`
+	}
+	if json.Unmarshal(raw, &args) == nil && args.SessionID != "" {
+		ids = append(ids, args.SessionID)
+	}
+	if b, err := json.Marshal(out); err == nil {
+		var res struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal(b, &res) == nil && res.SessionID != "" && res.SessionID != args.SessionID {
+			ids = append(ids, res.SessionID)
+		}
+	}
+	return ids
+}
+
+// wake tells every run to look at its held events again.
+func (h *Host) wake() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range h.runs {
+		select {
+		case r.evReady <- struct{}{}:
+		default:
+		}
+	}
 }

@@ -74,7 +74,13 @@ Scripts (TypeScript, run by the server)
                              run a script once: its log on stderr, its
                              result as JSON (--allow: read,control,spawn...)
   script stop RUN_ID         stop a running script
-  script ls                  running scripts and the latest that ended
+  script ls                  the scripts folder's scripts, and one-shots
+  script grant NAME          let a script in the folder run, with the
+                             permissions it asks for (revoke: take them)
+  script enable|disable NAME turn a script on or off
+  script reload [NAME]       load the folder again now
+  script logs NAME [-f]      a script's log
+  script audit [NAME]        what scripts changed
   script check FILE          bundle a script and report errors
   script types [--out FILE]  write hive.d.ts, the types of this server's API
 
@@ -362,7 +368,7 @@ func cmdServer(g globals, args []string) error {
 		// Read once; the panes this server starts must never see it.
 		os.Unsetenv("TS_AUTHKEY")
 		exe, _ := os.Executable()
-		srv, err := server.New(server.Config{Socket: *sock, StateDir: *state, Fresh: *fresh, HivePath: exe, ConfigPath: config.Path(),
+		srv, err := server.New(server.Config{Socket: *sock, StateDir: *state, Fresh: *fresh, HivePath: exe, ConfigPath: config.Path(), ScriptsDir: config.Scripts(),
 			Logger: newLogger(), Remote: rc})
 		if err != nil {
 			return err

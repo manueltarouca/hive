@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 	"syscall"
 	"time"
@@ -52,6 +54,7 @@ func (s *Server) reloadConfig() {
 	c, diags, stamp := s.readConfig()
 	s.mu.Lock()
 	old := s.conf.ScrollbackLimit
+	changed := changedKeys(s.conf, c)
 	s.conf, s.confDiags, s.confStamp = c, diags, stamp
 	var blocks []*rec
 	if c.ScrollbackLimit != old {
@@ -62,6 +65,9 @@ func (s *Server) reloadConfig() {
 	s.mu.Unlock()
 	for _, d := range diags {
 		s.log.Warn("config", "path", s.cfg.ConfigPath, "problem", d.String())
+	}
+	if len(changed) > 0 {
+		s.bus.Server("config_changed", map[string]any{"keys": changed})
 	}
 	for _, r := range blocks {
 		if err := r.b.SetScrollbackLimit(c.ScrollbackLimit); err != nil && !strings.Contains(err.Error(), "closed") {
@@ -129,4 +135,20 @@ func (s *Server) registerConfigMethods() {
 			s.reloadConfig()
 			return s.configView(), nil
 		}, api.Perm("config"))
+}
+
+// changedKeys names the settings whose values differ.
+func changedKeys(a, b config.Config) []string {
+	var am, bm map[string]any
+	ab, _ := json.Marshal(a)
+	bb, _ := json.Marshal(b)
+	_ = json.Unmarshal(ab, &am)
+	_ = json.Unmarshal(bb, &bm)
+	var out []string
+	for _, k := range config.Keys {
+		if !reflect.DeepEqual(am[k.Name], bm[k.Name]) {
+			out = append(out, k.Name)
+		}
+	}
+	return out
 }

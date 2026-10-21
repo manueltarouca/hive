@@ -23,6 +23,14 @@ patch, and this file lists it under "Changed" or "Removed".
   `script.list` and `script.result`; scoped events `script_started`,
   `script_log` and `script_ended`; setting `script-remote-run`. See
   [Scripts](https://manueltarouca.github.io/hive/docs/scripts).
+- Scripts that keep running: the server runs the scripts in
+  `~/.config/hive/scripts` once you grant them (`hive script grant`),
+  reloads one when you save it, keeps the old version when the new one has
+  an error, and quarantines one whose handlers keep running too long.
+  `h.store` keeps a script's values across restarts. Commands `hive script
+  grant`, `revoke`, `enable`, `disable`, `reload`, `logs` and `audit`;
+  methods to match; events `server_started`, `restore_finished` and
+  `config_changed`; setting `scripts`.
 - Every method says which permission a script needs to call it: `read`,
   `screen`, `control`, `spawn`, `input`, `ui`, `config` or `server`.
   `api list` and `api describe` show it, with a note for methods whose

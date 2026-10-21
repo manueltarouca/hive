@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -59,16 +60,22 @@ type Run struct {
 	imu sync.Mutex
 	gen uint64
 
+	// Time spent running JS, per second over the last minute.
+	cmu sync.Mutex
+	cpu []cpuSlot
+
 	// Loop-owned state.
-	mainDone bool
-	pending  int // calls in flight
-	timers   map[int]*jsTimer
-	subs     map[int]*jsSub
-	nextID   int
-	history  []event
-	lastCall uint64 // bus seq when the latest call started
-	teardown goja.Callable
-	stopping bool
+	mainDone    bool
+	pending     int // calls in flight
+	timers      map[int]*jsTimer
+	subs        map[int]*jsSub
+	nextID      int
+	history     []event
+	lastCall    uint64 // bus seq when the latest call started
+	teardown    goja.Callable
+	gotManifest bool
+	depth       int // the cause depth of the handler running now
+	store       *store
 
 	// Events from the pump, handed to the loop.
 	emu     sync.Mutex
@@ -77,15 +84,16 @@ type Run struct {
 	evReady chan struct{}
 
 	// Set once, read by others.
-	pmu      sync.Mutex
-	perms    Perms
-	ended    bool
-	ok       bool
-	result   string
-	errMsg   string
-	errCode  string
-	endedAt  time.Time
-	logLines int
+	pmu          sync.Mutex
+	perms        Perms
+	ended        bool
+	ok           bool
+	result       string
+	errMsg       string
+	errCode      string
+	endedAt      time.Time
+	logLines     int
+	manifestDone bool
 }
 
 type jsTimer struct {
@@ -99,6 +107,7 @@ type jsSub struct {
 	name   string
 	filter map[string]any
 	fn     goja.Callable
+	self   bool // also hear events this script's own calls made
 }
 
 // RunInfo describes a run.
@@ -176,10 +185,27 @@ func (r *Run) start() error {
 	}
 	r.post(func() {
 		_, err := main(goja.Undefined(), bundle,
-			r.rt.ToValue(func(out string) { r.mainDone = true; r.setResult(out) }),
-			r.rt.ToValue(func(msg, code string) { r.mainDone = true; r.fail(msg, code) }))
+			r.rt.ToValue(func(out string) {
+				r.mainDone = true
+				r.setResult(out)
+				if r.opts.Resident != nil && !r.gotManifest {
+					r.residentFailed("a script in the scripts folder needs export default hive.script({ name, permissions, setup })")
+				}
+			}),
+			r.rt.ToValue(func(msg, code string) {
+				r.mainDone = true
+				if r.opts.Resident != nil {
+					r.residentFailed(msg)
+					return
+				}
+				r.fail(msg, code)
+			}))
 		if err != nil {
 			r.mainDone = true
+			if r.opts.Resident != nil {
+				r.residentFailed(jsError(err))
+				return
+			}
 			r.failErr(err)
 		}
 	})
@@ -211,7 +237,7 @@ func (r *Run) loop() {
 		if r.isEnded() {
 			return
 		}
-		if r.mainDone && r.pending == 0 && len(r.timers) == 0 && len(r.subs) == 0 && len(r.tasks) == 0 {
+		if r.opts.Resident == nil && r.mainDone && r.pending == 0 && len(r.timers) == 0 && len(r.subs) == 0 && len(r.tasks) == 0 {
 			r.end()
 			return
 		}
@@ -224,8 +250,41 @@ var errBudget = errors.New("budget")
 // disarmed (tests: the timer firing in that window).
 var testHookAfterTask func()
 
+type cpuSlot struct {
+	at time.Time
+	d  time.Duration
+}
+
+func (r *Run) addCPU(d time.Duration) {
+	r.cmu.Lock()
+	defer r.cmu.Unlock()
+	now := time.Now().Truncate(time.Second)
+	if n := len(r.cpu); n > 0 && r.cpu[n-1].at.Equal(now) {
+		r.cpu[n-1].d += d
+	} else {
+		r.cpu = append(r.cpu, cpuSlot{now, d})
+	}
+	for len(r.cpu) > 0 && time.Since(r.cpu[0].at) > cpuWindow {
+		r.cpu = r.cpu[1:]
+	}
+}
+
+func (r *Run) recentCPU() time.Duration {
+	r.cmu.Lock()
+	defer r.cmu.Unlock()
+	var total time.Duration
+	for _, s := range r.cpu {
+		if time.Since(s.at) <= cpuWindow {
+			total += s.d
+		}
+	}
+	return total
+}
+
 // exec runs one piece of JS, interrupted if it overruns the budget.
 func (r *Run) exec(f func()) {
+	began := time.Now()
+	defer func() { r.addCPU(time.Since(began)) }()
 	var t *time.Timer
 	if b := r.opts.Budget; b > 0 {
 		r.imu.Lock()
@@ -233,7 +292,7 @@ func (r *Run) exec(f func()) {
 		r.imu.Unlock()
 		t = time.AfterFunc(b, func() {
 			r.imu.Lock()
-			if r.gen == gen {
+			if r.gen == gen && r.rt != nil {
 				r.rt.Interrupt(errBudget)
 			}
 			r.imu.Unlock()
@@ -270,10 +329,21 @@ func (r *Run) callJS(fn goja.Callable, args ...goja.Value) {
 func (r *Run) handlerErr(err error) {
 	var ie *goja.InterruptedError
 	if errors.As(err, &ie) {
-		if ie.Value() == errBudget {
-			r.fail(fmt.Sprintf("a handler ran longer than %v", r.opts.Budget), "timeout")
+		if ie.Value() != errBudget {
+			return
 		}
+		if res := r.opts.Resident; res != nil {
+			// A resident script keeps running; too many overruns
+			// quarantine it.
+			r.logLine("error", fmt.Sprintf("a handler ran longer than %v and was stopped", r.opts.Budget))
+			r.host.res.overrun(res)
+			return
+		}
+		r.fail(fmt.Sprintf("a handler ran longer than %v", r.opts.Budget), "timeout")
 		return
+	}
+	if res := r.opts.Resident; res != nil {
+		r.host.res.handlerError(res)
 	}
 	r.logLine("error", jsError(err))
 }
@@ -351,13 +421,20 @@ func (r *Run) finish() {
 	r.end()
 	if r.teardown != nil {
 		r.rt.ClearInterrupt()
-		t := time.AfterFunc(stopGrace, func() { r.rt.Interrupt("teardown took too long") })
+		rt := r.rt
+		t := time.AfterFunc(stopGrace, func() { rt.Interrupt("teardown took too long") })
 		_, _ = r.teardown(goja.Undefined())
 		t.Stop()
 	}
 	for _, t := range r.timers {
 		t.t.Stop()
 	}
+	// Ended runs are remembered for script.list; their runtime, and all
+	// the script's memory, isn't.
+	r.imu.Lock()
+	r.rt = nil
+	r.imu.Unlock()
+	r.timers, r.subs, r.history, r.teardown = nil, nil, nil, nil
 	close(r.done)
 	r.host.ended(r)
 	in := r.Info(false)
@@ -373,9 +450,25 @@ func (r *Run) finish() {
 	r.host.cfg.Backend.Bus().Scoped("script_ended", payload)
 }
 
+// residentFailed: a resident script's load or setup failed; it stops and
+// script.list says why.
+func (r *Run) residentFailed(msg string) {
+	r.logLine("error", msg)
+	r.host.res.setupFailed(r.opts.Resident, firstLineOf(msg))
+	r.fail(msg, "error")
+}
+
+func firstLineOf(s string) string {
+	line, _, _ := strings.Cut(s, "\n")
+	return line
+}
+
 func (r *Run) logLine(level, text string) {
 	if len(text) > logCap {
 		text = text[:logCap] + "…"
+	}
+	if r.opts.Resident != nil {
+		r.host.appendLog(r.Name, level, text)
 	}
 	r.host.cfg.Backend.Bus().Scoped("script_log", map[string]any{"run_id": r.ID, "name": r.Name, "level": level, "text": text})
 }
@@ -425,6 +518,21 @@ func (r *Run) install() error {
 		r.imu.Unlock()
 	})
 	set("manifest", r.jsManifest)
+	set("storeGet", func(key string) string { return r.st().get(key) })
+	set("storeSet", func(key, value string) {
+		if err := r.st().set(key, value); err != nil {
+			panic(r.rt.NewTypeError("%v", err))
+		}
+	})
+	set("storeDelete", func(key string) {
+		if err := r.st().delete(key); err != nil {
+			panic(r.rt.NewTypeError("%v", err))
+		}
+	})
+	set("storeKeys", func(prefix string) string {
+		b, _ := json.Marshal(r.st().keys(prefix))
+		return string(b)
+	})
 	set("teardown", func(fn goja.Callable) { r.teardown = fn })
 	return rt.Set("__host", o)
 }
@@ -435,8 +543,9 @@ func (r *Run) jsCall(method, argsJSON string) *goja.Promise {
 	p, resolve, reject := r.rt.NewPromise()
 	r.pending++
 	r.lastCall = r.host.cfg.Backend.Bus().Seq()
+	depth := r.depth
 	go func() {
-		out, err := r.host.call(r, method, argsJSON)
+		out, err := r.host.call(r, method, argsJSON, depth)
 		r.post(func() {
 			r.pending--
 			if err != nil {
@@ -476,6 +585,7 @@ func (r *Run) armTimer(id int, jt *jsTimer) {
 			} else {
 				delete(r.timers, id)
 			}
+			r.depth = 0
 			r.callJS(jt.fn)
 		})
 	})
@@ -488,7 +598,7 @@ func (r *Run) cancelTimer(id int) {
 	}
 }
 
-func (r *Run) jsSubscribe(name, filterJSON string, fn goja.Callable) int {
+func (r *Run) jsSubscribe(name, filterJSON string, fn goja.Callable, self bool) int {
 	if len(r.subs) >= maxSubs {
 		panic(r.rt.NewTypeError("too many event handlers (at most %d)", maxSubs))
 	}
@@ -498,7 +608,7 @@ func (r *Run) jsSubscribe(name, filterJSON string, fn goja.Callable) int {
 	}
 	r.nextID++
 	id := r.nextID
-	s := &jsSub{name: name, filter: filter, fn: fn}
+	s := &jsSub{name: name, filter: filter, fn: fn, self: self}
 	r.subs[id] = s
 	// Events since the latest call started may already be here: a split's
 	// program can exit before the script starts waiting for it.
@@ -521,9 +631,18 @@ func (r *Run) jsSubscribe(name, filterJSON string, fn goja.Callable) int {
 	return id
 }
 
-func (r *Run) jsManifest(manifestJSON string) {
+// manifestRead reports whether the script has declared itself yet.
+func (r *Run) manifestRead() bool {
+	r.pmu.Lock()
+	defer r.pmu.Unlock()
+	return r.manifestDone
+}
+
+// jsManifest reads a hive.script manifest and says whether setup may run.
+func (r *Run) jsManifest(manifestJSON string) bool {
 	var m struct {
 		Name        string   `json:"name"`
+		Description string   `json:"description"`
 		Permissions []string `json:"permissions"`
 	}
 	if err := json.Unmarshal([]byte(manifestJSON), &m); err != nil {
@@ -533,12 +652,27 @@ func (r *Run) jsManifest(manifestJSON string) {
 	if err != nil {
 		panic(r.rt.NewTypeError("manifest: %v", err))
 	}
+	r.gotManifest = true
+	defer func() { r.pmu.Lock(); r.manifestDone = true; r.pmu.Unlock() }()
+	if res := r.opts.Resident; res != nil {
+		granted, ok := r.host.res.manifest(res, p.List(), m.Description)
+		if !ok {
+			r.logLine("warn", fmt.Sprintf("waiting for permission: hive script grant %s (it asks for %s)", r.Name, strings.Join(p.List(), ", ")))
+			r.end()
+			return false
+		}
+		r.pmu.Lock()
+		r.perms = granted
+		r.pmu.Unlock()
+		return true
+	}
 	r.pmu.Lock()
 	r.perms = p.Intersect(r.opts.Limit)
 	if m.Name != "" && r.opts.Name == "script" {
 		r.Name = m.Name
 	}
 	r.pmu.Unlock()
+	return true
 }
 
 // ---- events ----
@@ -598,7 +732,16 @@ func (r *Run) deliver() {
 		q = append([]event{{Name: "resync_required", Payload: map[string]any{"dropped": float64(dropped)},
 			JSON: fmt.Sprintf(`{"dropped":%d}`, dropped)}}, q...)
 	}
-	for _, ev := range q {
+	hold, holding := r.host.causes.holdAfter()
+	for i, ev := range q {
+		if holding && ev.Seq > hold {
+			// A script's change is still running: wait for it to end, so
+			// its events can be told apart.
+			r.emu.Lock()
+			r.queue = append(q[i:len(q):len(q)], r.queue...)
+			r.emu.Unlock()
+			return
+		}
 		if !r.inScope(ev) {
 			continue
 		}
@@ -634,6 +777,14 @@ func (r *Run) dispatch(s *jsSub, ev event) {
 	if !matches(s.filter, ev.Payload) {
 		return
 	}
+	depth := 0
+	if w, ok := r.host.causes.of(ev); ok {
+		if w.run == r.ID && !s.self {
+			return
+		}
+		depth = w.depth + 1
+	}
+	r.depth = depth
 	parse, _ := goja.AssertFunction(r.rt.Get("JSON").ToObject(r.rt).Get("parse"))
 	payload, err := parse(goja.Undefined(), r.rt.ToValue(ev.JSON))
 	if err != nil {
@@ -642,5 +793,18 @@ func (r *Run) dispatch(s *jsSub, ev event) {
 	meta := r.rt.NewObject()
 	_ = meta.Set("event", ev.Name)
 	_ = meta.Set("seq", ev.Seq)
+	_ = meta.Set("depth", depth)
 	r.callJS(s.fn, payload, meta)
+}
+
+// st is the script's storage, opened on first use.
+func (r *Run) st() *store {
+	if r.store == nil {
+		dir := r.host.cfg.StateDir
+		if dir == "" {
+			dir = os.TempDir()
+		}
+		r.store = openStore(dir, r.Name)
+	}
+	return r.store
 }

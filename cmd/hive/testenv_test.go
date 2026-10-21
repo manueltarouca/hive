@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 )
 
-// testEnv is the environment for a test's hive: its own socket, state and
-// settings in dir, always together, so a test never reaches the user's
+// testEnv is the environment for a test's hive: its own socket, state,
+// settings and scripts in dir, always together, so a test never reaches the user's
 // server, state or settings file. HIVE_SESSION and HIVE_BLOCK are cleared:
 // tests run inside hive panes too.
 func testEnv(dir string) []string {
@@ -14,5 +14,6 @@ func testEnv(dir string) []string {
 		"HIVE_SERVER="+filepath.Join(dir, "s.sock"),
 		"HIVE_STATE_DIR="+filepath.Join(dir, "state"),
 		"HIVE_CONFIG="+filepath.Join(dir, "config"),
+		"HIVE_SCRIPTS="+filepath.Join(dir, "scripts"),
 		"HIVE_SESSION=", "HIVE_BLOCK=")
 }

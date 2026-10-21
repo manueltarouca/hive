@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -18,6 +19,10 @@ import (
 const scriptUsage = `usage: hive script run FILE|-e CODE|- [KEY=VALUE...] [--args JSON] [--allow PERMS] [--for DUR] [--all]
        hive script stop RUN_ID
        hive script ls
+       hive script grant|revoke|enable|disable NAME
+       hive script reload [NAME]
+       hive script logs NAME [--tail N] [-f]
+       hive script audit [NAME] [--tail N]
        hive script check FILE
        hive script types [--out FILE]`
 
@@ -41,6 +46,28 @@ func cmdScript(g globals, args []string) error {
 		return cmdScriptLs(g)
 	case "types":
 		return cmdScriptTypes(g, args[1:])
+	case "grant", "revoke", "enable", "disable":
+		if len(args) != 2 {
+			return usagef("usage: hive script %s NAME", args[0])
+		}
+		return cmdScriptAdmin(g, args[0], args[1])
+	case "reload":
+		x, err := open(g)
+		if err != nil {
+			return err
+		}
+		params := map[string]any{}
+		if len(args) > 1 {
+			params["name"] = args[1]
+		}
+		if err := x.call("script.reload", params, nil); err != nil {
+			return err
+		}
+		return cmdScriptLs(g)
+	case "logs":
+		return cmdScriptLogs(g, args[1:])
+	case "audit":
+		return cmdScriptAudit(g, args[1:])
 	case "check":
 		if len(args) != 2 {
 			return usagef("usage: hive script check FILE")
@@ -222,18 +249,180 @@ func cmdScriptLs(g globals) error {
 		return printRaw(raw)
 	}
 	var out struct {
-		Runs []script.RunInfo `json:"runs"`
+		Scripts []script.Resident `json:"scripts"`
+		Runs    []script.RunInfo  `json:"runs"`
 	}
 	_ = json.Unmarshal(raw, &out)
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "RUN\tNAME\tSTATE\tPERMISSIONS\tSTARTED\tERROR")
-	for _, r := range out.Runs {
-		state := r.State
-		if r.State == "ended" && !r.OK {
-			state = "failed"
+	if len(out.Scripts) > 0 {
+		fmt.Fprintln(tw, "SCRIPT\tSTATE\tPERMISSIONS\tERRORS\tNOTE")
+		for _, r := range out.Scripts {
+			perms, note := strings.Join(r.Permissions, ","), firstLine(r.Error)
+			if r.State == script.StatePending {
+				perms = "asks " + strings.Join(r.Asks, ",")
+				note = "hive script grant " + r.Name
+			}
+			if perms == "" {
+				perms = "read"
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\n", r.Name, r.State, perms, r.Errors, note)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", r.RunID, r.Name, state, strings.Join(r.Permissions, ","),
-			r.Started.Local().Format("15:04:05"), firstLine(r.Error))
+		fmt.Fprintln(tw)
+	}
+	var runs []script.RunInfo
+	for _, r := range out.Runs {
+		if !isResident(r, out.Scripts) {
+			runs = append(runs, r)
+		}
+	}
+	if len(runs) > 0 {
+		fmt.Fprintln(tw, "RUN\tNAME\tSTATE\tPERMISSIONS\tSTARTED\tERROR")
+		for _, r := range runs {
+			state := r.State
+			if r.State == "ended" && !r.OK {
+				state = "failed"
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", r.RunID, r.Name, state, strings.Join(r.Permissions, ","),
+				r.Started.Local().Format("15:04:05"), firstLine(r.Error))
+		}
+	}
+	if len(out.Scripts) == 0 && len(runs) == 0 {
+		fmt.Fprintln(os.Stderr, "No scripts. Put them in the scripts folder, or run one with hive script run FILE.")
+	}
+	return tw.Flush()
+}
+
+func isResident(r script.RunInfo, rs []script.Resident) bool {
+	for _, s := range rs {
+		if s.Name == r.Name {
+			return true
+		}
+	}
+	return false
+}
+
+// dangerous pairs, said in plain words before a grant.
+var dangerous = []struct {
+	a, b, why string
+}{
+	{"screen", "input", "it can read your terminals and type into them, agents included"},
+	{"screen", "exec", "it can read your terminals and run programs with what it read"},
+	{"screen", "network", "it can read your terminals and send what it read elsewhere"},
+}
+
+func cmdScriptAdmin(g globals, verb, name string) error {
+	x, err := open(g)
+	if err != nil {
+		return err
+	}
+	var r script.Resident
+	if err := x.call("script."+verb, map[string]any{"name": name}, &r); err != nil {
+		return err
+	}
+	if g.json {
+		return printJSON(os.Stdout, r)
+	}
+	switch verb {
+	case "grant":
+		perms := append([]string{"read"}, r.Permissions...)
+		fmt.Printf("%s may now: %s\n", r.Name, strings.Join(perms, ", "))
+		for _, d := range dangerous {
+			if slices.Contains(r.Permissions, d.a) && slices.Contains(r.Permissions, d.b) {
+				fmt.Printf("Note: %s.\n", d.why)
+			}
+		}
+	default:
+		fmt.Printf("%s is %s\n", r.Name, r.State)
+	}
+	return nil
+}
+
+func cmdScriptLogs(g globals, args []string) error {
+	fs := flags("script logs")
+	tail := fs.Int("tail", 50, "")
+	follow := fs.Bool("f", false, "")
+	var name string
+	for {
+		if err := parse(fs, args); err != nil {
+			return err
+		}
+		if fs.NArg() == 0 {
+			break
+		}
+		name, args = fs.Arg(0), fs.Args()[1:]
+	}
+	if name == "" {
+		return usagef("usage: hive script logs NAME [--tail N] [-f]")
+	}
+	x, err := open(g)
+	if err != nil {
+		return err
+	}
+	var out struct {
+		Lines []script.LogLine `json:"lines"`
+	}
+	if err := x.call("script.logs", map[string]any{"name": name, "tail": *tail}, &out); err != nil {
+		return err
+	}
+	for _, l := range out.Lines {
+		printLog(l.Time, l.Level, l.Text)
+	}
+	if !*follow {
+		return nil
+	}
+	err = x.c.EventsOf(x.ctx, []string{"script_log"}, -1, func(e client.Event) bool {
+		var p struct {
+			Name  string `json:"name"`
+			Level string `json:"level"`
+			Text  string `json:"text"`
+		}
+		if json.Unmarshal(e.Payload, &p) == nil && p.Name == name {
+			printLog(e.Time, p.Level, p.Text)
+		}
+		return true
+	})
+	if errors.Is(x.ctx.Err(), context.Canceled) {
+		return nil
+	}
+	return err
+}
+
+func printLog(t time.Time, level, text string) {
+	fmt.Printf("%s %-5s %s\n", t.Local().Format("15:04:05"), level, text)
+}
+
+func cmdScriptAudit(g globals, args []string) error {
+	fs := flags("script audit")
+	tail := fs.Int("tail", 50, "")
+	var name string
+	for {
+		if err := parse(fs, args); err != nil {
+			return err
+		}
+		if fs.NArg() == 0 {
+			break
+		}
+		name, args = fs.Arg(0), fs.Args()[1:]
+	}
+	x, err := open(g)
+	if err != nil {
+		return err
+	}
+	raw, err := x.c.CallRaw(x.ctx, "audit.list", map[string]any{"name": name, "tail": *tail})
+	if err != nil {
+		return err
+	}
+	if g.json {
+		return printRaw(raw)
+	}
+	var out struct {
+		Entries []script.Entry `json:"entries"`
+	}
+	_ = json.Unmarshal(raw, &out)
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "TIME\tSCRIPT\tMETHOD\tRESULT")
+	for _, e := range out.Entries {
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", e.Time.Local().Format("01-02 15:04:05"), strings.TrimPrefix(e.Principal, "script:"), e.Method, e.Result)
 	}
 	return tw.Flush()
 }

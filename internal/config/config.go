@@ -31,6 +31,8 @@ type Config struct {
 	Listen []string `json:"listen"`
 	// ScriptRemoteRun lets callers on other machines run scripts here.
 	ScriptRemoteRun bool `json:"script-remote-run"`
+	// Scripts runs the scripts in the scripts folder.
+	Scripts bool `json:"scripts"`
 }
 
 // Level is how bad a diagnostic is: an error keeps the default.
@@ -129,6 +131,8 @@ var Keys = []Key{
 			c.Listen = out
 			return nil
 		}},
+	{Name: "scripts", Default: "true", Server: true, Help: "run the scripts in the scripts folder (beside this file) when the server starts",
+		set: boolean(func(c *Config, b bool) { c.Scripts = b })},
 	{Name: "script-remote-run", Default: "false", Server: true, Help: "let callers on other machines (over Tailscale) run scripts on this server",
 		set: boolean(func(c *Config, b bool) { c.ScriptRemoteRun = b })},
 }
@@ -266,6 +270,15 @@ func Path() string {
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "hive", "config")
+}
+
+// Scripts is the folder of resident scripts: HIVE_SCRIPTS, or scripts/
+// beside the settings file.
+func Scripts() string {
+	if d := os.Getenv("HIVE_SCRIPTS"); d != "" {
+		return d
+	}
+	return filepath.Join(filepath.Dir(Path()), "scripts")
 }
 
 // Load reads the file at path. A missing file is the defaults; an unreadable

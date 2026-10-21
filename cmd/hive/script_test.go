@@ -83,4 +83,27 @@ export default () => ({ sessions: sessions.map((s: any) => s.label) });
 	if out, _, code := hive("", "script", "ls"); code != 0 || !strings.Contains(out, "failed") {
 		t.Fatalf("script ls: %d %s", code, out)
 	}
+
+	// A script in the folder waits for a grant, then runs.
+	os.MkdirAll(filepath.Join(dir, "scripts"), 0o755)
+	os.WriteFile(filepath.Join(dir, "scripts", "hello.ts"), []byte(`export default hive.script({
+  name: "hello", permissions: ["screen", "input"],
+  setup(h) { console.log("hello from the folder"); },
+});`), 0o644)
+	if out, _, _ := hive("", "script", "reload"); !strings.Contains(out, "pending") || !strings.Contains(out, "asks input,screen") {
+		t.Fatalf("reload: %s", out)
+	}
+	if out, _, code := hive("", "script", "grant", "hello"); code != 0 || !strings.Contains(out, "may now: read, input, screen") ||
+		!strings.Contains(out, "read your terminals and type into them") {
+		t.Fatalf("grant: %d %s", code, out)
+	}
+	if out, _, _ := hive("", "script", "ls"); !strings.Contains(out, "hello   running") {
+		t.Fatalf("ls: %s", out)
+	}
+	if out, _, _ := hive("", "script", "logs", "hello"); !strings.Contains(out, "hello from the folder") {
+		t.Fatalf("logs: %s", out)
+	}
+	if out, _, _ := hive("", "script", "audit"); !strings.Contains(out, "session.set_label") {
+		t.Fatalf("audit: %s", out)
+	}
 }

@@ -47,7 +47,7 @@
     }
   }
   function ctxFor(origin, meta) {
-    return Object.freeze(Object.assign({}, ctx, { origin }, meta ? { event: meta.event, seq: meta.seq } : {}));
+    return Object.freeze(Object.assign({}, ctx, { origin }, meta ? { event: meta.event, seq: meta.seq, depth: meta.depth } : {}));
   }
 
   function after(d, fn) {
@@ -69,7 +69,7 @@
       const c = ctxFor("event", meta);
       if (jsFilter && !jsFilter(ev, c)) return;
       guard(fn, c, ev);
-    });
+    }, !!(opts && opts.self));
     return { cancel: () => host.unsubscribe(id) };
   }
   function wait(event, filter, opts) {
@@ -81,7 +81,7 @@
         host.unsubscribe(id);
         if (timer) host.cancel(timer);
         resolve(ev);
-      });
+      }, true);
       if (timeout > 0) timer = host.timer(timeout, false, () => {
         host.unsubscribe(id);
         reject(new HiveError({ status: 408, code: "timeout", message: "no " + event + " within " + opts.timeout }));
@@ -157,6 +157,14 @@
     },
     sessions: () => call("session.list", {}).then((r) => r.sessions.map((s) => session(s.session_id))),
     agents: { list: () => call("agent.list", {}).then((r) => r.agents || []) },
+    // This script's own storage: JSON values by key, kept across reloads
+    // and restarts (1 MB).
+    store: {
+      get: (key) => Promise.resolve().then(() => { const v = host.storeGet(String(key)); return v === "" ? undefined : JSON.parse(v); }),
+      set: (key, value) => Promise.resolve().then(() => host.storeSet(String(key), JSON.stringify(value === undefined ? null : value))),
+      delete: (key) => Promise.resolve().then(() => host.storeDelete(String(key))),
+      keys: (prefix) => Promise.resolve().then(() => JSON.parse(host.storeKeys(prefix === undefined ? "" : String(prefix)))),
+    },
   };
 
   // Namespaces from the server's own method list: h.session.new_split,
@@ -196,7 +204,7 @@
       const d = ex.default;
       if (typeof d === "function") return d(h);
       if (d && Object.getPrototypeOf(d) === scriptProto) {
-        host.manifest(JSON.stringify(Object.assign({}, d, { setup: undefined, teardown: undefined })));
+        if (!host.manifest(JSON.stringify(Object.assign({}, d, { setup: undefined, teardown: undefined })))) return undefined;
         if (typeof d.teardown === "function") host.teardown(() => d.teardown(h));
         if (typeof d.setup === "function") return d.setup(h);
       }

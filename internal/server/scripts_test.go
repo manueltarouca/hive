@@ -214,7 +214,7 @@ export default () => "exit " + r.exit_code + " " + ev;
 	// Handlers run until stopped; h.stop ends a run cleanly.
 	out = h.runScript(`
 let n = 0;
-h.on("session_label_changed", (ctx: any, ev: any) => { n++; if (ev.label === "stop") { console.log(ctx.event, n); h.stop(); } });
+h.on("session_label_changed", {}, (ctx: any, ev: any) => { n++; if (ev.label === "stop") { console.log(ctx.event, n); h.stop(); } }, { self: true });
 await h.session.set_label({ label: "a" });
 await h.session.set_label({ label: "stop" });
 `, map[string]any{"allow": []string{"control"}, "session_id": sid})
@@ -384,5 +384,47 @@ export {};
 	out, err := exec.Command(tsc, "-p", dir).CombinedOutput()
 	if err == nil || strings.Count(string(out), "error TS") != 3 {
 		t.Fatalf("bad.ts should fail with 3 errors:\n%s", out)
+	}
+}
+
+// A script's own changes don't wake its own handlers, unless it asks; two
+// scripts waking each other stop at depth 8.
+func TestScriptCausesAndLoops(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	sid := created["session_id"].(string)
+
+	out := h.runScript(`
+let mine = 0;
+const sub = h.on("session_label_changed", () => { mine++ });
+await h.session.set_label({ label: "x" });
+await h.sleep("100ms");
+sub.cancel();
+export default () => mine;`, map[string]any{"allow": []string{"control"}, "session_id": sid})
+	if string(out.Result) != "0" {
+		t.Fatalf("own change woke its handler: %+v", out)
+	}
+
+	pingpong := func(tag string) string {
+		js, err := script.Bundle("", `
+h.on("session_label_changed", async (ctx: any, ev: any) => {
+  if (ev.label.startsWith("`+tag+`")) return;
+  await h.session.set_label({ label: "`+tag+`" + ctx.depth });
+});`, t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := h.call("script.run", map[string]any{"code": js, "allow": []string{"control"}, "session_id": sid, "for": 1.5})
+		return r["run_id"].(string)
+	}
+	a, b := pingpong("a"), pingpong("b")
+	h.call("session.set_label", map[string]any{"session_id": sid, "label": "go"})
+	for _, id := range []string{a, b} {
+		h.call("script.result", map[string]any{"run_id": id, "timeout": 10})
+	}
+	label := h.call("session.view", map[string]any{"session_id": sid})["label"].(string)
+	if label != "a7" && label != "b7" {
+		t.Fatalf("the chain ended at %q, want depth 7", label)
 	}
 }

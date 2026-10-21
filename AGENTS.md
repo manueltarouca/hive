@@ -16,8 +16,8 @@ cd apps/android && ./gradlew testDebugUnitTest   # after make vt-android
 ## Rules
 
 - Never use the user's own server. A test or an experiment sets
-  `HIVE_SERVER`, `HIVE_STATE_DIR` and `HIVE_CONFIG` together, to a temporary
-  folder. A server refuses to start on a state folder another server holds.
+  `HIVE_SERVER`, `HIVE_STATE_DIR`, `HIVE_CONFIG` and `HIVE_SCRIPTS`
+  together, to a temporary folder. A server refuses to start on a state folder another server holds.
 - Command, flag, method and event names, and exit codes, are a contract. Add
   to them; don't rename or remove them.
 - Write a failing test first, then the fix.

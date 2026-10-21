@@ -110,7 +110,8 @@ declare global {
 
       /** Run fn for every event of this name ("*": all). */
       on(event: string, fn: (ctx: Context, ev: Event) => unknown): Subscription;
-      on(event: string, filter: Filter | ((ev: Event, ctx: Context) => boolean), fn: (ctx: Context, ev: Event) => unknown): Subscription;
+      /** opts.self: also hear events this script's own calls made. */
+      on(event: string, filter: Filter | ((ev: Event, ctx: Context) => boolean), fn: (ctx: Context, ev: Event) => unknown, opts?: { self?: boolean }): Subscription;
       once(event: string, filter?: Filter | ((ev: Event, ctx: Context) => boolean)): Promise<Event>;
       wait(event: string, filter?: Filter | ((ev: Event, ctx: Context) => boolean), opts?: { timeout?: Duration }): Promise<Event>;
 
@@ -121,6 +122,14 @@ declare global {
       stop(code?: number): never;
 
       log(level: "debug" | "info" | "warn" | "error", ...msg: unknown[]): void;
+
+      /** This script's own values, kept across reloads and restarts (1 MB). */
+      store: {
+        get<T = any>(key: string): Promise<T | undefined>;
+        set(key: string, value: unknown): Promise<void>;
+        delete(key: string): Promise<void>;
+        keys(prefix?: string): Promise<string[]>;
+      };
     }
   }
 }

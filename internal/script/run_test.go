@@ -98,3 +98,31 @@ func resultOf(in RunInfo) string {
 	b, _ := json.Marshal(in.Result)
 	return string(b)
 }
+
+// A script that grows the heap past the limit is stopped, and its memory
+// goes back.
+func TestHeapWatchdog(t *testing.T) {
+	reg := api.New()
+	h := New(Config{Backend: fakeBackend{reg, events.New(64)}, HeapLimit: 64 << 20, watchEvery: 20 * time.Millisecond})
+	defer h.Close()
+	h.StartResidents()
+	js, err := Bundle("", `
+const keep: string[] = [];
+h.every("5ms", () => { for (let i = 0; i < 20000; i++) keep.push("x".repeat(64) + i); });`, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := h.Start(RunOptions{JS: js, Perms: Perms{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	info, err := h.Wait(ctx, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.OK || !strings.Contains(info.Error, "memory") {
+		t.Fatalf("info = %+v", info)
+	}
+}

@@ -36,7 +36,7 @@ as JSON. A script that throws exits with status 1.
 | `hive script run -e CODE` | Run code from the command line |
 | `hive script run -` | Run code from stdin |
 | `hive script stop RUN_ID` | Stop a running script. Ctrl-C does the same for the one you started. |
-| `hive script ls` | Running scripts, and the latest that ended |
+| `hive script ls` | Scripts in the folder, running one-shots, and the latest that ended |
 | `hive script check FILE` | Report errors without running it |
 | `hive script types [--out FILE]` | Write `hive.d.ts`, for your editor |
 
@@ -148,6 +148,92 @@ export default hive.script({
 ```
 
 A script that starts another can't give it more than it has itself.
+
+## Scripts that keep running
+
+Put a script in the scripts folder, `~/.config/hive/scripts` (beside the
+settings file, or `HIVE_SCRIPTS`), and the server runs it whenever it runs:
+it starts after your sessions are restored, and keeps running with every
+app closed. A script there is `NAME.ts` or `NAME/index.ts`. Shared code goes
+in `lib/`, which isn't run on its own.
+
+```ts
+// ~/.config/hive/scripts/tests-on-done.ts
+export default hive.script({
+  name: "tests-on-done",
+  permissions: ["spawn"],
+  setup(h) {
+    h.on("terminal.agent_changed", { state: "done" }, async (ctx, ev) => {
+      const [tests] = await (await h.block(ev.block_id)).new_split({
+        layout: { command: ["make", "test"], keep_open: true }, focus: false,
+      });
+      const { exit_code } = await tests.wait({ timeout: "10m" });
+      console.log(exit_code === 0 ? "tests pass" : "tests fail");
+    });
+  },
+});
+```
+
+A new script waits until you allow it:
+
+```sh
+hive script ls                 # tests-on-done  pending  asks spawn
+hive script grant tests-on-done
+```
+
+You grant a script once. Editing it doesn't ask again; asking for more
+permissions does.
+
+| Command | Does |
+| --- | --- |
+| `hive script ls` | Every script in the folder: running, pending, failed, disabled or quarantined |
+| `hive script grant NAME` / `revoke NAME` | Allow what it asks for, or take it back |
+| `hive script disable NAME` / `enable NAME` | Turn it off or on, without removing it |
+| `hive script reload [NAME]` | Load it again now |
+| `hive script logs NAME [-f]` | Its log (`-f` keeps following) |
+| `hive script audit [NAME]` | What it changed |
+
+When you save a script, the server loads the new version within a few
+seconds. If the new version has an error, the old one keeps running, and
+`hive script ls` shows the error.
+
+A script in the folder can keep values with `h.store`. They survive reloads
+and restarts:
+
+```ts
+export default hive.script({
+  name: "counter",
+  permissions: [],
+  async setup(h) {
+    const starts = ((await h.store.get("starts")) ?? 0) + 1;
+    await h.store.set("starts", starts);
+    console.log("started " + starts + " times");
+  },
+});
+```
+
+`h.store.get`, `set`, `delete` and `keys(prefix)` take JSON values, up to
+1 MB per script.
+
+These events help scripts in the folder: `server_started`, then
+`restore_finished` (with `sessions` and `agents_resumed`), and
+`config_changed` (with the `keys` that changed).
+
+### When a script misbehaves
+
+- An error in a handler is logged, and the script keeps running.
+- A handler that runs for more than 5 seconds without a break is stopped.
+  Five of those in 5 minutes, and the script is quarantined: stopped until
+  you `hive script enable` it.
+- If the server's memory grows by more than 1 GB, the busiest script is
+  quarantined.
+- A script's own changes don't wake its own `h.on` handlers (pass
+  `{ self: true }` as a fourth argument to hear them). Scripts that keep
+  waking each other are stopped after 8 rounds: the call fails with
+  `loop_suspected`.
+
+Set `scripts = false` in the [settings](./settings) to start the server
+without them.
 
 ## Safety
 

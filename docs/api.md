@@ -79,7 +79,7 @@ lists every change.
 | Agents | `agent.report`, `agent.list` |
 | Settings | `config.get`, `config.set`, `config.reload` (the server's own settings file; see [Settings](./settings)) |
 | Server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `target.resolve`, `client.list`, `whoami` |
-| Scripts | `script.run`, `script.stop`, `script.list`, `script.result` (see [Scripts](./scripts)) |
+| Scripts | `script.run`, `script.stop`, `script.list`, `script.result`, `script.grant`, `script.revoke`, `script.enable`, `script.disable`, `script.reload`, `script.logs`, `audit.list` (see [Scripts](./scripts)) |
 
 Each method also says which permission a [script](./scripts#permissions)
 needs to call it: `hive api list --json` and `hive api describe` show it as
@@ -113,9 +113,13 @@ saw and misses nothing, unless the gap is older than the server keeps. Then it
 gets `resync_required` and should read the state again. A `heartbeat` comes
 every 15 seconds, so a client can tell a quiet server from a lost connection.
 
-A script's `script_started`, `script_log` and `script_ended` come only to a
-stream that names them with `?types=`, so a busy script never crowds the
-apps' stream.
+Scripts' events, `script_started`, `script_log`, `script_ended`,
+`script_loaded`, `script_unloaded`, `script_failed` and
+`script_quarantined`, come only to a stream that names them with
+`?types=`, so a busy script never crowds the apps' stream.
+
+With `?all=1`, the server also sends `server_started`, `restore_finished`
+and `config_changed`.
 
 With `?all=1`, server events come too: `client_joined` and `client_left`
 when an app or a phone connects or goes, and `tailscale_status_changed` for

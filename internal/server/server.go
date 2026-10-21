@@ -65,6 +65,10 @@ type Config struct {
 	// (tests). ConfigPoll is how often it's checked for edits (default 2s).
 	ConfigPath string
 	ConfigPoll time.Duration
+	// ScriptsDir is the folder of resident scripts; empty means none.
+	ScriptsDir string
+	// scriptBudget, when set, replaces scripts' 5 s handler budget (tests).
+	scriptBudget time.Duration
 	// OnFlush, when set, hears about every save (benchmarks).
 	OnFlush func(FlushStats)
 	// Remote, when set, adds listeners beyond the socket.
@@ -140,7 +144,9 @@ type Server struct {
 	reg     *api.Registry
 	bus     *events.Bus
 	scripts *script.Host
-	store   *persist.Store
+	// agentsResumed counts the agents restore started again.
+	agentsResumed int
+	store         *persist.Store
 
 	mu       sync.Mutex
 	sessions []*session.Session
@@ -224,7 +230,11 @@ func New(cfg Config) (*Server, error) {
 		cfg.ResumeArgv = func(string, string) []string { return nil } // read at start: resume-agents = false
 		s.cfg.ResumeArgv = cfg.ResumeArgv
 	}
-	s.scripts = script.New(script.Config{Backend: s, StateDir: cfg.StateDir, Logger: s.log})
+	scriptsDir := cfg.ScriptsDir
+	if !s.conf.Scripts {
+		scriptsDir = "" // scripts = false, read at start
+	}
+	s.scripts = script.New(script.Config{Backend: s, StateDir: cfg.StateDir, Logger: s.log, ScriptsDir: scriptsDir, Poll: cfg.ConfigPoll, HandlerBudget: cfg.scriptBudget})
 	s.registerMethods()
 	s.registerScriptMethods()
 	if cfg.ConfigPath != "" {
@@ -276,6 +286,7 @@ func (s *Server) Serve() error {
 	}
 	go s.persistLoop()
 	go s.stateLoop()
+	s.startScripts()
 	s.log.Info("listening", "socket", s.cfg.Socket, "state", s.cfg.StateDir)
 	err = s.srv.Serve(ln)
 	if errors.Is(err, http.ErrServerClosed) {
@@ -1029,6 +1040,7 @@ func (s *Server) restore() error {
 				r, err := s.startBlock(ss.ID, bid, st, opts)
 				if err == nil && argv != nil {
 					r.resuming = time.Now().Add(resumeGrace)
+					s.agentsResumed++
 					// Nothing in front may change after that: look again then.
 					time.AfterFunc(resumeGrace+100*time.Millisecond, func() { s.recheckResumed(bid) })
 				}

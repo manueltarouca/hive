@@ -31,6 +31,17 @@ type scriptRunIn struct {
 	All       bool            `json:"all,omitempty" desc:"Hear every session's events, not only its own."`
 }
 
+// startScripts loads the scripts folder once sessions are restored, then
+// tells every script the server is up.
+func (s *Server) startScripts() {
+	s.scripts.StartResidents()
+	s.mu.Lock()
+	sessions, agents := len(s.sessions), s.agentsResumed
+	s.mu.Unlock()
+	s.bus.Server("server_started", map[string]any{"restored": !s.cfg.Fresh, "version": Version})
+	s.bus.Server("restore_finished", map[string]any{"sessions": sessions, "agents_resumed": agents})
+}
+
 func (s *Server) registerScriptMethods() {
 	api.Register(s.reg, "script.run", "Run a script once. Its log and end come as script_log and script_ended events (GET /v1/events?types=script_log,script_ended&since=SEQ).",
 		func(ctx context.Context, in scriptRunIn) (map[string]any, error) {
@@ -70,9 +81,56 @@ func (s *Server) registerScriptMethods() {
 	api.Register(s.reg, "script.stop", "Stop a running script.",
 		func(ctx context.Context, in runRef) (empty, error) { return empty{}, s.scripts.Stop(in.RunID) },
 		api.Perm("control"))
-	api.Register(s.reg, "script.list", "List running scripts and the latest that ended.",
+	api.Register(s.reg, "script.list", "List the scripts folder's scripts, running one-shots, and the latest that ended.",
 		func(ctx context.Context, _ empty) (map[string]any, error) {
-			return map[string]any{"runs": nonNilRuns(s.scripts.List())}, nil
+			return map[string]any{"scripts": s.scripts.Residents(), "runs": nonNilRuns(s.scripts.List())}, nil
+		}, api.Perm("read"))
+	type nameIn struct {
+		Name string `json:"name" required:"true" desc:"A script in the scripts folder."`
+	}
+	api.Register(s.reg, "script.grant", "Allow a script the permissions its manifest asks for, and start it.",
+		func(ctx context.Context, in nameIn) (script.Resident, error) { return s.scripts.Grant(in.Name) },
+		api.Perm("server"))
+	api.Register(s.reg, "script.revoke", "Take a script's permissions away. It waits for a new grant.",
+		func(ctx context.Context, in nameIn) (script.Resident, error) { return s.scripts.Revoke(in.Name) },
+		api.Perm("server"))
+	api.Register(s.reg, "script.enable", "Turn a script back on, quarantined ones included.",
+		func(ctx context.Context, in nameIn) (script.Resident, error) { return s.scripts.Enable(in.Name, true) },
+		api.Perm("server"))
+	api.Register(s.reg, "script.disable", "Turn a script off without removing it.",
+		func(ctx context.Context, in nameIn) (script.Resident, error) { return s.scripts.Enable(in.Name, false) },
+		api.Perm("server"))
+	type reloadIn struct {
+		Name string `json:"name,omitempty" desc:"One script; all of them without it."`
+	}
+	api.Register(s.reg, "script.reload", "Load scripts from the folder again now, instead of at the next check.",
+		func(ctx context.Context, in reloadIn) (map[string]any, error) {
+			rs, err := s.scripts.Reload(in.Name)
+			return map[string]any{"scripts": rs}, err
+		}, api.Perm("server"))
+	type logsIn struct {
+		Name string `json:"name" required:"true"`
+		Tail int    `json:"tail,omitempty" desc:"The last N lines. Default 100."`
+	}
+	api.Register(s.reg, "script.logs", "A script's log, from its file.",
+		func(ctx context.Context, in logsIn) (map[string]any, error) {
+			n := in.Tail
+			if n <= 0 {
+				n = 100
+			}
+			return map[string]any{"lines": s.scripts.Logs(in.Name, n)}, nil
+		}, api.Perm("read"))
+	type auditIn struct {
+		Name string `json:"name,omitempty" desc:"One script's entries."`
+		Tail int    `json:"tail,omitempty" desc:"The last N entries. Default 100."`
+	}
+	api.Register(s.reg, "audit.list", "What scripts changed: every call that arranged, ran, typed or changed settings.",
+		func(ctx context.Context, in auditIn) (map[string]any, error) {
+			n := in.Tail
+			if n <= 0 {
+				n = 100
+			}
+			return map[string]any{"entries": s.scripts.Audit(in.Name, n)}, nil
 		}, api.Perm("read"))
 	type resultIn struct {
 		RunID   string  `json:"run_id" required:"true"`
