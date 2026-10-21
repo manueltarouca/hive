@@ -76,18 +76,18 @@ func (s *Server) registerMethods() {
 				out["tailscale"] = node
 			}
 			return out, nil
-		})
+		}, api.Perm("read"))
 	api.Register(r, "whoami", "Return who this connection speaks for and how it reached the server.",
 		func(ctx context.Context, _ empty) (remote.Identity, error) {
 			return remote.IdentityOf(ctx), nil
-		})
+		}, api.Perm("read"))
 	api.Register(r, "server.shutdown", "Save every session and stop the server. Sessions are restored at the next start.",
 		func(ctx context.Context, _ empty) (empty, error) {
 			go func() { time.Sleep(50 * time.Millisecond); s.Shutdown() }()
 			return empty{}, nil
-		})
+		}, api.Perm("server"))
 	api.Register(r, "server.flush", "Save state and snapshots to disk now.",
-		func(ctx context.Context, _ empty) (empty, error) { return empty{}, s.Flush() })
+		func(ctx context.Context, _ empty) (empty, error) { return empty{}, s.Flush() }, api.Perm("server"))
 
 	type listIn struct {
 		Full bool `json:"full,omitempty" desc:"Include each method's schemas."`
@@ -96,14 +96,14 @@ func (s *Server) registerMethods() {
 		func(ctx context.Context, in listIn) ([]map[string]any, error) {
 			var out []map[string]any
 			for _, m := range s.reg.List() {
-				e := map[string]any{"name": m.Name, "description": m.Description}
+				e := map[string]any{"name": m.Name, "description": m.Description, "permission": m.Permission}
 				if in.Full {
 					e["input_schema"], e["output_schema"] = m.InputSchema, m.OutputSchema
 				}
 				out = append(out, e)
 			}
 			return out, nil
-		})
+		}, api.Perm("read"))
 	type describeIn struct {
 		Method string `json:"method" required:"true"`
 	}
@@ -114,7 +114,7 @@ func (s *Server) registerMethods() {
 				return nil, &api.Error{Status: 404, Code: "method_not_found", Message: "no method named " + in.Method}
 			}
 			return m, nil
-		})
+		}, api.Perm("read"))
 
 	// ---- targets ----
 	type resolveIn struct {
@@ -132,7 +132,7 @@ func (s *Server) registerMethods() {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			return s.resolve(in.Kind, in.Target, in.SessionID, in.WindowID)
-		})
+		}, api.Perm("read"))
 
 	// ---- sessions ----
 	api.Register(r, "session.list", "List sessions.",
@@ -151,7 +151,7 @@ func (s *Server) registerMethods() {
 				out = append(out, sum)
 			}
 			return map[string][]sessionSummary{"sessions": out}, nil
-		})
+		}, api.Perm("read"))
 
 	type createIn struct {
 		Label   string      `json:"label,omitempty"`
@@ -201,7 +201,7 @@ func (s *Server) registerMethods() {
 			s.bus.Session(ss.ID, "window_created", map[string]any{"window_id": w.ID, "label": w.Label})
 			s.changed(ss)
 			return newOut{SessionID: ss.ID, WindowID: w.ID, BlockIDs: blocks, SplitIDs: nonNil(splits), Revision: ss.Revision}, nil
-		})
+		}, api.PermBy("control", spawnNote, permByLayout))
 
 	api.Register(r, "session.view", "Return the session's windows, layouts, and blocks.",
 		func(ctx context.Context, in sessionRef) (json.RawMessage, error) {
@@ -221,7 +221,7 @@ func (s *Server) registerMethods() {
 				"session_id": ss.ID, "label": ss.Label, "revision": ss.Revision,
 				"active_window_id": ss.ActiveWindow().ID, "windows": ss.Windows, "blocks": blocks,
 			})
-		})
+		}, api.Perm("read"))
 
 	api.Register(r, "session.list_blocks", "List every block in the session.",
 		func(ctx context.Context, in sessionRef) (json.RawMessage, error) {
@@ -240,7 +240,7 @@ func (s *Server) registerMethods() {
 				}
 			}
 			return copyJSON(map[string]any{"blocks": out})
-		})
+		}, api.Perm("read"))
 
 	api.Register(r, "session.set_label", "Set the session's label.",
 		func(ctx context.Context, in struct {
@@ -257,7 +257,7 @@ func (s *Server) registerMethods() {
 			s.bus.Session(ss.ID, "session_label_changed", map[string]any{"label": in.Label})
 			s.changed(ss)
 			return revisionOut{ss.Revision}, nil
-		})
+		}, api.Perm("control"))
 
 	api.Register(r, "session.close", "Close a session and every block in it. It is not restored.",
 		func(ctx context.Context, in sessionRef) (empty, error) {
@@ -273,7 +273,7 @@ func (s *Server) registerMethods() {
 				_ = s.closeBlock(bid)
 			}
 			return empty{}, nil
-		})
+		}, api.Perm("control"))
 
 	// ---- windows ----
 	type newWindowIn struct {
@@ -309,7 +309,7 @@ func (s *Server) registerMethods() {
 			}
 			s.changed(ss)
 			return newOut{WindowID: w.ID, BlockIDs: blocks, SplitIDs: nonNil(splits), Revision: ss.Revision}, nil
-		})
+		}, api.PermBy("control", spawnNote, permByLayout))
 
 	type windowRef struct {
 		SessionID string `json:"session_id" required:"true"`
@@ -334,7 +334,7 @@ func (s *Server) registerMethods() {
 				_ = s.closeBlock(bid)
 			}
 			return empty{}, nil
-		})
+		}, api.Perm("control"))
 	api.Register(r, "session.focus_window", "Make a window the active one.",
 		func(ctx context.Context, in windowRef) (revisionOut, error) {
 			return s.withSession(in.SessionID, func(ss *session.Session) error {
@@ -345,7 +345,7 @@ func (s *Server) registerMethods() {
 				s.bus.Session(ss.ID, "active_window_changed", map[string]any{"window_id": in.WindowID})
 				return nil
 			})
-		})
+		}, api.Perm("control"))
 	type moveWindowIn struct {
 		SessionID string `json:"session_id" required:"true"`
 		WindowID  string `json:"window_id" required:"true"`
@@ -371,7 +371,7 @@ func (s *Server) registerMethods() {
 				ss.Windows = append(rest[:at], append([]*session.Window{w}, rest[at:]...)...)
 				return nil
 			})
-		})
+		}, api.Perm("control"))
 	type stepIn struct {
 		SessionID string `json:"session_id" required:"true"`
 	}
@@ -393,7 +393,7 @@ func (s *Server) registerMethods() {
 					s.bus.Session(ss.ID, "active_window_changed", map[string]any{"window_id": ss.Active})
 					return nil
 				})
-			})
+			}, api.Perm("control"))
 	}
 	api.Register(r, "session.set_window_label", "Set a window's label.",
 		func(ctx context.Context, in struct {
@@ -410,7 +410,7 @@ func (s *Server) registerMethods() {
 				s.bus.Session(ss.ID, "window_label_changed", map[string]any{"window_id": w.ID, "label": in.Label})
 				return nil
 			})
-		})
+		}, api.Perm("control"))
 
 	api.Register(r, "session.pin_window", "Pin or unpin a window: pinned tabs come first in every client.",
 		func(ctx context.Context, in struct {
@@ -427,7 +427,7 @@ func (s *Server) registerMethods() {
 				s.bus.Session(ss.ID, "window_pinned", map[string]any{"window_id": w.ID, "pinned": in.Pinned})
 				return nil
 			})
-		})
+		}, api.Perm("control"))
 
 	// ---- blocks and layout ----
 	type newSplitIn struct {
@@ -488,7 +488,7 @@ func (s *Server) registerMethods() {
 			s.changed(ss)
 			return newOut{AnchorBlockID: in.BlockID, WindowID: w.ID, BlockIDs: blocks,
 				SplitIDs: append([]string{sid}, splits...), Revision: ss.Revision}, nil
-		})
+		}, api.PermBy("control", spawnNote, permByLayout))
 
 	type blockRef struct {
 		SessionID string `json:"session_id" required:"true"`
@@ -506,7 +506,7 @@ func (s *Server) registerMethods() {
 				return empty{}, err
 			}
 			return empty{}, s.closeBlock(in.BlockID)
-		})
+		}, api.Perm("control"))
 	api.Register(r, "session.describe_block", "Return a block's placement, state, and the methods it offers.",
 		func(ctx context.Context, in blockRef) (json.RawMessage, error) {
 			s.mu.Lock()
@@ -524,7 +524,7 @@ func (s *Server) registerMethods() {
 			}
 			info["methods"] = methods
 			return copyJSON(info)
-		})
+		}, api.Perm("read"))
 	api.Register(r, "session.focus_block", "Focus a block, and its window.",
 		func(ctx context.Context, in blockRef) (revisionOut, error) {
 			return s.withSession(in.SessionID, func(ss *session.Session) error {
@@ -535,7 +535,7 @@ func (s *Server) registerMethods() {
 				w.Focus, ss.Active = in.BlockID, w.ID
 				return nil
 			})
-		})
+		}, api.Perm("control"))
 	api.Register(r, "session.focus_direction", "Focus the nearest block in a direction.",
 		func(ctx context.Context, in struct {
 			SessionID string `json:"session_id" required:"true"`
@@ -561,7 +561,7 @@ func (s *Server) registerMethods() {
 				return nil
 			})
 			return map[string]any{"block_id": to, "revision": rev.Revision}, err
-		})
+		}, api.Perm("control"))
 	for _, step := range []struct {
 		name, desc string
 		d          int
@@ -586,7 +586,7 @@ func (s *Server) registerMethods() {
 					w.Focus = bs[(i+step.d+len(bs))%len(bs)]
 					return nil
 				})
-			})
+			}, api.Perm("control"))
 	}
 	api.Register(r, "session.zoom_block", "Toggle or set whether a block fills its window.",
 		func(ctx context.Context, in struct {
@@ -609,7 +609,7 @@ func (s *Server) registerMethods() {
 				return nil
 			})
 			return map[string]any{"zoomed": zoomed, "revision": rev.Revision}, err
-		})
+		}, api.Perm("control"))
 	api.Register(r, "session.resize_pane", "Move the border between a block and its neighbor.",
 		func(ctx context.Context, in struct {
 			SessionID string  `json:"session_id" required:"true"`
@@ -631,7 +631,7 @@ func (s *Server) registerMethods() {
 				}
 				return nil
 			})
-		})
+		}, api.Perm("control"))
 	api.Register(r, "session.move_block", "Move a block into a new split beside another block.",
 		func(ctx context.Context, in struct {
 			SessionID     string  `json:"session_id" required:"true"`
@@ -653,7 +653,7 @@ func (s *Server) registerMethods() {
 				}
 				return nil
 			})
-		})
+		}, api.Perm("control"))
 	api.Register(r, "session.set_block_label", "Update a block's label.",
 		func(ctx context.Context, in struct {
 			SessionID string `json:"session_id" required:"true"`
@@ -668,7 +668,7 @@ func (s *Server) registerMethods() {
 				rr.st.Label = in.Label
 				return nil
 			})
-		})
+		}, api.Perm("control"))
 
 	// ---- clients ----
 	api.Register(r, "client.list", "List connected clients.",
@@ -680,7 +680,7 @@ func (s *Server) registerMethods() {
 				out = append(out, c)
 			}
 			return map[string][]*Client{"clients": out}, nil
-		})
+		}, api.Perm("read"))
 
 	s.registerTerminalMethods()
 	s.registerAgentMethods()
@@ -815,7 +815,7 @@ type blockCall struct {
 	Args      json.RawMessage `json:"args,omitempty"`
 }
 
-func (s *Server) terminal(name, desc string, run func(r *rec, args json.RawMessage) (any, error)) {
+func (s *Server) terminal(name, desc string, run func(r *rec, args json.RawMessage) (any, error), opts ...api.Option) {
 	api.Register(s.reg, terminalPrefix+name, desc, func(ctx context.Context, in blockCall) (any, error) {
 		s.mu.Lock()
 		rr, err := s.needBlock(in.BlockID)
@@ -827,7 +827,7 @@ func (s *Server) terminal(name, desc string, run func(r *rec, args json.RawMessa
 			return nil, err
 		}
 		return run(rr, in.Args)
-	})
+	}, opts...)
 }
 
 func args[T any](raw json.RawMessage) (T, error) {
@@ -870,17 +870,17 @@ func (s *Server) registerTerminalMethods() {
 				return nil, api.BadRequest("%v", err)
 			}
 			return map[string]any{"content": out}, nil
-		})
+		}, api.Perm("screen"))
 	s.terminal("title", "Return the terminal's title.", func(r *rec, _ json.RawMessage) (any, error) {
 		return map[string]any{"title": r.b.Title()}, nil
-	})
+	}, api.Perm("read"))
 	s.terminal("pwd", "Return the working directory the program last reported.", func(r *rec, _ json.RawMessage) (any, error) {
 		return map[string]any{"pwd": r.b.Pwd()}, nil
-	})
+	}, api.Perm("read"))
 	s.terminal("size", "Return the terminal's size in cells.", func(r *rec, _ json.RawMessage) (any, error) {
 		c, rr := r.b.Size()
 		return map[string]any{"cols": c, "rows": rr, "size_owner": r.owner}, nil
-	})
+	}, api.Perm("read"))
 	s.terminal("process", "Describe the terminal's foreground process: pid, name, cwd, and program (what runs, as a person would name it: claude, not its version-named binary).", func(r *rec, _ json.RawMessage) (any, error) {
 		fg, err := r.b.Foreground()
 		out := map[string]any{"child_pid": r.b.PID()}
@@ -888,7 +888,7 @@ func (s *Server) registerTerminalMethods() {
 			out["foreground"] = fg
 		}
 		return out, nil
-	})
+	}, api.Perm("read"))
 	s.terminal("write", "Write text to the terminal as if it were typed. args: {data} or {data_base64}",
 		func(r *rec, raw json.RawMessage) (any, error) {
 			a, err := args[struct {
@@ -905,7 +905,7 @@ func (s *Server) registerTerminalMethods() {
 				}
 			}
 			return map[string]any{"written": len(data)}, r.b.Write(data)
-		})
+		}, api.Perm("input"))
 	s.terminal("send_key", "Press keys, such as ctrl+c or enter, encoded for the terminal's modes. args: {keys: [..]}",
 		func(r *rec, raw json.RawMessage) (any, error) {
 			a, err := args[struct {
@@ -920,7 +920,7 @@ func (s *Server) registerTerminalMethods() {
 				}
 			}
 			return map[string]any{"sent": len(a.Keys)}, nil
-		})
+		}, api.Perm("input"))
 	s.terminal("resize", "Request a size for the terminal. args: {cols, rows, client_id, take, release}. Only the client with size authority may resize, unless take is set; release sets the size and gives up authority.",
 		func(r *rec, raw json.RawMessage) (any, error) {
 			a, err := args[struct {
@@ -963,7 +963,7 @@ func (s *Server) registerTerminalMethods() {
 			s.mu.Unlock()
 			s.markDirty()
 			return map[string]any{"cols": a.Cols, "rows": a.Rows, "size_owner": who}, nil
-		})
+		}, api.Perm("control"))
 	s.terminal("list_dir", "List the directories under a path, for Go to Directory. args: {path}; default the working directory.",
 		func(r *rec, raw json.RawMessage) (any, error) {
 			a, err := args[struct {
@@ -1003,13 +1003,13 @@ func (s *Server) registerTerminalMethods() {
 				}
 			}
 			return map[string]any{"path": path, "entries": out}, nil
-		})
+		}, api.Perm("screen"))
 	s.terminal("program_status", "Return the status records programs have reported (OSC 7501).",
 		func(r *rec, _ json.RawMessage) (any, error) {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			return map[string]any{"records": sortedStatus(r.st.Status)}, nil
-		})
+		}, api.Perm("read"))
 	api.Register(s.reg, terminalPrefix+"wait", "Wait for the program to exit. args: {timeout} in seconds, at most 60; repeat to wait longer. Works for a short while after the block has closed.",
 		func(ctx context.Context, in blockCall) (map[string]any, error) {
 			a, err := args[struct {
@@ -1041,7 +1041,7 @@ func (s *Server) registerTerminalMethods() {
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			}
-		})
+		}, api.Perm("read"))
 
 	type methodIn struct {
 		SessionID string          `json:"session_id,omitempty"`
@@ -1051,13 +1051,10 @@ func (s *Server) registerTerminalMethods() {
 	}
 	api.Register(s.reg, "block.method", "Invoke a typed method on a block.",
 		func(ctx context.Context, in methodIn) (any, error) {
-			name := in.Method
-			if !strings.HasPrefix(name, terminalPrefix) {
-				name = terminalPrefix + name
-			}
+			name := blockMethodName(in.Method)
 			raw, _ := json.Marshal(blockCall{SessionID: in.SessionID, BlockID: in.BlockID, Args: in.Args})
 			return s.reg.Call(ctx, name, raw)
-		})
+		}, api.PermBy("read", "the permission of the method it reaches", s.permOfForwarded))
 }
 
 // ---- agents ----
@@ -1158,7 +1155,7 @@ func (s *Server) registerAgentMethods() {
 			s.mu.Unlock()
 			s.saveStateSoon()
 			return &copyA, nil
-		})
+		}, api.Perm("control"))
 
 	type agentRow struct {
 		BlockID      string         `json:"block_id"`
@@ -1195,7 +1192,7 @@ func (s *Server) registerAgentMethods() {
 				}
 			}
 			return copyJSON(map[string][]agentRow{"agents": rows})
-		})
+		}, api.Perm("read"))
 }
 
 // ---- small helpers ----

@@ -108,3 +108,29 @@ func TestCallRecoversPanic(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestPermissions(t *testing.T) {
+	r := New()
+	Register(r, "a", "A.", func(ctx context.Context, _ struct{}) (struct{}, error) { return struct{}{}, nil }, Perm("read"))
+	Register(r, "b", "B.", func(ctx context.Context, _ struct{}) (struct{}, error) { return struct{}{}, nil },
+		PermBy("control", "spawn with a command", func(raw json.RawMessage) (string, error) {
+			if string(raw) == `{"command":["x"]}` {
+				return "spawn", nil
+			}
+			return "control", nil
+		}))
+	for _, c := range []struct{ name, raw, want string }{
+		{"a", `{}`, "read"}, {"b", `{}`, "control"}, {"b", `{"command":["x"]}`, "spawn"},
+	} {
+		got, err := r.PermissionOf(c.name, json.RawMessage(c.raw))
+		if err != nil || got != c.want {
+			t.Errorf("%s %s = %q, %v; want %q", c.name, c.raw, got, err, c.want)
+		}
+	}
+	if m, _ := r.Describe("b"); m.Permission != "control" || m.PermissionNote == "" {
+		t.Errorf("describe b = %+v", m)
+	}
+	if _, err := r.PermissionOf("nope", nil); err == nil {
+		t.Error("unknown method has a permission")
+	}
+}

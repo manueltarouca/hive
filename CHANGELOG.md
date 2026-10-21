@@ -11,6 +11,15 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ## [Unreleased]
 
+### Added
+
+- Every method says which permission a script needs to call it: `read`,
+  `screen`, `control`, `spawn`, `input`, `ui`, `config` or `server`.
+  `api list` and `api describe` show it, with a note for methods whose
+  arguments decide it (a layout that runs a command needs `spawn`).
+- Error codes `permission_denied`, `timeout` and `script_unloaded`, for
+  scripts.
+
 ### Fixed
 
 - A method that crashed while called over the attach stream (the apps'

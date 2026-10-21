@@ -108,7 +108,7 @@ func (s *Server) configView() configView {
 func (s *Server) registerConfigMethods() {
 	type empty struct{}
 	api.Register(s.reg, "config.get", "The server's settings: its file's path, every value, and problems in the file by line.",
-		func(ctx context.Context, _ empty) (configView, error) { return s.configView(), nil })
+		func(ctx context.Context, _ empty) (configView, error) { return s.configView(), nil }, api.Perm("read"))
 	type setIn struct {
 		Key   string `json:"key" required:"true" desc:"A setting, such as scrollback-limit"`
 		Value string `json:"value" required:"true" desc:"Its new value; empty resets it to the default"`
@@ -123,10 +123,10 @@ func (s *Server) registerConfigMethods() {
 			}
 			s.reloadConfig()
 			return s.configView(), nil
-		})
+		}, api.PermBy("config", "server for listen and settings starting with script", permOfSetting))
 	api.Register(s.reg, "config.reload", "Read the settings file again and apply it.",
 		func(ctx context.Context, _ empty) (configView, error) {
 			s.reloadConfig()
 			return s.configView(), nil
-		})
+		}, api.Perm("config"))
 }

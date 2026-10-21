@@ -52,15 +52,49 @@ func Internal(format string, args ...any) *Error {
 	return newErr(http.StatusInternalServerError, "internal", format, args...)
 }
 
+// PermissionDenied: a script called a method its permissions don't cover.
+func PermissionDenied(format string, args ...any) *Error {
+	return newErr(http.StatusForbidden, "permission_denied", format, args...)
+}
+
+// Timeout: a wait or a time budget ran out.
+func Timeout(format string, args ...any) *Error {
+	return newErr(http.StatusRequestTimeout, "timeout", format, args...)
+}
+
+// ScriptUnloaded: the script stopped while the call was in flight.
+func ScriptUnloaded(format string, args ...any) *Error {
+	return newErr(http.StatusConflict, "script_unloaded", format, args...)
+}
+
 // Method is a registered method and its documentation.
 type Method struct {
-	Name         string         `json:"name"`
-	Description  string         `json:"description"`
-	InputSchema  map[string]any `json:"input_schema"`
-	OutputSchema map[string]any `json:"output_schema"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Permission is what a script needs to call the method (read, screen,
+	// control, spawn, input, ui, config, server). PermissionNote says when a
+	// call needs more, for methods whose permission depends on the arguments.
+	Permission     string         `json:"permission,omitempty"`
+	PermissionNote string         `json:"permission_note,omitempty"`
+	InputSchema    map[string]any `json:"input_schema"`
+	OutputSchema   map[string]any `json:"output_schema"`
 
 	inType  reflect.Type
 	handler func(ctx context.Context, raw json.RawMessage) (any, error)
+	permBy  func(raw json.RawMessage) (string, error)
+}
+
+// Option adds to a method as it is registered.
+type Option func(*Method)
+
+// Perm sets the permission a script needs to call the method.
+func Perm(p string) Option { return func(m *Method) { m.Permission = p } }
+
+// PermBy sets the permission for a method whose arguments decide it: p is
+// the least it needs, note says when it needs more, and by works it out per
+// call.
+func PermBy(p, note string, by func(raw json.RawMessage) (string, error)) Option {
+	return func(m *Method) { m.Permission, m.PermissionNote, m.permBy = p, note, by }
 }
 
 // Registry holds methods by name.
@@ -72,7 +106,7 @@ type Registry struct {
 func New() *Registry { return &Registry{methods: map[string]*Method{}} }
 
 // Register adds a method. I and O must be structs.
-func Register[I, O any](r *Registry, name, description string, fn func(ctx context.Context, in I) (O, error)) {
+func Register[I, O any](r *Registry, name, description string, fn func(ctx context.Context, in I) (O, error), opts ...Option) {
 	it, ot := reflect.TypeFor[I](), reflect.TypeFor[O]()
 	m := &Method{
 		Name: name, Description: description,
@@ -85,7 +119,22 @@ func Register[I, O any](r *Registry, name, description string, fn func(ctx conte
 		}
 		return fn(ctx, in)
 	}
+	for _, o := range opts {
+		o(m)
+	}
 	r.methods[name] = m
+}
+
+// PermissionOf is the permission a call needs, given its arguments.
+func (r *Registry) PermissionOf(name string, raw json.RawMessage) (string, error) {
+	m, ok := r.methods[name]
+	if !ok {
+		return "", newErr(http.StatusNotFound, "method_not_found", "no method named %q", name)
+	}
+	if m.permBy != nil {
+		return m.permBy(raw)
+	}
+	return m.Permission, nil
 }
 
 // List returns every method, sorted by name.
