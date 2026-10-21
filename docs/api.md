@@ -60,6 +60,9 @@ A call answers with `{"result": …}`, or with `{"error": {"status", "code",
 | `ambiguous` | 409 | A target matched more than one thing |
 | `conflict` | 409 | Another client holds the size, or a label is taken |
 | `forbidden` | 403 | This caller may not use this server |
+| `permission_denied` | 403 | A script called a method its permissions don't cover |
+| `timeout` | 408 | A script's wait or time limit ran out |
+| `script_unloaded` | 409 | The script stopped while the call was running |
 
 ## Methods
 
@@ -76,6 +79,11 @@ lists every change.
 | Agents | `agent.report`, `agent.list` |
 | Settings | `config.get`, `config.set`, `config.reload` (the server's own settings file; see [Settings](./settings)) |
 | Server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `target.resolve`, `client.list`, `whoami` |
+| Scripts | `script.run`, `script.stop`, `script.list`, `script.result` (see [Scripts](./scripts)) |
+
+Each method also says which permission a [script](./scripts#permissions)
+needs to call it: `hive api list --json` and `hive api describe` show it as
+`permission`.
 
 Terminal methods take the block and their own arguments separately:
 
@@ -97,12 +105,17 @@ every method's arguments.
 | *(none)* | Sessions created and destroyed |
 | `?session=ID` | Everything in one session, terminal events included |
 | `?all=1` | Everything, clients included |
+| `?types=a,b` | Only events of these types, such as `script_log,script_ended` |
 | `?since=N` | First, the events after number N that are still kept |
 
 Every event has a number. A client that reconnects passes the last number it
 saw and misses nothing, unless the gap is older than the server keeps. Then it
 gets `resync_required` and should read the state again. A `heartbeat` comes
 every 15 seconds, so a client can tell a quiet server from a lost connection.
+
+A script's `script_started`, `script_log` and `script_ended` come only to a
+stream that names them with `?types=`, so a busy script never crowds the
+apps' stream.
 
 With `?all=1`, server events come too: `client_joined` and `client_left`
 when an app or a phone connects or goes, and `tailscale_status_changed` for

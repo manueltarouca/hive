@@ -69,6 +69,14 @@ Settings (~/.config/hive/config, or HIVE_CONFIG)
   config set KEY VALUE       change one setting, keeping the rest of the file
   config reload              make the server read it again
 
+Scripts (TypeScript, run by the server)
+  script run FILE|-e CODE|- [KEY=VALUE...] [--allow PERMS] [--for DUR] [--all]
+                             run a script once: its log on stderr, its
+                             result as JSON (--allow: read,control,spawn...)
+  script stop RUN_ID         stop a running script
+  script ls                  running scripts and the latest that ended
+  script check FILE          bundle a script and report errors
+
 API
   api list [-q]              every server method
   api describe METHOD        a method's arguments and result
@@ -167,6 +175,8 @@ func dispatch(g globals, args []string) error {
 		return cmdAgents(g)
 	case "agent":
 		return cmdAgent(g, rest)
+	case "script":
+		return cmdScript(g, rest)
 	}
 	return usagef("unknown command %q; run hive help", cmd)
 }

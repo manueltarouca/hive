@@ -38,6 +38,7 @@ import (
 	"github.com/manueltarouca/hive/internal/id"
 	"github.com/manueltarouca/hive/internal/persist"
 	"github.com/manueltarouca/hive/internal/remote"
+	"github.com/manueltarouca/hive/internal/script"
 	"github.com/manueltarouca/hive/internal/session"
 	"github.com/manueltarouca/hive/internal/vt"
 )
@@ -134,11 +135,12 @@ type Server struct {
 	confStamp fileStamp
 	confMu    sync.Mutex // serializes reloadConfig
 
-	cfg   Config
-	log   *slog.Logger
-	reg   *api.Registry
-	bus   *events.Bus
-	store *persist.Store
+	cfg     Config
+	log     *slog.Logger
+	reg     *api.Registry
+	bus     *events.Bus
+	scripts *script.Host
+	store   *persist.Store
 
 	mu       sync.Mutex
 	sessions []*session.Session
@@ -222,7 +224,9 @@ func New(cfg Config) (*Server, error) {
 		cfg.ResumeArgv = func(string, string) []string { return nil } // read at start: resume-agents = false
 		s.cfg.ResumeArgv = cfg.ResumeArgv
 	}
+	s.scripts = script.New(script.Config{Backend: s, StateDir: cfg.StateDir, Logger: s.log})
 	s.registerMethods()
+	s.registerScriptMethods()
 	if cfg.ConfigPath != "" {
 		go s.watchConfig()
 	}
@@ -289,6 +293,8 @@ func (s *Server) Shutdown() {
 		go func() {
 			defer close(s.stopped)
 			defer s.unlockState()
+			// Scripts first: they would react to every block closing below.
+			s.scripts.Close()
 			if err := s.flush(true); err != nil {
 				s.log.Error("final save failed", "err", err)
 			}

@@ -76,6 +76,20 @@ The CLI calls a pane a block and a tab a window.
 | `hive agent uninstall claude` | Remove them |
 | `hive agent hook HARNESS` | Run by an agent's hooks |
 
+## Scripts
+
+| Command | Does |
+| --- | --- |
+| `hive script run FILE [KEY=VALUE…]` | Run a TypeScript or JavaScript file on the server, once. Its log goes to stderr, its result to stdout as JSON. Ctrl-C stops it. |
+| `hive script run -e CODE` / `-` | Run code from the command line, or from stdin |
+| `hive script stop RUN_ID` | Stop a running script |
+| `hive script ls` | Running scripts, and the latest that ended |
+| `hive script check FILE` | Bundle a script and report errors, without running it |
+
+`script run` takes `--allow PERMS` (such as `control,spawn`; read only
+without it), `--args JSON`, `--for DUR` (stop it after that long) and
+`--all` (hear every session's events). See [Scripts](./scripts).
+
 ## API and server
 
 | Command | Does |

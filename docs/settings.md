@@ -52,6 +52,7 @@ comment.
 | `scrollback-limit` | `16m` | History kept per terminal, in bytes (`k`, `m`, `g`), at least `64k`. Read by the server; lowering it drops old lines at once |
 | `resume-agents` | `true` | Resume agents' sessions when the server starts again. Read when the server starts |
 | `listen` | empty | Listeners the server adds when it starts, separated by spaces, such as `tailnet://:4483`. Only `tailnet://` and `tailnet-serve://`. One that can't open is tried again every 15 seconds. Listener options to `hive server start` replace it. See [Remote hosts](./remote) |
+| `script-remote-run` | `false` | Let callers on other machines (over Tailscale) run [scripts](./scripts) on this server |
 
 ## Changing settings
 

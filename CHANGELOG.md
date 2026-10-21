@@ -13,6 +13,15 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ### Added
 
+- Scripts: TypeScript or JavaScript the server runs, with the same methods
+  and events as the CLI. `hive script run FILE` runs one once, with its log
+  on stderr and its result on stdout; `hive script stop`, `hive script ls`
+  and `hive script check` go with it. A script can only read unless allowed
+  more (`--allow control,spawn`, or a `hive.script` manifest), and what it
+  changes goes to an audit log. Methods `script.run`, `script.stop`,
+  `script.list` and `script.result`; scoped events `script_started`,
+  `script_log` and `script_ended`; setting `script-remote-run`. See
+  [Scripts](https://manueltarouca.github.io/hive/docs/scripts).
 - Every method says which permission a script needs to call it: `read`,
   `screen`, `control`, `spawn`, `input`, `ui`, `config` or `server`.
   `api list` and `api describe` show it, with a note for methods whose

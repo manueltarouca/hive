@@ -29,6 +29,8 @@ type Config struct {
 	ResumeAgents     bool   `json:"resume-agents"`
 	// Listeners the server adds when it starts, as --extra-listen takes them.
 	Listen []string `json:"listen"`
+	// ScriptRemoteRun lets callers on other machines run scripts here.
+	ScriptRemoteRun bool `json:"script-remote-run"`
 }
 
 // Level is how bad a diagnostic is: an error keeps the default.
@@ -127,6 +129,8 @@ var Keys = []Key{
 			c.Listen = out
 			return nil
 		}},
+	{Name: "script-remote-run", Default: "false", Server: true, Help: "let callers on other machines (over Tailscale) run scripts on this server",
+		set: boolean(func(c *Config, b bool) { c.ScriptRemoteRun = b })},
 }
 
 func oneOf(apply func(*Config, string), allowed ...string) func(*Config, string) error {

@@ -76,7 +76,7 @@ func run(argv []string) int {
 		return exitUnreachable
 	case errors.As(err, &ce) && (ce.Code == "not_found" || ce.Code == "ambiguous"):
 		return exitTarget
-	case errors.As(err, &ce) && ce.Code == "forbidden":
+	case errors.As(err, &ce) && (ce.Code == "forbidden" || ce.Code == "permission_denied"):
 		return exitForbidden
 	case errors.Is(err, context.Canceled):
 		return exitInterrupted
