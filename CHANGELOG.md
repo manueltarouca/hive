@@ -11,6 +11,13 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ## [Unreleased]
 
+### Changed
+
+- `session.new_split`, `session.move_block` and split layouts refuse a
+  `ratio` outside 0 to 1 with `bad_request`. It used to become 0.5 without a
+  word, so a percentage such as 30 split the pane in half. Leaving `ratio` out
+  still means half.
+
 ## [0.1.0] - 2026-10-20
 
 The first release.

@@ -454,9 +454,9 @@ func (s *Server) registerMethods() {
 				return newOut{}, api.NotFound("block %s is not placed in session %s", in.BlockID, in.SessionID)
 			}
 			side := sideFor(in.Direction, in.Side)
-			ratio := in.Ratio
-			if ratio <= 0 || ratio >= 1 {
-				ratio = 0.5
+			ratio, err := checkRatio(in.Ratio)
+			if err != nil {
+				return newOut{}, err
 			}
 			cols, rows := anchor.b.Size()
 			dir, after, _ := session.SideDirection(side)
@@ -640,6 +640,9 @@ func (s *Server) registerMethods() {
 			Side          string  `json:"side,omitempty" enum:"right,left,below,above" desc:"Default right."`
 			Ratio         float64 `json:"ratio,omitempty" desc:"The moved block's share, 0 to 1. Default 0.5."`
 		}) (revisionOut, error) {
+			if _, err := checkRatio(in.Ratio); err != nil {
+				return revisionOut{}, err
+			}
 			return s.withSession(in.SessionID, func(ss *session.Session) error {
 				w := ss.WindowOf(in.BlockID)
 				if w == nil || !w.Has(in.TargetBlockID) {
@@ -1253,4 +1256,16 @@ func tailLines(text string, n int) string {
 		}
 	}
 	return strings.Join(keep, "\n")
+}
+
+// checkRatio turns an absent ratio (0) into the default half, and refuses
+// one outside (0, 1): a percentage such as 30 is a mistake, not 0.5.
+func checkRatio(r float64) (float64, error) {
+	switch {
+	case r == 0:
+		return 0.5, nil
+	case r < 0 || r >= 1 || r != r:
+		return 0, api.BadRequest("ratio must be between 0 and 1, such as 0.3, not %v", r)
+	}
+	return r, nil
 }

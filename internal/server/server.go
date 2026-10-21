@@ -395,9 +395,9 @@ func (s *Server) buildLayout(sessionID string, spec *LayoutSpec, cols, rows uint
 		if spec.A == nil || spec.B == nil {
 			return nil, nil, nil, api.BadRequest("a split needs both a and b")
 		}
-		ratio := spec.Ratio
-		if ratio <= 0 || ratio >= 1 {
-			ratio = 0.5
+		ratio, err := checkRatio(spec.Ratio)
+		if err != nil {
+			return nil, nil, nil, err
 		}
 		dir := spec.Direction
 		if dir == "" {
