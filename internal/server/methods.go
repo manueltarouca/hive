@@ -1086,6 +1086,7 @@ func (s *Server) registerAgentMethods() {
 		Cwd            string `json:"cwd,omitempty"`
 		TranscriptPath string `json:"transcript_path,omitempty"`
 		Message        string `json:"message,omitempty"`
+		Kind           string `json:"kind,omitempty" desc:"What a notification is about: permission_prompt, elicitation_dialog..."`
 		AgentPID       int    `json:"agent_pid,omitempty" desc:"The agent process the hook runs for (its nearest ancestor that isn't a shell). Reports from an agent that doesn't hold the pane, such as one another agent runs as a tool, are ignored."`
 	}
 	api.Register(s.reg, "agent.report", "Report an agent's identity and state from its hooks. Saved to disk at once.",
@@ -1100,6 +1101,9 @@ func (s *Server) registerAgentMethods() {
 			}
 			if r := []rune(in.Message); len(r) > 400 {
 				in.Message = string(r[:400]) + "…"
+			}
+			if len(in.Kind) > 64 || strings.ContainsFunc(in.Kind, func(r rune) bool { return !(r == '_' || r >= 'a' && r <= 'z') }) {
+				return nil, api.BadRequest("kind: lowercase letters and _ only")
 			}
 			s.mu.Lock()
 			rr, err := s.needBlock(in.BlockID)
@@ -1145,16 +1149,19 @@ func (s *Server) registerAgentMethods() {
 			if in.TranscriptPath != "" {
 				a.TranscriptPath = in.TranscriptPath
 			}
-			a.State, a.Message, a.UpdatedAt = in.State, in.Message, time.Now().UTC()
+			prev := *a
+			a.State, a.Message, a.Kind, a.UpdatedAt = in.State, in.Message, in.Kind, time.Now().UTC()
+			if in.State != "blocked" {
+				a.Kind = ""
+			}
 			a.EndedBy, a.Before = "", ""
 			if endedByShell {
 				a.EndedBy, a.Before, a.State = "shell", in.State, "ended"
 			}
+			bumpRevision(&prev, a)
 			rr.st.Agent = a
 			copyA := *a
-			s.bus.Block(rr.st.SessionID, in.BlockID, "agent_changed", map[string]any{
-				"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": a.Message, "event": in.Event,
-			})
+			s.publishAgent(rr.st.SessionID, in.BlockID, a, in.Event)
 			s.mu.Unlock()
 			s.saveStateSoon()
 			return &copyA, nil

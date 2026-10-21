@@ -140,8 +140,11 @@ events include `child_exited`, `title_changed`, `pwd_changed`, `bell`,
 `process_changed`, `size_changed`, `desktop_notification`,
 `program_status_changed` and `agent_changed`.
 
-`agent_changed` carries `harness`, `session_id`, `state`, `message` and
-`event`: what changed it. That is a hook's event name (`SessionStart`,
+`agent_changed` carries `harness`, `session_id` (the agent's own), `state`,
+`message`, `kind` (for a blocked agent: `permission_prompt` or
+`elicitation_dialog`, a question), `revision` (it moves on whenever state,
+message or kind change), `updated_at`, `cwd`, and `event`: what changed
+it. That is a hook's event name (`SessionStart`,
 `Stop`…), or one of the server's own:
 
 | `event` | Why |

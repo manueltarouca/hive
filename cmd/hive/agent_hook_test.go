@@ -31,3 +31,28 @@ func TestReportFallsBackForOlderServers(t *testing.T) {
 		t.Fatalf("err = %v, sent = %v", err, sent)
 	}
 }
+
+// A server older than kind refuses it too: drop it and send again, then
+// agent_pid if that server is older still.
+func TestSendReportDropsNewerFields(t *testing.T) {
+	var sent []map[string]any
+	oldest := func(p map[string]any) error {
+		c := map[string]any{}
+		for k, v := range p {
+			c[k] = v
+		}
+		sent = append(sent, c)
+		for _, f := range []string{"kind", "agent_pid"} {
+			if _, ok := p[f]; ok {
+				return &client.Error{Status: 400, Code: "bad_request", Message: `input: json: unknown field "` + f + `"`}
+			}
+		}
+		return nil
+	}
+	if err := sendReport(oldest, map[string]any{"block_id": "b", "agent_pid": 42, "kind": "permission_prompt"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(sent) != 3 || sent[2]["kind"] != nil || sent[2]["agent_pid"] != nil || sent[2]["block_id"] != "b" {
+		t.Fatalf("sent = %v", sent)
+	}
+}

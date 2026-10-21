@@ -53,13 +53,19 @@ type BlockState struct {
 
 // Agent is a coding agent known to run in a block.
 type Agent struct {
-	Harness        string    `json:"harness"`
-	SessionID      string    `json:"session_id,omitempty"`
-	Cwd            string    `json:"cwd,omitempty"`
-	TranscriptPath string    `json:"transcript_path,omitempty"`
-	State          string    `json:"state,omitempty"` // idle, working, blocked, done, ended
-	Message        string    `json:"message,omitempty"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	Harness        string `json:"harness"`
+	SessionID      string `json:"session_id,omitempty"`
+	Cwd            string `json:"cwd,omitempty"`
+	TranscriptPath string `json:"transcript_path,omitempty"`
+	State          string `json:"state,omitempty"` // idle, working, blocked, done, ended
+	Message        string `json:"message,omitempty"`
+	// Kind is what a notification was about, such as permission_prompt or
+	// elicitation_dialog (both make an agent blocked).
+	Kind      string    `json:"kind,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
+	// Revision moves on whenever state, message or kind change, so a rule
+	// can act only on the state it saw.
+	Revision uint64 `json:"revision"`
 	// EndedBy "shell": ended because the pane's shell came back in front,
 	// not by the agent's word. It comes back, in its Before state, if the
 	// same agent is in front again (a tool's shell had the terminal).

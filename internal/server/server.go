@@ -515,9 +515,9 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 				if a.State == "" {
 					a.State = "idle"
 				}
-				s.bus.Block(r.st.SessionID, e.BlockID, "agent_changed", map[string]any{
-					"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": a.Message, "event": "agent_returned",
-				})
+				a.Kind = ""
+				a.Revision++
+				s.publishAgent(r.st.SessionID, e.BlockID, a, "agent_returned")
 			}
 		}
 	case "program_status_changed":
@@ -539,10 +539,9 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 			// an interrupt runs no hook, but Claude Code reports going idle.
 			if a := r.st.Agent; a != nil && a.State != "ended" {
 				if st, ok := agents.StateFromStatus(a.Harness, rec.App, rec.State); ok && st != a.State {
-					a.State, a.Message, a.UpdatedAt = st, rec.Message, time.Now().UTC()
-					s.bus.Block(r.st.SessionID, e.BlockID, "agent_changed", map[string]any{
-						"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": a.Message, "event": "program_status",
-					})
+					a.State, a.Message, a.Kind, a.UpdatedAt = st, rec.Message, "", time.Now().UTC()
+					a.Revision++
+					s.publishAgent(r.st.SessionID, e.BlockID, a, "program_status")
 				}
 			}
 		}
@@ -934,10 +933,9 @@ func restoreCommand(st *persist.BlockState, resume func(string, string) []string
 func (s *Server) agentGoneLocked(r *rec, blockID string) {
 	a := r.st.Agent
 	a.Before, a.EndedBy = a.State, "shell"
-	a.State, a.Message, a.UpdatedAt = "ended", "", time.Now().UTC()
-	s.bus.Block(r.st.SessionID, blockID, "agent_changed", map[string]any{
-		"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": "", "event": "shell_returned",
-	})
+	a.State, a.Message, a.Kind, a.UpdatedAt = "ended", "", "", time.Now().UTC()
+	a.Revision++
+	s.publishAgent(r.st.SessionID, blockID, a, "shell_returned")
 }
 
 // recheckResumed ends a restored agent whose resume never took the
@@ -1208,4 +1206,21 @@ func lockStateDir(dir string) (func(), error) {
 	_ = f.Truncate(0)
 	_, _ = f.WriteAt([]byte(fmt.Sprintf("%d\n", os.Getpid())), 0)
 	return func() { syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
+}
+
+// bumpRevision moves an agent's revision on when what a rule matches on
+// changed.
+func bumpRevision(prev, a *persist.Agent) {
+	a.Revision = prev.Revision
+	if prev.State != a.State || prev.Message != a.Message || prev.Kind != a.Kind || prev.Harness != a.Harness {
+		a.Revision++
+	}
+}
+
+// publishAgent sends agent_changed. Caller holds s.mu.
+func (s *Server) publishAgent(sessionID, blockID string, a *persist.Agent, event string) {
+	s.bus.Block(sessionID, blockID, "agent_changed", map[string]any{
+		"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": a.Message, "event": event,
+		"kind": a.Kind, "revision": a.Revision, "updated_at": a.UpdatedAt, "cwd": a.Cwd,
+	})
 }

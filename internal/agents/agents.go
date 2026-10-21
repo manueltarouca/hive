@@ -60,6 +60,8 @@ type Report struct {
 	TranscriptPath string `json:"transcript_path,omitempty"`
 	Message        string `json:"message,omitempty"`
 	Source         string `json:"source,omitempty"`
+	// Kind is a notification's type: permission_prompt, elicitation_dialog.
+	Kind string `json:"kind,omitempty"`
 }
 
 // ClaudeEvents are the Claude Code hooks hive installs.
@@ -168,6 +170,7 @@ func ParseHook(harness string, data []byte) (Report, error) {
 		r.SessionID, r.Cwd, r.TranscriptPath = "", "", ""
 	}
 	if in.Event == "Notification" {
+		r.Kind = in.NotifType
 		switch in.NotifType {
 		case "idle_prompt": // waiting for the next prompt, not stuck
 			r.State = "done"

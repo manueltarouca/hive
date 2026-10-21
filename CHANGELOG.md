@@ -38,6 +38,11 @@ patch, and this file lists it under "Changed" or "Removed".
 - `GET /v1/events?types=a,b` streams only events of those types. Some
   events, such as a script's log lines, reach only a stream that names them,
   so they never crowd the apps' stream or its history.
+- `agent_changed` and `agent.list` carry `kind` (what a blocked agent's
+  notification is about: `permission_prompt`, `elicitation_dialog`),
+  `revision` (moves on whenever state, message or kind change),
+  `updated_at` and `cwd`. `agent.report` takes `kind`; the hook sends it,
+  and leaves it out for a server too old to know it.
 - Error codes `permission_denied`, `timeout` and `script_unloaded`, for
   scripts.
 

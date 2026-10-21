@@ -1354,14 +1354,32 @@ func claudeDir() string {
 // the field, so the report goes again without it: hooks keep working with a
 // server that hasn't been restarted since hive was updated.
 func sendReport(call func(map[string]any) error, params map[string]any) error {
-	err := call(params)
-	var e *client.Error
-	if err != nil && errors.As(err, &e) && e.Code == "bad_request" && strings.Contains(e.Message, `"agent_pid"`) {
-		delete(params, "agent_pid")
-		return call(params)
+	if params["kind"] == "" {
+		delete(params, "kind")
 	}
-	return err
+	for {
+		err := call(params)
+		var e *client.Error
+		if err == nil || !errors.As(err, &e) || e.Code != "bad_request" {
+			return err
+		}
+		// An older server refuses fields newer hooks send: drop the one
+		// it named, and send again.
+		dropped := false
+		for _, f := range newerReportFields {
+			if _, ok := params[f]; ok && strings.Contains(e.Message, `"`+f+`"`) {
+				delete(params, f)
+				dropped = true
+			}
+		}
+		if !dropped {
+			return err
+		}
+	}
 }
+
+// newerReportFields are agent.report fields servers before them refuse.
+var newerReportFields = []string{"agent_pid", "kind"}
 
 func agentHook(g globals, harness string) error {
 	bid := os.Getenv("HIVE_BLOCK")
@@ -1384,7 +1402,7 @@ func agentHook(g globals, harness string) error {
 	defer cancel()
 	err = sendReport(func(params map[string]any) error { return c.Call(ctx, "agent.report", params, nil) }, map[string]any{
 		"block_id": bid, "harness": r.Harness, "event": r.Event, "state": r.State,
-		"session_id": r.SessionID, "cwd": r.Cwd, "transcript_path": r.TranscriptPath, "message": r.Message,
+		"session_id": r.SessionID, "cwd": r.Cwd, "transcript_path": r.TranscriptPath, "message": r.Message, "kind": r.Kind,
 		// The agent this hook runs for, so the server can tell the pane's
 		// agent from one it runs as a tool.
 		"agent_pid": block.AgentProcess(os.Getppid()),
