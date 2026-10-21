@@ -11,6 +11,12 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ## [Unreleased]
 
+### Fixed
+
+- A method that crashed while called over the attach stream (the apps'
+  connection) stopped the whole server. It now fails that one call with
+  `internal`, as it already did over `/v1/call`.
+
 ### Changed
 
 - `session.new_split`, `session.move_block` and split layouts refuse a

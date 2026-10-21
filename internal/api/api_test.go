@@ -92,3 +92,19 @@ func TestDescribeSchema(t *testing.T) {
 		t.Fatalf("out = %v", m.OutputSchema)
 	}
 }
+
+// A handler that panics is an internal error, not a dead server: calls also
+// arrive over the attach stream and from scripts, where nothing recovers.
+func TestCallRecoversPanic(t *testing.T) {
+	r := New()
+	Register(r, "boom", "Panics.", func(ctx context.Context, _ struct{}) (struct{}, error) {
+		var m map[string]int
+		m["x"] = 1
+		return struct{}{}, nil
+	})
+	_, err := r.Call(context.Background(), "boom", nil)
+	var e *Error
+	if !errors.As(err, &e) || e.Code != "internal" || e.Status != 500 {
+		t.Fatalf("err = %v", err)
+	}
+}

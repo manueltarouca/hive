@@ -9,8 +9,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"reflect"
+	"runtime/debug"
 	"slices"
 	"sort"
 	"strings"
@@ -102,12 +104,20 @@ func (r *Registry) Describe(name string) (*Method, bool) {
 	return m, ok
 }
 
-// Call runs a method with JSON arguments.
-func (r *Registry) Call(ctx context.Context, name string, raw json.RawMessage) (any, error) {
+// Call runs a method with JSON arguments. A handler that panics returns an
+// internal error: calls also come from the attach stream and from scripts,
+// where nothing else would recover.
+func (r *Registry) Call(ctx context.Context, name string, raw json.RawMessage) (out any, err error) {
 	m, ok := r.methods[name]
 	if !ok {
 		return nil, newErr(http.StatusNotFound, "method_not_found", "no method named %q", name)
 	}
+	defer func() {
+		if p := recover(); p != nil {
+			out, err = nil, Internal("%s: %v", name, p)
+			slog.Error("method panicked", "method", name, "panic", p, "stack", string(debug.Stack()))
+		}
+	}()
 	return m.handler(ctx, raw)
 }
 
