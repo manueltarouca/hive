@@ -112,6 +112,10 @@ final class HostConnection {
     var agents: [AgentInfo] = []
     /// Each agent's state at the last reload, for notifications.
     var lastAgentStates: [String: String] = [:]
+    /// Badges scripts put on this host's panes.
+    var badges = BadgeBook()
+    /// Script notifications already shown, so a replay doesn't repeat them.
+    var notesShown: Set<String> = []
 
     /// Carried into every engine, the ones reconnects make too.
     var theme: Theme = .ghostty {
@@ -286,6 +290,19 @@ final class HostConnection {
         closing = true
         let client = client
         vt.async { client.close() }
+    }
+
+    /// A call whose failure matters to the caller (an action a button runs).
+    func call(_ method: String, _ params: JSON = [:], result: @escaping @MainActor (Result<JSON, HiveError>) -> Void) {
+        let client = client
+        vt.async {
+            client.call(method, params) { r in
+                Task { @MainActor [weak self] in
+                    guard let self, self.client === client else { return }
+                    result(r)
+                }
+            }
+        }
     }
 
     func call(_ method: String, _ params: JSON = [:], then: (@MainActor (JSON) -> Void)? = nil) {

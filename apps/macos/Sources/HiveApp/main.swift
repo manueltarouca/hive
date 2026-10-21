@@ -318,6 +318,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     // A notification clicked: the window, on that agent.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let info = response.notification.request.content.userInfo
+        let action = response.actionIdentifier
+        // A script's notification: its button runs the script's action.
+        if info["notification_id"] != nil {
+            nonisolated(unsafe) let info = info
+            await MainActor.run {
+                self.model.noteResponse(info, action: action)
+                if !action.hasPrefix("act.") { self.showMainWindow() }
+            }
+            return
+        }
         guard let block = info["block_id"] as? String else { return }
         let host = info["host"] as? String
         await MainActor.run {

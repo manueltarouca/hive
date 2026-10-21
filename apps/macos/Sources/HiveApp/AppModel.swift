@@ -211,6 +211,8 @@ final class AppModel: ObservableObject {
     @Published var windows: [WindowInfo] = []
     @Published var activeWindow: String?
     @Published var blocks: [String: BlockInfo] = [:]
+    /// Badges scripts put on the current host's panes.
+    @Published var paneBadges = BadgeBook()
     @Published var style: Style = .light
     /// The settings file (~/.config/hive/config), read through the bundled hive.
     let settingsStore = SettingsStore()
@@ -330,6 +332,8 @@ final class AppModel: ObservableObject {
             if h === self.current { self.connected = true; self.status = h.shortProblem ?? h.status }
             self.reloadSessions(h, create: h.isLocal)
             if h === self.current { self.reloadView() }
+            self.reloadBadges(h)
+            self.replayNotes(h)
         }
         h.onDisconnected = { [weak self] h in
             guard let self else { return }
@@ -549,6 +553,7 @@ final class AppModel: ObservableObject {
         windows = []
         blocks = [:]
         current = h
+        paneBadges = h.badges
         host = h.displayName
         remote = !h.isLocal
         // The title bar, the away card and their tone follow the new host.
@@ -684,11 +689,114 @@ final class AppModel: ObservableObject {
                     programCopied(block: inner["payload"]["block_id"].string ?? "", text: inner["payload"]["payload"]["text"].string ?? "")
                 }
                 if name == "title_changed" || name == "size_changed" || name == "process_changed", sid == currentSession { scheduleReload() }
+                if name == "status_changed" {
+                    h.badges.apply(inner["payload"]["payload"]["badge"])
+                    if h === current { paneBadges = h.badges }
+                }
             } else if sid == currentSession {
                 scheduleReload()
             }
             if type == "block_closed" || type == "block_created" { reloadSessions(h) }
+        case "notification":
+            showScriptNote(ScriptNote(ev["payload"]["notification"]), from: h)
+        case "notification_acked":
+            if let id = ev["payload"]["notification_id"].string {
+                UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["\(h.id)-\(id)"])
+            }
         default: break
+        }
+    }
+
+    // MARK: scripts' badges and notifications
+
+    func reloadBadges(_ h: HostConnection) {
+        h.call("status.list") { [weak self, weak h] j in
+            guard let self, let h else { return }
+            h.badges.load(j)
+            if h === self.current { self.paneBadges = h.badges }
+        }
+    }
+
+    private func notesSeenKey(_ h: HostConnection) -> String { "notesSeen." + h.id }
+
+    /// Shows what a host's scripts said while the app was away: the newest
+    /// few, and a line for the rest.
+    func replayNotes(_ h: HostConnection) {
+        let seen = AppModel.defaults.object(forKey: notesSeenKey(h)) as? Date
+        var params: JSON = [:]
+        if let seen { params = ["since": .string(ISO8601DateFormatter.hiveNote.string(from: seen))] }
+        h.call("notification.list", params) { [weak self, weak h] j in
+            guard let self, let h else { return }
+            let r = NoteReplay(j, seenUntil: seen, alreadyShown: h.notesShown)
+            for n in r.show { self.showScriptNote(n, from: h) }
+            if r.more > 0 {
+                let c = UNMutableNotificationContent()
+                c.title = "\(r.more) more from scripts"
+                c.body = h.isLocal ? "While hive was closed." : "On \(h.displayName), while hive was away."
+                UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "\(h.id)-replay", content: c, trigger: nil))
+            }
+            if let latest = r.latest { AppModel.defaults.set(latest, forKey: self.notesSeenKey(h)) }
+        }
+    }
+
+    /// Notification categories, one per notification with buttons: macOS
+    /// shows the buttons a category names. The newest 50 are kept.
+    private var noteCategories: [UNNotificationCategory] = []
+
+    func showScriptNote(_ n: ScriptNote, from h: HostConnection) {
+        guard !n.id.isEmpty, settings.notify != "never", !h.notesShown.contains(n.id) else { return }
+        h.notesShown.insert(n.id)
+        if let t = n.time { AppModel.defaults.set(t, forKey: notesSeenKey(h)) }
+        let c = UNMutableNotificationContent()
+        c.title = n.title
+        let session = n.session.flatMap { id in h.sessions.first(where: { $0.id == id })?.label }
+        c.subtitle = h.isLocal ? (session ?? "") : "\(session ?? "a session") on \(h.displayName)"
+        c.body = n.bodyWithSteps
+        var info: [String: Any] = ["host": h.id, "notification_id": n.id]
+        if let b = n.block { info["block_id"] = b }
+        if !n.actions.isEmpty {
+            let category = "hive.note.\(n.id)"
+            let buttons = n.actions.enumerated().map { i, a in
+                UNNotificationAction(identifier: "act.\(i)", title: a.title, options: [])
+            }
+            noteCategories.append(UNNotificationCategory(identifier: category, actions: buttons, intentIdentifiers: [], options: []))
+            noteCategories = Array(noteCategories.suffix(50))
+            UNUserNotificationCenter.current().setNotificationCategories(Set(noteCategories))
+            c.categoryIdentifier = category
+            info["actions"] = n.actions.map { a -> [String: String] in
+                ["action": a.action, "args": String(decoding: a.args.data(), as: UTF8.self)]
+            }
+        }
+        c.userInfo = info
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "\(h.id)-\(n.id)", content: c, trigger: nil))
+    }
+
+    /// A script notification's button or click: run its action, or open its
+    /// pane; either way, every app counts it as seen.
+    func noteResponse(_ info: [AnyHashable: Any], action identifier: String) {
+        guard let id = info["notification_id"] as? String, let h = host(id: info["host"] as? String ?? "") else { return }
+        h.call("notification.ack", ["notification_id": .string(id)])
+        let block = info["block_id"] as? String
+        if identifier.hasPrefix("act."), let i = Int(identifier.dropFirst(4)),
+           let actions = info["actions"] as? [[String: String]], actions.indices.contains(i) {
+            let a = actions[i]
+            var params: [String: JSON] = ["name": .string(a["action"] ?? ""), "args": (try? JSON.parse(Data((a["args"] ?? "{}").utf8))) ?? [:],
+                                          "origin": "notification"]
+            if let block { params["block_id"] = .string(block) }
+            h.call("action.run", .object(params)) { r in
+                if case .failure(let e) = r {
+                    let c = UNMutableNotificationContent()
+                    c.title = "Nothing was sent"
+                    c.body = e.message
+                    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "\(h.id)-\(id)-failed", content: c, trigger: nil))
+                }
+            }
+            return
+        }
+        if let block, let a = agents.first(where: { $0.blockID == block && $0.host == h.id }) {
+            jump(to: a)
+        } else if let sid = info["session_id"] as? String {
+            select(session: sid)
         }
     }
 

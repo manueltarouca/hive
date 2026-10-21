@@ -474,6 +474,13 @@ struct PaneHeader: View {
             if let st = info?.agentState, st == "working" || st == "blocked" || st == "done" {
                 StatusBadge(state: st, style: s)
             }
+            // Scripts' badges: the first two, those that need you first.
+            let badges = model.paneBadges.badges(for: blockID)
+            ForEach(badges.prefix(2)) { b in ScriptBadgeView(badge: b, style: s) }
+            if badges.count > 2 {
+                Text("+\(badges.count - 2)").font(.system(size: 10, weight: .medium)).foregroundStyle(s.secondary.swiftUI)
+                    .help(badges.dropFirst(2).map(\.text).joined(separator: "\n"))
+            }
             if model.copiedBlock == blockID {
                 Text("Copied").font(.system(size: 10, weight: .medium))
                     .padding(.horizontal, 6).padding(.vertical, 1)
@@ -548,6 +555,46 @@ struct StatusBadge: View {
                 .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
                 .onAppear { pulse = true }
         }
+    }
+}
+
+/// A badge a script put on the pane: a hexagon in its state's color and
+/// its message, which fades at the edge when long.
+struct ScriptBadgeView: View {
+    let badge: ScriptBadge
+    var style: Style = .dark
+
+    var color: Color {
+        switch badge.state {
+        case "error", "blocked": return style.blocked.swiftUI
+        case "done": return style.done.swiftUI
+        case "working": return style.accent.swiftUI
+        default: return style.secondary.swiftUI
+        }
+    }
+
+    static let maxText: CGFloat = 150
+
+    var body: some View {
+        let string = badge.progress.map { "\(badge.text) \($0)%" } ?? badge.text
+        let label = Text(string).font(.system(size: 10, weight: .medium)).foregroundStyle(color).fixedSize()
+        // Short, it hugs its text; long, it stops at 150 points and fades.
+        let width = (string as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium)]).width
+        HStack(spacing: 4) {
+            Image(systemName: "hexagon.fill").font(.system(size: 7)).foregroundStyle(color)
+            if width > Self.maxText {
+                label.frame(width: Self.maxText, alignment: .leading).clipped().mask(FadeMask())
+            } else {
+                label
+            }
+        }
+        .fixedSize()
+        .lineLimit(1)
+        .padding(.horizontal, 6).padding(.vertical, 1)
+        .background(Capsule().fill(color.opacity(0.13)))
+        .help(badge.title.isEmpty ? badge.text : "\(badge.title): \(badge.text)")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(badge.id): \(badge.text)")
     }
 }
 

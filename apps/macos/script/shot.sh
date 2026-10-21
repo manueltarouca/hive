@@ -15,7 +15,7 @@ for t in winid; do
 done
 D="$(mktemp -d "${TMPDIR:-/tmp}/hive-fixture.XXXX")"
 # HIVE_CONFIG: the fixture's own settings, never the real file.
-export HIVE_SERVER="$D/s.sock" HIVE_STATE_DIR="$D/state" HIVE_CONFIG="$D/config"
+export HIVE_SERVER="$D/s.sock" HIVE_STATE_DIR="$D/state" HIVE_CONFIG="$D/config" HIVE_SCRIPTS="$D/scripts"
 # Fixture agents report made-up sessions: never resume a real agent.
 export HIVE_RESUME_CLAUDE='["sh","-c","echo resumed {id}; exec cat"]'
 H="$root/bin/hive"
@@ -45,6 +45,17 @@ $H -s api-gateway split --json --cwd "$root" -- sh -c '
   printf "{\"session_id\":\"a2\",\"cwd\":\"%s\",\"hook_event_name\":\"Stop\"}" "$2" | "$1" agent hook claude
   printf "\033]2;✳ Write changelog\007"; exec cat' sh "$H" "$root" >/dev/null
 sleep 2
+
+# BADGES=1 puts scripts' badges on the panes: one that needs you, one with
+# progress, one too long to fit.
+if [ "${BADGES:-0}" = 1 ]; then
+  badge() { $H api call status.set "$1" >/dev/null; }
+  tests=$($H api call target.resolve '{"kind":"block","target":"tests"}' | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+  badge "{\"target\":\"$tests\",\"id\":\"tests\",\"state\":\"error\",\"msg\":\"2 failing\"}"
+  badge "{\"target\":\"$tests\",\"id\":\"ci\",\"state\":\"working\",\"msg\":\"CI\",\"progress\":40}"
+  badge "{\"target\":\"$agent\",\"id\":\"branch\",\"state\":\"idle\",\"msg\":\"attach-resize-sequencing-with-a-very-long-branch-name\"}"
+  badge "{\"target\":\"$tests\",\"id\":\"lint\",\"state\":\"done\",\"msg\":\"lint ok\"}"
+fi
 
 # EXTRA_TABS=n adds plain tabs, to check the title bar with many tabs.
 i=1; while [ "$i" -le "${EXTRA_TABS:-0}" ]; do  # not seq: on macOS, seq 1 0 counts down
@@ -104,6 +115,6 @@ for f in titlebar header; do cwebp -quiet -q 85 "$out/$style-$f.png" -o "$out/$s
 echo "$D" > "$out/fixture"
 # Follow-up commands source this: both variables, or a stray server uses
 # your real state directory.
-{ printf 'export HIVE_SERVER=%s HIVE_STATE_DIR=%s HIVE_CONFIG=%s\n' "$HIVE_SERVER" "$HIVE_STATE_DIR" "$HIVE_CONFIG"
+{ printf 'export HIVE_SERVER=%s HIVE_STATE_DIR=%s HIVE_CONFIG=%s HIVE_SCRIPTS=%s\n' "$HIVE_SERVER" "$HIVE_STATE_DIR" "$HIVE_CONFIG" "$HIVE_SCRIPTS"
   printf "export HIVE_RESUME_CLAUDE='%s'\n" "$HIVE_RESUME_CLAUDE"; } > "$out/fixture.env"
 echo "$out/$style.webp"
