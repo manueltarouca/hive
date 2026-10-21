@@ -76,6 +76,7 @@ Scripts (TypeScript, run by the server)
   script stop RUN_ID         stop a running script
   script ls                  running scripts and the latest that ended
   script check FILE          bundle a script and report errors
+  script types [--out FILE]  write hive.d.ts, the types of this server's API
 
 API
   api list [-q]              every server method

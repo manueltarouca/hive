@@ -18,7 +18,8 @@ import (
 const scriptUsage = `usage: hive script run FILE|-e CODE|- [KEY=VALUE...] [--args JSON] [--allow PERMS] [--for DUR] [--all]
        hive script stop RUN_ID
        hive script ls
-       hive script check FILE`
+       hive script check FILE
+       hive script types [--out FILE]`
 
 func cmdScript(g globals, args []string) error {
 	if len(args) == 0 {
@@ -38,6 +39,8 @@ func cmdScript(g globals, args []string) error {
 		return x.call("script.stop", map[string]any{"run_id": args[1]}, nil)
 	case "ls":
 		return cmdScriptLs(g)
+	case "types":
+		return cmdScriptTypes(g, args[1:])
 	case "check":
 		if len(args) != 2 {
 			return usagef("usage: hive script check FILE")
@@ -238,4 +241,38 @@ func cmdScriptLs(g globals) error {
 func firstLine(s string) string {
 	line, _, _ := strings.Cut(s, "\n")
 	return line
+}
+
+// cmdScriptTypes writes hive.d.ts for the server it talks to, so editors
+// check scripts against the methods that server has.
+func cmdScriptTypes(g globals, args []string) error {
+	fs := flags("script types")
+	out := fs.String("out", "hive.d.ts", "")
+	if err := parse(fs, args); err != nil {
+		return err
+	}
+	x, err := open(g)
+	if err != nil {
+		return err
+	}
+	var methods []script.MethodSchema
+	if err := x.call("api.list", map[string]any{"full": true}, &methods); err != nil {
+		return err
+	}
+	var ver struct {
+		Version string `json:"hive_version"`
+	}
+	if err := x.call("server.version", nil, &ver); err != nil {
+		return err
+	}
+	dts := script.Types(ver.Version, methods)
+	if *out == "-" {
+		_, err := os.Stdout.WriteString(dts)
+		return err
+	}
+	if err := os.WriteFile(*out, []byte(dts), 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "wrote %s (%d methods)\n", *out, len(methods))
+	return nil
 }

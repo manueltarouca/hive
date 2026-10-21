@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -309,5 +311,78 @@ func TestScriptDocsExamples(t *testing.T) {
 	d := h.call("session.describe_block", map[string]any{"session_id": sid, "block_id": bid})
 	if d["label"] != filepath.Base(dir) {
 		t.Fatalf("label = %v, want %s", d["label"], filepath.Base(dir))
+	}
+}
+
+// hive.d.ts is generated from the registry; with a TypeScript compiler on
+// hand (HIVE_TSC, or tsc on PATH), it and the docs' examples type-check.
+func TestScriptTypes(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	var methods []script.MethodSchema
+	raw, err := h.c.CallRaw(context.Background(), "api.list", map[string]any{"full": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &methods); err != nil {
+		t.Fatal(err)
+	}
+	dts := script.Types("test", methods)
+	for _, want := range []string{
+		`"session.new_split": { args: {`,
+		"new_split(args: Methods[\"session.new_split\"][\"args\"])",
+		"format(args: Methods[\"hive.terminal.format\"][\"args\"])",
+		"list(args?: Methods[\"session.list\"][\"args\"])",
+		`direction?: "horizontal" | "vertical";`,
+		"Permission: control; spawn when it runs a command",
+	} {
+		if !strings.Contains(dts, want) {
+			t.Errorf("hive.d.ts lacks %s", want)
+		}
+	}
+	tsc := os.Getenv("HIVE_TSC")
+	if tsc == "" {
+		if p, err := exec.LookPath("tsc"); err == nil {
+			tsc = p
+		}
+	}
+	if tsc == "" {
+		t.Skip("no TypeScript compiler: set HIVE_TSC to check the types")
+	}
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "hive.d.ts"), []byte(dts), 0o644)
+	doc, _ := os.ReadFile("../../docs/scripts.md")
+	files := []string{"hive.d.ts"}
+	for i, part := range strings.Split(string(doc), "```ts\n")[1:] {
+		code, _, _ := strings.Cut(part, "```")
+		name := fmt.Sprintf("example%d.ts", i+1)
+		os.WriteFile(filepath.Join(dir, name), []byte(code+"\nexport {};\n"), 0o644)
+		files = append(files, name)
+	}
+	cfg, _ := json.Marshal(map[string]any{
+		"compilerOptions": map[string]any{"target": "es2022", "module": "esnext", "moduleResolution": "bundler",
+			"strict": true, "noEmit": true, "useUnknownInCatchVariables": false, "lib": []string{"es2022"}},
+		"files": files,
+	})
+	os.WriteFile(filepath.Join(dir, "tsconfig.json"), cfg, 0o644)
+	cmd := exec.Command(tsc, "-p", dir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("tsc: %v\n%s", err, out)
+	}
+	// And they catch mistakes: a misspelled argument, a wrong type.
+	os.WriteFile(filepath.Join(dir, "bad.ts"), []byte(`
+await h.session.new_split({ block_id: "b", directoin: "vertical" });
+await h.session.set_label({ session_id: "s", label: 3 });
+const n: number = (await h.session.list()).sessions[0].label;
+export {};
+`), 0o644)
+	cfg, _ = json.Marshal(map[string]any{
+		"compilerOptions": map[string]any{"target": "es2022", "module": "esnext", "strict": true, "noEmit": true, "lib": []string{"es2022"}},
+		"files":           []string{"hive.d.ts", "bad.ts"},
+	})
+	os.WriteFile(filepath.Join(dir, "tsconfig.json"), cfg, 0o644)
+	out, err := exec.Command(tsc, "-p", dir).CombinedOutput()
+	if err == nil || strings.Count(string(out), "error TS") != 3 {
+		t.Fatalf("bad.ts should fail with 3 errors:\n%s", out)
 	}
 }

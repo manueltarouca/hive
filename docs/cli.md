@@ -85,6 +85,7 @@ The CLI calls a pane a block and a tab a window.
 | `hive script stop RUN_ID` | Stop a running script |
 | `hive script ls` | Running scripts, and the latest that ended |
 | `hive script check FILE` | Bundle a script and report errors, without running it |
+| `hive script types [--out FILE]` | Write `hive.d.ts`: this server's methods as TypeScript types, for your editor |
 
 `script run` takes `--allow PERMS` (such as `control,spawn`; read only
 without it), `--args JSON`, `--for DUR` (stop it after that long) and

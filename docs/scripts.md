@@ -38,6 +38,7 @@ as JSON. A script that throws exits with status 1.
 | `hive script stop RUN_ID` | Stop a running script. Ctrl-C does the same for the one you started. |
 | `hive script ls` | Running scripts, and the latest that ended |
 | `hive script check FILE` | Report errors without running it |
+| `hive script types [--out FILE]` | Write `hive.d.ts`, for your editor |
 
 Options for `run`:
 
@@ -56,6 +57,23 @@ The CLI bundles the script on your machine, so `hive -S box script run
 ./x.ts` works with your local files. The server only runs scripts sent from
 other machines when you turn on `script-remote-run` in its
 [settings](./settings).
+
+## Types in your editor
+
+`hive script types` writes `hive.d.ts`: every method of the server you talk
+to, with its arguments, its result and the permission it needs. Put it
+beside your scripts with a `tsconfig.json`, and your editor completes `h.`
+and flags a misspelled argument before you run anything:
+
+```json
+{
+  "compilerOptions": { "target": "es2022", "module": "esnext", "strict": true, "noEmit": true, "lib": ["es2022"] },
+  "include": ["*.ts"]
+}
+```
+
+Run `hive script types` again after you update hive. hive doesn't check
+types when it runs a script; `tsc --noEmit` does, if you want it to.
 
 ## What a script can do
 

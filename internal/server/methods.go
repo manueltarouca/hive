@@ -100,6 +100,9 @@ func (s *Server) registerMethods() {
 				if in.Full {
 					e["input_schema"], e["output_schema"] = m.InputSchema, m.OutputSchema
 				}
+				if m.PermissionNote != "" {
+					e["permission_note"] = m.PermissionNote
+				}
 				out = append(out, e)
 			}
 			return out, nil

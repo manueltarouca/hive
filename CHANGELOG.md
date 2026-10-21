@@ -15,8 +15,9 @@ patch, and this file lists it under "Changed" or "Removed".
 
 - Scripts: TypeScript or JavaScript the server runs, with the same methods
   and events as the CLI. `hive script run FILE` runs one once, with its log
-  on stderr and its result on stdout; `hive script stop`, `hive script ls`
-  and `hive script check` go with it. A script can only read unless allowed
+  on stderr and its result on stdout; `hive script stop`, `hive script ls`,
+  `hive script check` and `hive script types` (a `hive.d.ts` for editors)
+  go with it. A script can only read unless allowed
   more (`--allow control,spawn`, or a `hive.script` manifest), and what it
   changes goes to an audit log. Methods `script.run`, `script.stop`,
   `script.list` and `script.result`; scoped events `script_started`,
