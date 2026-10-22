@@ -50,6 +50,17 @@ func (h *Host) ActionOwner(name string) (string, bool) {
 	return a.Script, true
 }
 
+// ActionRun is the run an action belongs to now.
+func (h *Host) ActionRun(name string) (string, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	a := h.actions[name]
+	if a == nil {
+		return "", false
+	}
+	return a.run.ID, true
+}
+
 // Actions lists every action, by name.
 func (h *Host) Actions() []ActionInfo {
 	h.mu.Lock()

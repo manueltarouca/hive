@@ -600,7 +600,7 @@ func (s *Server) closeBlock(blockID string) error {
 	<-r.b.EventsDone()
 	s.mu.Lock()
 	delete(s.blocks, blockID)
-	s.badgesGone(blockID)
+	s.badgesGone(blockID, r.st.SessionID)
 	s.mu.Unlock()
 	s.store.RemoveSnapshot(blockID)
 	s.markDirty()

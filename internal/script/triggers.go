@@ -23,7 +23,7 @@ const (
 	triggerRate   = 1000        // matches a minute, per trigger
 	dedupeWindow  = time.Second // the same line again is the same match
 	idleFlush     = 250 * time.Millisecond
-	snapshotEvery = 500 * time.Millisecond
+	snapshotEvery = 500 * time.Millisecond // at most this often, while the screen changes
 	tapBuffer     = 256
 )
 
@@ -206,11 +206,19 @@ func (ts *triggerSet) read(t *tap) {
 	if err != nil {
 		return
 	}
-	defer func() { detach() }()
+	defer func() {
+		if detach != nil {
+			detach()
+		}
+	}()
 	var a assembler
 	idle := time.NewTimer(time.Hour)
 	defer idle.Stop()
-	var lastSnap time.Time
+	// Snapshots run on their own clock: a program that keeps redrawing
+	// (a spinner) never goes quiet, and its screen still matters.
+	snap := time.NewTicker(snapshotEvery)
+	defer snap.Stop()
+	drawn := false // output since the last snapshot
 	prev := map[string]bool{}
 	for {
 		select {
@@ -221,6 +229,7 @@ func (ts *triggerSet) read(t *tap) {
 				// It fell behind: start again from now. Lines in the gap
 				// are lost; scripts can search the scrollback.
 				detach()
+				detach = nil
 				if sub, detach, err = tp.Tap(t.ref.ID); err != nil {
 					return
 				}
@@ -230,30 +239,33 @@ func (ts *triggerSet) read(t *tap) {
 			for _, l := range a.feed(f.Data) {
 				ts.offer(t.ref, l, false)
 			}
+			drawn = true
 			idle.Reset(idleFlush)
 		case <-idle.C:
 			if l, ok := a.flush(); ok {
 				ts.offer(t.ref, l, false)
 			}
-			if ts.wantsSnapshot(t.ref) && time.Since(lastSnap) >= snapshotEvery {
-				lastSnap = time.Now()
-				screen, err := tp.FormatScreen(t.ref.ID)
-				if err != nil {
+		case <-snap.C:
+			if !drawn || !ts.wantsSnapshot(t.ref) {
+				continue
+			}
+			drawn = false
+			screen, err := tp.FormatScreen(t.ref.ID)
+			if err != nil {
+				continue
+			}
+			now := map[string]bool{}
+			for _, text := range strings.Split(screen, "\n") {
+				text = strings.TrimRight(text, " ")
+				if text == "" {
 					continue
 				}
-				now := map[string]bool{}
-				for _, text := range strings.Split(screen, "\n") {
-					text = strings.TrimRight(text, " ")
-					if text == "" {
-						continue
-					}
-					now[text] = true
-					if !prev[text] {
-						ts.offer(t.ref, line{text: text, alt: a.alt}, true)
-					}
+				now[text] = true
+				if !prev[text] {
+					ts.offer(t.ref, line{text: text, alt: a.alt}, true)
 				}
-				prev = now
 			}
+			prev = now
 		}
 	}
 }
@@ -323,6 +335,9 @@ func (ts *triggerSet) offer(b BlockRef, l line, fromSnapshot bool) {
 		if t.once {
 			delete(ts.all, id)
 		}
+	}
+	if len(ts.all) == 0 {
+		ts.stopLocked() // the last trigger was a once
 	}
 	if len(ts.seen) > 10000 {
 		for k, v := range ts.seen {

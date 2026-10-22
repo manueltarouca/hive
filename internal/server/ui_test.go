@@ -81,7 +81,11 @@ h.agents.rule({
 	if button["step"] != `Type "approved\n" in the agent's pane` {
 		t.Fatalf("step = %v", button["step"])
 	}
-	tap := map[string]any{"name": button["action"], "args": button["args"], "origin": "notification"}
+	tap := map[string]any{"name": button["action"], "args": button["args"], "origin": "notification", "notification_id": n["notification_id"]}
+	// A button needs its notification, and only runs what it offered.
+	if e := h.callErr("action.run", map[string]any{"name": button["action"], "args": button["args"], "origin": "notification"}); e.Code != "bad_request" {
+		t.Fatalf("no notification_id: %v", e)
+	}
 
 	// The agent moved on: the old button sends nothing.
 	report("permission_prompt", "Claude needs your permission to use Grep")
@@ -90,6 +94,7 @@ h.agents.rule({
 	}
 	n = <-notes
 	tap["args"] = n["actions"].([]any)[0].(map[string]any)["args"]
+	tap["notification_id"] = n["notification_id"]
 	h.call("action.run", tap)
 	h.waitScreen(sid, bid, "approved")
 }
@@ -144,5 +149,47 @@ export default () => r;`, map[string]any{"allow": []string{"ui"}, "session_id": 
 	}
 	if e := h.callErr("notify.send", map[string]any{"title": "x2", "actions": []any{map[string]any{"title": "Go", "action": "hello"}}}); e.Code != "not_found" && e.Code != "rate_limited" {
 		t.Fatalf("foreign action: %v", e)
+	}
+}
+
+// A notification's button stops working when the script that sent it
+// stops, even if another script takes the action's name; a closed pane's
+// badges are cleared for the apps.
+func TestNoteButtonsFollowTheirScript(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	c := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	sid, bid := c["session_id"].(string), strs(c["block_ids"])[0]
+	send, _ := script.Bundle("", `
+h.actions.register({ name: "go", run: () => "first" });
+const n = await h.notify.send({ title: "x", actions: [{ title: "Go", action: "go" }] });
+h.after("10ms", () => h.stop());
+export default () => n.notification_id;`, t.TempDir())
+	r := h.call("script.run", map[string]any{"code": send, "allow": []string{"ui"}})
+	res := h.call("script.result", map[string]any{"run_id": r["run_id"], "timeout": 5})
+	noteID := res["result"].(string)
+	taker, _ := script.Bundle("", `h.actions.register({ name: "go", run: () => "second" }); h.after("3s", () => h.stop());`, t.TempDir())
+	r2 := h.call("script.run", map[string]any{"code": taker, "allow": []string{"ui"}})
+	defer h.call("script.stop", map[string]any{"run_id": r2["run_id"]})
+	time.Sleep(200 * time.Millisecond)
+	if e := h.callErr("action.run", map[string]any{"name": "go", "notification_id": noteID}); e.Code != "conflict" {
+		t.Fatalf("another script's action ran: %v", e)
+	}
+
+	since := int64(h.srv.bus.Seq())
+	h.call("status.set", map[string]any{"target": bid, "id": "t", "state": "error"})
+	h.call("block.close", map[string]any{"session_id": sid, "block_id": bid})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cleared := false
+	_ = h.c.Events(ctx, "", true, since, func(e client.Event) bool {
+		if strings.Contains(string(e.Raw), `"status_changed"`) && strings.Contains(string(e.Raw), `"state":"clear"`) {
+			cleared = true
+			return false
+		}
+		return true
+	})
+	if !cleared {
+		t.Fatal("no clear for a closed pane's badge")
 	}
 }

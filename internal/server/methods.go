@@ -1017,8 +1017,11 @@ func (s *Server) registerTerminalMethods() {
 			if err != nil {
 				return nil, err
 			}
+			if a.Pattern == "" {
+				return nil, api.BadRequest("args: pattern is required")
+			}
 			re, err := regexp.Compile(a.Pattern)
-			if err != nil || a.Pattern == "" {
+			if err != nil {
 				return nil, api.BadRequest("pattern: %v (RE2)", err)
 			}
 			if a.Limit <= 0 || a.Limit > 1000 {

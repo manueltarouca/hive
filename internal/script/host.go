@@ -171,6 +171,9 @@ func (h *Host) Start(o RunOptions) (*Run, error) {
 	if !nameRE.MatchString(o.Name) || len(o.Name) > 64 {
 		return nil, api.BadRequest("script name %q: lowercase letters, digits, - and _", o.Name)
 	}
+	if o.Resident == nil {
+		o.Name = h.freeName(o.Name)
+	}
 	r := newRun(h, o)
 	if err := r.start(); err != nil {
 		return nil, err
@@ -495,4 +498,30 @@ func (h *Host) Modes() map[string]bool {
 		r.pmu.Unlock()
 	}
 	return out
+}
+
+// freeName gives a one-shot a name no running script has, so badges,
+// actions and logs never mix two scripts: tests, then tests-2.
+func (h *Host) freeName(name string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	taken := map[string]bool{}
+	for _, r := range h.runs {
+		taken[r.Name] = true
+	}
+	if h.res != nil {
+		h.res.mu.Lock()
+		for n := range h.res.all {
+			taken[n] = true
+		}
+		h.res.mu.Unlock()
+	}
+	if !taken[name] {
+		return name
+	}
+	for i := 2; ; i++ {
+		if n := fmt.Sprintf("%s-%d", name, i); !taken[n] {
+			return n
+		}
+	}
 }

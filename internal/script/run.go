@@ -86,7 +86,7 @@ type Run struct {
 	bindings    []keymap.Binding // what this script binds (residents only); under pmu
 	keyFns      int
 	modes       map[string]bool // modes this script declared: exclusive or not; under pmu
-	depth       int // the cause depth of the handler running now
+	depth       int             // the cause depth of the handler running now
 	store       *store
 
 	// Events from the pump, handed to the loop.

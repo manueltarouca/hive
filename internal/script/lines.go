@@ -90,7 +90,7 @@ func (a *assembler) feed(p []byte) []line {
 		case '\t':
 			a.put(' ')
 		default:
-			if c >= 0x20 || c >= 0x80 {
+			if c >= 0x20 && c != 0x7f {
 				a.put(c)
 			}
 		}

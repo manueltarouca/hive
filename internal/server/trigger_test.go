@@ -48,3 +48,19 @@ export default () => r.matches.map((m: any) => m.groups[0]).join("");`,
 		t.Fatalf("search: %+v", out)
 	}
 }
+
+// A snapshot trigger sees a program that never stops redrawing.
+func TestSnapshotTriggerWhileDrawing(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	c := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	out := h.runScript(`
+const m = h.wait_output({ pattern: "Do you want to proceed", mode: "snapshot", screen: "any", timeout: "5s" });
+await (await h.block()).new_split({ focus: false, layout: { command: ["sh", "-c",
+  "printf '\\033[?1049hDo you want to proceed?\\n'; i=0; while true; do printf '\\r%s' $i; i=$((i+1)); sleep 0.05; done"] } });
+export default async () => (await m).match;`,
+		map[string]any{"allow": []string{"spawn", "screen"}, "session_id": c["session_id"], "block_id": strs(c["block_ids"])[0]})
+	if out.str(t) != "Do you want to proceed" {
+		t.Fatalf("snapshot: %+v", out)
+	}
+}

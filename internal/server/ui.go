@@ -11,6 +11,7 @@ import (
 
 	"github.com/manueltarouca/hive/internal/api"
 	"github.com/manueltarouca/hive/internal/id"
+	"github.com/manueltarouca/hive/internal/persist"
 	"github.com/manueltarouca/hive/internal/script"
 )
 
@@ -48,6 +49,9 @@ type NoteAction struct {
 	Args   map[string]any `json:"args,omitempty"`
 	// Step says what pressing it does, in plain words, for the app to show.
 	Step string `json:"step,omitempty"`
+	// run is the script run that sent it: the button works only while
+	// that run still owns the action.
+	run string
 }
 
 // Badge is a status a script shows on a pane: the fields of a program's
@@ -114,9 +118,10 @@ func (s *Server) registerUIMethods() {
 				if !ok {
 					return Notification{}, api.NotFound("no action %s", a.Action)
 				}
-				if !isScript || owner != c.Name {
+				if run, _ := s.scripts.ActionRun(a.Action); !isScript || owner != c.Name || run != c.RunID {
 					return Notification{}, api.PermissionDenied("a notification can only offer actions of the script that sends it")
 				}
+				a.run = c.RunID
 				a.Title = clip(a.Title, 40)
 				a.Step = clip(a.Step, 200)
 				n.Actions = append(n.Actions, a)
@@ -331,11 +336,17 @@ func (s *Server) scriptEnded(name string) {
 	s.clearBadges("script:"+name, "", "")
 }
 
-// badgesGone forgets a closed block's badges. Caller holds s.mu.
-func (s *Server) badgesGone(blockID string) {
+// badgesGone forgets a closed block's badges, and tells the apps. Caller
+// holds s.mu.
+func (s *Server) badgesGone(blockID, sessionID string) {
 	s.ui.mu.Lock()
+	gone := s.ui.badges[blockID]
 	delete(s.ui.badges, blockID)
 	s.ui.mu.Unlock()
+	for _, b := range gone {
+		b.State = "clear"
+		s.bus.Block(sessionID, blockID, "status_changed", map[string]any{"badge": b})
+	}
 }
 
 func (s *Server) registerActionMethods() {
@@ -344,12 +355,13 @@ func (s *Server) registerActionMethods() {
 			return map[string]any{"actions": s.scripts.Actions()}, nil
 		}, api.Perm("read"))
 	type runIn struct {
-		Name      string          `json:"name" required:"true"`
-		Args      json.RawMessage `json:"args,omitempty"`
-		Origin    string          `json:"origin,omitempty" enum:"cli,notification,palette,key,api" desc:"Where it was started. Default api."`
-		BlockID   string          `json:"block_id,omitempty" desc:"The pane it acts on, when it was started from one."`
-		SessionID string          `json:"session_id,omitempty"`
-		ClientID  string          `json:"client_id,omitempty"`
+		Name           string          `json:"name" required:"true"`
+		Args           json.RawMessage `json:"args,omitempty"`
+		Origin         string          `json:"origin,omitempty" enum:"cli,notification,palette,key,api" desc:"Where it was started. Default api; notification needs notification_id."`
+		NotificationID string          `json:"notification_id,omitempty" desc:"The notification whose button this is: it runs only while the script that sent it is running."`
+		BlockID        string          `json:"block_id,omitempty" desc:"The pane it acts on, when it was started from one."`
+		SessionID      string          `json:"session_id,omitempty"`
+		ClientID       string          `json:"client_id,omitempty"`
 	}
 	api.Register(s.reg, "action.run", "Run a script's action, and return its result.",
 		func(ctx context.Context, in runIn) (json.RawMessage, error) {
@@ -359,6 +371,12 @@ func (s *Server) registerActionMethods() {
 			}
 			if _, isScript := script.CallerFrom(ctx); isScript {
 				origin = "script"
+			}
+			if in.NotificationID != "" || origin == "notification" {
+				if err := s.checkNoteAction(in.NotificationID, in.Name); err != nil {
+					return nil, err
+				}
+				origin = "notification"
 			}
 			meta := map[string]any{"origin": origin, "block_id": in.BlockID, "session_id": in.SessionID, "client_id": in.ClientID}
 			s.bus.Server("action_run", map[string]any{"name": in.Name, "origin": origin, "client_id": in.ClientID})
@@ -385,20 +403,26 @@ func (s *Server) registerActionMethods() {
 				}
 				confirm = re
 			}
-			// Checked and sent under the lock that changes the agent, so
-			// nothing moves in between.
+			// Check under the lock, act outside it: a terminal that isn't
+			// reading would hold every other call up. The window between is
+			// the one a person's key press has too; the revision is checked
+			// again after, and the answer says if it moved.
 			s.mu.Lock()
-			defer s.mu.Unlock()
 			r := s.blocks[in.BlockID]
+			var a *persist.Agent
+			if r != nil {
+				a = r.st.Agent
+			}
+			stale := a == nil || a.State != "blocked" || a.Revision != in.Revision
+			s.mu.Unlock()
 			if r == nil {
 				return nil, api.NotFound("no block %s", in.BlockID)
 			}
-			a := r.st.Agent
-			if a == nil || a.State != "blocked" || a.Revision != in.Revision {
+			if stale {
 				return nil, api.Conflict("the agent moved on since: nothing was sent")
 			}
 			if confirm != nil {
-				text, err := r.b.Format("text", true, true)
+				text, err := r.b.FormatScreen(true, true)
 				if err != nil {
 					return nil, err
 				}
@@ -418,4 +442,34 @@ func (s *Server) registerActionMethods() {
 			}
 			return map[string]any{"sent": true}, nil
 		}, api.Perm("input"))
+}
+
+// checkNoteAction: a notification's button runs its action only if the
+// notification offered it and the run that sent it still owns it.
+func (s *Server) checkNoteAction(noteID, action string) error {
+	if noteID == "" {
+		return api.BadRequest("a notification's button needs its notification_id")
+	}
+	u := &s.ui
+	u.mu.Lock()
+	var offered *NoteAction
+	for _, n := range u.notes {
+		if n.ID != noteID {
+			continue
+		}
+		for i := range n.Actions {
+			if n.Actions[i].Action == action {
+				a := n.Actions[i]
+				offered = &a
+			}
+		}
+	}
+	u.mu.Unlock()
+	if offered == nil {
+		return api.NotFound("notification %s offers no %s (it may be over a day old)", noteID, action)
+	}
+	if run, ok := s.scripts.ActionRun(action); !ok || run != offered.run {
+		return api.Conflict("the script that sent this has stopped: nothing was run")
+	}
+	return nil
 }
