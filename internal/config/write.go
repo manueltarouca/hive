@@ -159,6 +159,9 @@ func setIn(text, name, value string) string {
 	}
 	lines := strings.Split(text, "\n")
 	want := name + " = " + value
+	if k := key(name); k != nil && k.Repeat {
+		return setRepeated(lines, nl, name, value)
+	}
 	active, commented := -1, -1
 	for i, raw := range lines {
 		s := strings.TrimSpace(strings.TrimSuffix(raw, "\r"))
@@ -184,6 +187,39 @@ func setIn(text, name, value string) string {
 		lines[at] = want + cr
 		return strings.Join(lines, "\n")
 	}
+	if text != "" && !strings.HasSuffix(text, "\n") {
+		text += nl
+	}
+	return text + want + nl
+}
+
+// setRepeated edits a key that may be on many lines (keybind): a value is
+// added after the last of them, unless that exact line is there already;
+// an empty value removes them all.
+func setRepeated(lines []string, nl, name, value string) string {
+	last := -1
+	var keep []string
+	for _, raw := range lines {
+		if k, v, hasEq, skip := line(raw); !skip && hasEq && k == name {
+			if value == "" {
+				continue
+			}
+			if v == value {
+				return strings.Join(lines, "\n") // there already
+			}
+			last = len(keep)
+		}
+		keep = append(keep, raw)
+	}
+	if value == "" {
+		return strings.Join(keep, "\n")
+	}
+	want := name + " = " + value
+	if last >= 0 {
+		keep = append(keep[:last+1], append([]string{want}, keep[last+1:]...)...)
+		return strings.Join(keep, "\n")
+	}
+	text := strings.Join(keep, "\n")
 	if text != "" && !strings.HasSuffix(text, "\n") {
 		text += nl
 	}

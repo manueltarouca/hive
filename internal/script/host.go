@@ -16,6 +16,7 @@ import (
 
 	"github.com/manueltarouca/hive/internal/api"
 	"github.com/manueltarouca/hive/internal/events"
+	"github.com/manueltarouca/hive/internal/keymap"
 	"github.com/manueltarouca/hive/internal/remote"
 )
 
@@ -47,6 +48,8 @@ type Config struct {
 	// OnEnded hears that a script's run ended, to clear what it left on
 	// screen (badges).
 	OnEnded func(name string)
+	// OnKeymap hears that scripts' key bindings changed.
+	OnKeymap func()
 }
 
 // Host runs scripts.
@@ -449,4 +452,47 @@ func (h *Host) wake() {
 		default:
 		}
 	}
+}
+
+// Bindings are every running script's key bindings, oldest script first.
+func (h *Host) Bindings() []keymap.Binding {
+	h.mu.Lock()
+	runs := make([]*Run, 0, len(h.runs))
+	for _, r := range h.runs {
+		runs = append(runs, r)
+	}
+	h.mu.Unlock()
+	sort.Slice(runs, func(i, j int) bool { return runs[i].Started.Before(runs[j].Started) })
+	var out []keymap.Binding
+	for _, r := range runs {
+		r.pmu.Lock()
+		out = append(out, r.bindings...)
+		r.pmu.Unlock()
+	}
+	return out
+}
+
+func (h *Host) keymapChanged() {
+	if f := h.cfg.OnKeymap; f != nil {
+		go f()
+	}
+}
+
+// Modes are the modes scripts declared, and whether each is exclusive.
+func (h *Host) Modes() map[string]bool {
+	h.mu.Lock()
+	runs := make([]*Run, 0, len(h.runs))
+	for _, r := range h.runs {
+		runs = append(runs, r)
+	}
+	h.mu.Unlock()
+	out := map[string]bool{}
+	for _, r := range runs {
+		r.pmu.Lock()
+		for k, v := range r.modes {
+			out[k] = out[k] || v
+		}
+		r.pmu.Unlock()
+	}
+	return out
 }

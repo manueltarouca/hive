@@ -15,6 +15,7 @@ import (
 
 	"github.com/manueltarouca/hive/internal/api"
 	"github.com/manueltarouca/hive/internal/events"
+	"github.com/manueltarouca/hive/internal/keymap"
 	"github.com/manueltarouca/hive/internal/remote"
 )
 
@@ -82,6 +83,9 @@ type Run struct {
 	children    []*Run // runs it started, stopped with it
 	gotManifest bool
 	hasActions  bool
+	bindings    []keymap.Binding // what this script binds (residents only); under pmu
+	keyFns      int
+	modes       map[string]bool // modes this script declared: exclusive or not; under pmu
 	depth       int // the cause depth of the handler running now
 	store       *store
 
@@ -474,6 +478,13 @@ func (r *Run) finish() {
 	r.timers, r.subs, r.history, r.teardown = nil, nil, nil, nil
 	r.host.dropActions(r)
 	r.host.trig.removeRun(r)
+	r.pmu.Lock()
+	had := len(r.bindings) > 0
+	r.bindings = nil
+	r.pmu.Unlock()
+	if had {
+		r.host.keymapChanged()
+	}
 	if r.forTimer != nil {
 		r.forTimer.Stop()
 	}
@@ -535,7 +546,7 @@ func (r *Run) install() error {
 	o := rt.NewObject()
 	ctxJSON, _ := json.Marshal(map[string]any{
 		"session_id": r.cx.SessionID, "block_id": r.cx.BlockID, "client_id": r.cx.ClientID,
-		"origin": "cli", "principal": r.identity.Principal, "server": "local", "run_id": r.ID, "depth": 0,
+		"origin": "cli", "principal": r.identity.Principal, "server": "local", "run_id": r.ID, "depth": 0, "script": r.Name,
 	})
 	args := string(r.opts.Args)
 	if args == "" {
@@ -574,6 +585,17 @@ func (r *Run) install() error {
 	})
 	set("manifest", r.jsManifest)
 	set("registerAction", r.jsRegisterAction)
+	set("bind", r.jsBind)
+	set("mode", func(name string, exclusive bool) {
+		r.pmu.Lock()
+		if r.modes == nil {
+			r.modes = map[string]bool{}
+		}
+		r.modes[name] = exclusive
+		r.pmu.Unlock()
+		r.host.keymapChanged()
+	})
+	set("unbind", r.jsUnbind)
 	set("trigger", r.jsTrigger)
 	set("untrigger", r.jsUntrigger)
 	set("home", func() string { d, _ := os.UserHomeDir(); return d })
@@ -892,4 +914,63 @@ func (r *Run) st() *store {
 		r.store = openStore(dir, name)
 	}
 	return r.store
+}
+
+// jsBind binds a key (in a mode, as "resize/left") to an action. Only
+// scripts in the folder bind keys: a one-shot's would vanish with it.
+func (r *Run) jsBind(key, action, argsJSON string) {
+	if r.opts.Resident == nil {
+		r.logLine("warn", "h.bind: only scripts in the scripts folder bind keys; "+key+" isn't bound")
+		return
+	}
+	if !r.permsNow().Has("ui") {
+		panic(r.rt.NewTypeError("binding keys needs the ui permission, which this script doesn't have"))
+	}
+	line := key + "=" + action
+	if argsJSON != "" && argsJSON != "{}" {
+		line += ":" + argsJSON
+	}
+	b, err := keymap.ParseBinding(line)
+	if err != nil {
+		panic(r.rt.NewTypeError("h.bind: %v", err))
+	}
+	b.Source = "script:" + r.Name
+	r.pmu.Lock() // the host reads bindings from other goroutines
+	defer r.pmu.Unlock()
+	for i, old := range r.bindings {
+		if old.Key == b.Key && old.Mode == b.Mode {
+			r.bindings = append(r.bindings[:i], r.bindings[i+1:]...)
+			break
+		}
+	}
+	r.bindings = append(r.bindings, b)
+	r.host.keymapChanged()
+}
+
+// jsUnbind removes this script's binding of a key; it returns how many went.
+func (r *Run) jsUnbind(key string) int {
+	mode, k, ok := strings.Cut(key, "/")
+	if !ok {
+		mode, k = "", key
+	}
+	parsed, err := keymap.Parse(k)
+	if err != nil {
+		panic(r.rt.NewTypeError("h.unbind: %v", err))
+	}
+	r.pmu.Lock()
+	defer r.pmu.Unlock()
+	n := 0
+	keep := []keymap.Binding{}
+	for _, b := range r.bindings {
+		if b.Key == parsed.String() && b.Mode == mode {
+			n++
+			continue
+		}
+		keep = append(keep, b)
+	}
+	r.bindings = keep
+	if n > 0 {
+		r.host.keymapChanged()
+	}
+	return n
 }

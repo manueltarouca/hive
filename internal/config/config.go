@@ -6,6 +6,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/manueltarouca/hive/internal/keymap"
 	"github.com/manueltarouca/hive/internal/remote"
 	"math"
 	"os"
@@ -33,6 +34,8 @@ type Config struct {
 	ScriptRemoteRun bool `json:"script-remote-run"`
 	// Scripts runs the scripts in the scripts folder.
 	Scripts bool `json:"scripts"`
+	// Keybind changes the apps' shortcuts: one KEY=ACTION per line.
+	Keybind []string `json:"keybind"`
 }
 
 // Level is how bad a diagnostic is: an error keeps the default.
@@ -62,7 +65,9 @@ type Key struct {
 	Help   string `json:"help"`
 	// The values it takes, when they're a fixed list.
 	Choices []string `json:"choices,omitempty"`
-	set     func(c *Config, v string) error
+	// Repeat: the key may appear on many lines, each adding a value.
+	Repeat bool `json:"repeat,omitempty"`
+	set    func(c *Config, v string) error
 }
 
 const minScrollback = 64 << 10
@@ -129,6 +134,18 @@ var Keys = []Key{
 				}
 			}
 			c.Listen = out
+			return nil
+		}},
+	{Name: "keybind", Default: "", Server: true, Repeat: true, Help: "change a shortcut, one per line: KEY=ACTION, such as cmd+shift+t=client.new_tab, or KEY=unbind; see the Scripts docs",
+		set: func(c *Config, v string) error {
+			if v == "" {
+				c.Keybind = nil
+				return nil
+			}
+			if _, err := keymap.ParseBinding(v); err != nil {
+				return err
+			}
+			c.Keybind = append(c.Keybind, v)
 			return nil
 		}},
 	{Name: "scripts", Default: "true", Server: true, Help: "run the scripts in the scripts folder (beside this file) when the server starts",
@@ -232,7 +249,7 @@ func Parse(src string) (Config, []Diagnostic) {
 			diags = append(diags, Diagnostic{n, name, Error, fmt.Sprintf("%s %v (got %q)", name, err, value)})
 			continue // an earlier line's value, if any, stays
 		}
-		if prev, ok := seen[name]; ok {
+		if prev, ok := seen[name]; ok && !k.Repeat {
 			diags = append(diags, Diagnostic{n, name, Warning, fmt.Sprintf("%s is also set on line %d; this one wins", name, prev)})
 		}
 		seen[name] = n

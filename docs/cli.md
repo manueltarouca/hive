@@ -89,6 +89,9 @@ The CLI calls a pane a block and a tab a window.
 | `hive script reload [NAME]` | Load the folder again now |
 | `hive script logs NAME [-f]` | A script's log |
 | `hive script audit [NAME]` | What scripts changed |
+| `hive actions` | The actions scripts offer |
+| `hive do ACTION [KEY=VALUE…]` | Run one, from the pane you're in |
+| `hive keymap [--client mac]` | What keys do in an app, and where each binding came from |
 | `hive script check FILE` | Bundle a script and report errors, without running it |
 | `hive script types [--out FILE]` | Write `hive.d.ts`: this server's methods as TypeScript types, for your editor |
 

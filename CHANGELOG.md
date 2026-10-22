@@ -38,6 +38,11 @@ patch, and this file lists it under "Changed" or "Removed".
 - `GET /v1/events?types=a,b` streams only events of those types. Some
   events, such as a script's log lines, reach only a stream that names them,
   so they never crowd the apps' stream or its history.
+- Keys as data: `keymap.get` gives an app its shortcuts (its defaults,
+  then scripts' `h.bind`, then the settings file's `keybind` lines), with
+  sequences (`ctrl+b>c`) and modes (`resize/left`); event
+  `keymap_changed`. `client.perform` asks a connected app to do one of its
+  own actions. Commands `hive keymap`, `hive actions` and `hive do`.
 - Notifications and badges: `notify.send` reaches every app, and the server
   keeps notifications for a day (`notification.list`, `notification.ack`),
   so an app that was closed shows what it missed. `status.set`,

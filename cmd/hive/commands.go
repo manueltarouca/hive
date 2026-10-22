@@ -81,6 +81,9 @@ Scripts (TypeScript, run by the server)
   script reload [NAME]       load the folder again now
   script logs NAME [-f]      a script's log
   script audit [NAME]        what scripts changed
+  actions                    the actions scripts offer
+  do ACTION [KEY=VALUE...]   run one, from the pane you're in
+  keymap [--client KIND]     what keys do, and where each came from
   script check FILE          bundle a script and report errors
   script types [--out FILE]  write hive.d.ts, the types of this server's API
 
@@ -184,6 +187,12 @@ func dispatch(g globals, args []string) error {
 		return cmdAgent(g, rest)
 	case "script":
 		return cmdScript(g, rest)
+	case "keymap":
+		return cmdKeymap(g, rest)
+	case "actions":
+		return cmdActions(g)
+	case "do":
+		return cmdDo(g, rest)
 	}
 	return usagef("unknown command %q; run hive help", cmd)
 }

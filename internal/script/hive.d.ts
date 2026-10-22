@@ -40,6 +40,8 @@ declare global {
       readonly server: string;
       readonly run_id?: string;
       readonly depth: number;
+      /** This script's name. */
+      readonly script: string;
       /** For an event handler: the event's name and number. */
       readonly event?: string;
       readonly seq?: number;
@@ -200,6 +202,14 @@ declare global {
       stop(code?: number): never;
 
       log(level: "debug" | "info" | "warn" | "error", ...msg: unknown[]): void;
+
+      /** Give a key to an action (this script's, or an app's own such as client.new_tab), or to a function. Scripts in the folder only; needs ui. */
+      bind(key: string, action: string, args?: Record<string, unknown>): void;
+      bind(key: string, fn: (ctx: Context) => unknown): void;
+      /** Remove this script's binding of a key. */
+      unbind(key: string): number;
+      /** Declare a mode: its keys (MODE/KEY) apply once client.mode enters it, until Escape. */
+      mode(name: string, opts?: { exclusive?: boolean }): void;
 
       /** This script's own values, kept across reloads and restarts (1 MB). */
       store: {

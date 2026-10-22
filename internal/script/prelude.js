@@ -161,6 +161,7 @@
     };
   }
 
+  let keyFns = 0;
   function errText(e) { return e instanceof Error ? (e.stack || String(e)) : String(e); }
 
   // ---- actions ----
@@ -244,6 +245,18 @@
     log: (level, ...a) => log(level, a),
     after, every, sleep, on, wait, trigger, wait_output,
     once: (event, filter) => wait(event, filter),
+    // Keys: bind(key, action, args) or bind(key, fn). Keys as "cmd+shift+t",
+    // sequences "ctrl+b>c", in a mode "resize/left".
+    bind: (key, target, args) => {
+      if (typeof target === "function") {
+        const name = (ctx.script + "-key-" + (++keyFns)).replace(/[^a-z0-9_-]/g, "-");
+        actions.register({ name, title: "Key " + key, run: (c) => target(c) });
+        target = name;
+      }
+      host.bind(String(key), String(target), args === undefined ? "" : JSON.stringify(args));
+    },
+    unbind: (key) => host.unbind(String(key)),
+    mode: (name, opts) => host.mode(String(name), !!(opts && opts.exclusive)),
     stop: (code) => host.stop(code === undefined ? 0 : code),
     block: (target) => {
       if (target === undefined) {

@@ -324,3 +324,26 @@ func TestListen(t *testing.T) {
 		t.Fatal("a server listens only on its socket by default")
 	}
 }
+
+func TestKeybindRepeats(t *testing.T) {
+	c, diags := Parse("keybind = cmd+t=client.new_tab\nkeybind = resize/left=client.resize:{\"direction\":\"left\"}\nkeybind = cmd+t=Bad Thing\n")
+	if len(c.Keybind) != 2 || c.Keybind[1] != `resize/left=client.resize:{"direction":"left"}` {
+		t.Fatalf("keybind = %q", c.Keybind)
+	}
+	if len(diags) != 1 || diags[0].Line != 3 || diags[0].Level != Error {
+		t.Fatalf("diags = %+v", diags)
+	}
+}
+
+func TestSetKeybindAddsLines(t *testing.T) {
+	text := "theme = night\nkeybind = cmd+t=client.new_tab\nfont-size = 13\n"
+	text = setIn(text, "keybind", "cmd+k=unbind")
+	text = setIn(text, "keybind", "cmd+k=unbind") // twice is once
+	want := "theme = night\nkeybind = cmd+t=client.new_tab\nkeybind = cmd+k=unbind\nfont-size = 13\n"
+	if text != want {
+		t.Fatalf("got %q", text)
+	}
+	if got := setIn(text, "keybind", ""); got != "theme = night\nfont-size = 13\n" {
+		t.Fatalf("clear: %q", got)
+	}
+}

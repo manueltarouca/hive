@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -68,6 +69,9 @@ func (s *Server) reloadConfig() {
 	}
 	if len(changed) > 0 {
 		s.bus.Server("config_changed", map[string]any{"keys": changed})
+		if slices.Contains(changed, "keybind") {
+			s.keymapChanged()
+		}
 	}
 	for _, r := range blocks {
 		if err := r.b.SetScrollbackLimit(c.ScrollbackLimit); err != nil && !strings.Contains(err.Error(), "closed") {

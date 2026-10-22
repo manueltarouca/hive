@@ -52,6 +52,7 @@ comment.
 | `scrollback-limit` | `16m` | History kept per terminal, in bytes (`k`, `m`, `g`), at least `64k`. Read by the server; lowering it drops old lines at once |
 | `resume-agents` | `true` | Resume agents' sessions when the server starts again. Read when the server starts |
 | `listen` | empty | Listeners the server adds when it starts, separated by spaces, such as `tailnet://:4483`. Only `tailnet://` and `tailnet-serve://`. One that can't open is tried again every 15 seconds. Listener options to `hive server start` replace it. See [Remote hosts](./remote) |
+| `keybind` | none | Change a shortcut: `KEY=ACTION`, one per line, such as `keybind = cmd+shift+t=client.new_tab`, or `KEY=unbind` to remove one. See [Keys](#keys) |
 | `scripts` | `true` | Run the [scripts](./scripts#scripts-that-keep-running) in the scripts folder (beside this file). Read when the server starts |
 | `script-remote-run` | `false` | Let callers on other machines (over Tailscale) run [scripts](./scripts) on this server |
 
@@ -92,3 +93,21 @@ don't count).
 
 `HIVE_CONFIG` names a different file, for tests. `HIVE_STYLE=dark` or
 `light` overrides the theme.
+
+## Keys
+
+Every shortcut in the Mac app is a binding you can change. `hive keymap`
+lists them, with where each came from. Add a `keybind` line per change:
+
+```
+keybind = cmd+shift+t=client.new_tab
+keybind = cmd+k=unbind
+keybind = ctrl+b>c=client.new_tab
+keybind = resize/left=client.resize:{"direction":"left"}
+```
+
+A key is written with `ctrl`, `alt`, `shift` and `cmd`; a sequence as
+`ctrl+b>c`; a key in a mode as `resize/left`. Arguments, when an action
+takes them, follow a colon, as JSON. Your lines win over the app's
+defaults and over scripts'. `hive config set keybind VALUE` adds a line,
+and `hive config set keybind ""` removes them all.

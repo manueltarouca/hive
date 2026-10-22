@@ -78,7 +78,7 @@ lists every change.
 | Terminals, as `hive.terminal.NAME` | `format`, `search`, `write`, `send_key`, `resize`, `size`, `title`, `pwd`, `process`, `program_status`, `list_dir`, `wait` |
 | Agents | `agent.report`, `agent.list`, `agent.act` |
 | Notifications and badges | `notify.send`, `notification.list`, `notification.ack`, `status.set`, `status.clear`, `status.list` |
-| Actions | `action.list`, `action.run` |
+| Actions and keys | `action.list`, `action.run`, `keymap.get`, `client.perform` |
 | Settings | `config.get`, `config.set`, `config.reload` (the server's own settings file; see [Settings](./settings)) |
 | Server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `target.resolve`, `client.list`, `whoami` |
 | Scripts | `script.run`, `script.stop`, `script.list`, `script.result`, `script.grant`, `script.revoke`, `script.enable`, `script.disable`, `script.reload`, `script.logs`, `audit.list` (see [Scripts](./scripts)) |
@@ -121,7 +121,8 @@ Scripts' events, `script_started`, `script_log`, `script_ended`,
 `?types=`, so a busy script never crowds the apps' stream.
 
 With `?all=1`, the server also sends `server_started`, `restore_finished`,
-`config_changed`, `notification`, `notification_acked` and `action_run`.
+`config_changed`, `keymap_changed`, `notification`, `notification_acked`
+and `action_run`.
 A pane's badges change with the terminal event `status_changed`.
 
 With `?all=1`, server events come too: `client_joined` and `client_left`

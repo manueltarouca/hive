@@ -236,11 +236,12 @@ func New(cfg Config) (*Server, error) {
 	if !s.conf.Scripts {
 		scriptsDir = "" // scripts = false, read at start
 	}
-	s.scripts = script.New(script.Config{Backend: s, StateDir: cfg.StateDir, Logger: s.log, ScriptsDir: scriptsDir, Poll: cfg.ConfigPoll, HandlerBudget: cfg.scriptBudget, OnEnded: s.scriptEnded})
+	s.scripts = script.New(script.Config{Backend: s, StateDir: cfg.StateDir, Logger: s.log, ScriptsDir: scriptsDir, Poll: cfg.ConfigPoll, HandlerBudget: cfg.scriptBudget, OnEnded: s.scriptEnded, OnKeymap: s.keymapChanged})
 	s.registerMethods()
 	s.registerScriptMethods()
 	s.registerUIMethods()
 	s.registerActionMethods()
+	s.registerKeyMethods()
 	if cfg.ConfigPath != "" {
 		go s.watchConfig()
 	}

@@ -223,6 +223,40 @@ An action runs with its script's permissions. Another script can run it
 only when it's `public: true` and that script already has those
 permissions itself.
 
+## Keys
+
+A script in the scripts folder can give an action a key, in the Mac app:
+
+```ts
+export default hive.script({
+  name: "scratch-key",
+  permissions: ["control", "ui"],
+  setup(h) {
+    h.actions.register({
+      name: "scratch-window",
+      title: "Open a scratch window",
+      run: async (ctx) => { await h.session.new_window({ session_id: ctx.session_id!, label: "scratch" }); },
+    });
+    h.bind("ctrl+cmd+n", "scratch-window");
+    h.bind("ctrl+b>c", "client.new_tab");               // a sequence: ctrl+b, then c
+    h.mode("resize", { exclusive: true });              // keys only for this mode, until Escape
+    h.bind("ctrl+cmd+r", "client.mode", { mode: "resize" });
+    h.bind("resize/left", "client.resize", { direction: "left" });
+  },
+});
+```
+
+Keys are written as `cmd+shift+t`, with `ctrl`, `alt`, `shift` and `cmd`;
+sequences as `ctrl+b>c`; keys in a mode as `resize/left`. A binding can
+name a script's action, or one of the app's own: `client.new_tab`,
+`client.split_right`, `client.zoom`, `client.palette`, `client.mode`, and
+the rest `hive keymap` lists. `h.bind(key, fn)` binds a function.
+
+You can change any key in the [settings](./settings#keys) file too, and
+those win over scripts'. `hive keymap` shows every binding and where it
+came from. The app takes keys only from the server on its own Mac; actions
+of other hosts are in the command palette, under the host's name.
+
 ## Permissions
 
 A script can only do what it was allowed. Without `--allow`, it can read:
@@ -235,7 +269,7 @@ list sessions, describe blocks, hear events.
 | `control` | Arrange, label, focus and close; new panes with your shell, in any folder |
 | `spawn` | New panes that run a command. Includes `control`. |
 | `input` | Typing into terminals: `write` and `send_key`, and answering agents |
-| `ui` | Notifications, badges and actions |
+| `ui` | Notifications, badges, actions and keys |
 | `config` | Changing settings, except `listen` and those starting with `script` |
 | `server` | Stopping the server, saving now, and the settings `config` can't change |
 

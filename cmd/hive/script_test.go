@@ -106,4 +106,21 @@ export default () => ({ sessions: sessions.map((s: any) => s.label) });
 	if out, _, _ := hive("", "script", "audit"); !strings.Contains(out, "session.set_label") {
 		t.Fatalf("audit: %s", out)
 	}
+
+	// Actions from the CLI, and the keymap.
+	os.WriteFile(filepath.Join(dir, "scripts", "greet.ts"), []byte(`export default hive.script({
+  name: "greet", permissions: ["ui"],
+  setup(h) { h.actions.register({ name: "greet", title: "Say hello", run: (ctx, a: any) => "hi " + a.who }); },
+});`), 0o644)
+	hive("", "script", "reload")
+	hive("", "script", "grant", "greet")
+	if out, _, _ := hive("", "actions"); !strings.Contains(out, "greet   Say hello") {
+		t.Fatalf("actions: %s", out)
+	}
+	if out, e, code := hive("", "do", "greet", "who=mt"); code != 0 || strings.TrimSpace(out) != `"hi mt"` {
+		t.Fatalf("do: %d %q %q", code, out, e)
+	}
+	if out, _, _ := hive("", "keymap"); !strings.Contains(out, "cmd+d") || !strings.Contains(out, "client.split_right") {
+		t.Fatalf("keymap: %s", out)
+	}
 }
