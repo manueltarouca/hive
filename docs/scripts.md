@@ -364,6 +364,78 @@ These events help scripts in the folder: `server_started`, then
 `restore_finished` (with `sessions` and `agents_resumed`), and
 `config_changed` (with the `keys` that changed).
 
+### Seeing what scripts do, and turning them off
+
+Nothing a script does is hidden from you:
+
+- **It shows where it happened.** When a script types into a pane, opens
+  or closes one, or asks the app to do something, the pane's header shows
+  it for a few seconds, such as "⚡ limit-resume answered the agent".
+  Clicking it opens the script.
+- **It's listed.** Every change a script makes goes into its activity:
+  `hive script show NAME`, `hive script audit -f`, or the Scripts window
+  (Hive → Scripts… on the Mac, Settings → Scripts on the phone). You see
+  the start of what it typed there; the log file on disk keeps only its
+  length.
+- **You can turn it off, or let it only watch.** A script in watch mode may
+  still look, mark panes and notify you, but every change it tries is
+  refused, and the refusal is listed. Use the switches in the Scripts
+  window, or `hive script watch NAME` and `hive script disable NAME`.
+
+A script can declare its own switches, which the Scripts window shows and
+`hive script set` changes:
+
+```ts
+export default hive.script({
+  name: "nudge",
+  permissions: ["input", "ui"],
+  options: {
+    auto: { title: "Type it by itself (off: only tell me)", default: true },
+    after_min: { title: "Minutes to wait", type: "number", default: 10, min: 1, max: 120 },
+  },
+  setup(h) {
+    // Read a switch when you act: it can change at any time.
+    h.on("options_changed", (ctx, ev) => console.log(ev.key + " is now " + ev.value));
+  },
+});
+```
+
+`h.options.auto` reads the current value. Only people change switches,
+modes and grants: a script can't, not even one allowed `server`.
+
+A notification can offer to turn its script down, from where it says what
+the script did. These buttons are run by the server for whoever presses
+them, never by the script:
+
+```ts
+await h.notify.send({
+  title: "Resumed oracle",
+  actions: [
+    { title: "Stop typing it", action: "hive.set_option", args: { key: "auto", value: false } },
+    { title: "Watch only", action: "hive.set_mode", args: { mode: "watch" } },
+  ],
+});
+```
+
+### Starter scripts
+
+hive comes with scripts for working with many agents. `hive script add`
+lists them, and `hive script add NAME` copies one into your scripts folder,
+where it waits for you to allow it.
+
+| Starter | Does | Asks |
+| --- | --- | --- |
+| `limit-resume` | When an agent stops at its usage limit, marks its pane with when the limit resets, and types "resume" into it then. Each resume is a notification, with buttons to stop doing it. | input, screen, ui |
+| `needs-you` | Reminds you of agents that keep waiting, and ⌃⌘J takes you to the one that has waited longest. | ui |
+| `stall-watch` | Marks agents that say they're working but whose screen hasn't moved for 15 minutes. | screen, ui |
+| `digest` | One notification with where every agent is, from the palette or the phone, and each morning if you like. | ui |
+| `lane-keeper` | For a team of agents with an orchestrator: notices lanes that went idle without asking anything, and tells the orchestrator (asks you first, unless you switch that on). | input, ui |
+| `team` | Pause, resume, reload skills or say one line to every agent in a session. | input, ui |
+| `keep-awake` | Keeps the Mac awake with a caffeinate tab while agents work. | spawn, ui |
+| `dev-panes` | Marks failed test runs and dev server ports in shell panes. | screen, ui |
+
+Each is a short file you can read before you allow it, and change after.
+
 ### When a script misbehaves
 
 - An error in a handler is logged, and the script keeps running.

@@ -86,9 +86,13 @@ The CLI calls a pane a block and a tab a window.
 | `hive script ls` | Scripts in the scripts folder, running one-shots, and the latest that ended |
 | `hive script grant NAME` / `revoke NAME` | Let a script in the folder run with what it asks for, or take that back |
 | `hive script enable NAME` / `disable NAME` | Turn a script in the folder on or off |
+| `hive script watch NAME` / `act NAME` | Let a script only watch (it may look, mark panes and notify; every change it tries is refused and listed), or act again |
+| `hive script set NAME KEY=VALUE…` | Change a script's switches, the options it declares |
+| `hive script show NAME` | One script: what it is, may do, its switches, and what it did lately |
+| `hive script add [NAME…]` | List the starter scripts, or copy one into the scripts folder |
 | `hive script reload [NAME]` | Load the folder again now |
 | `hive script logs NAME [-f]` | A script's log |
-| `hive script audit [NAME]` | What scripts changed |
+| `hive script audit [NAME] [-f]` | What scripts did, and what people did to them; `-f` keeps following |
 | `hive actions` | The actions scripts offer |
 | `hive do ACTION [KEY=VALUE…]` | Run one, from the pane you're in |
 | `hive keymap [--client mac]` | What keys do in an app, and where each binding came from |

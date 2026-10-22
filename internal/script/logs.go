@@ -99,7 +99,7 @@ func (h *Host) Audit(name string, n int) []Entry {
 			if json.Unmarshal(sc.Bytes(), &e) != nil {
 				continue
 			}
-			if name != "" && strings.TrimPrefix(e.Principal, "script:") != name {
+			if name != "" && e.Script != name && strings.TrimPrefix(e.Principal, "script:") != name {
 				continue
 			}
 			out = append(out, e)

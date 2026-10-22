@@ -13,6 +13,27 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ### Added
 
+- Seeing what scripts do, and turning them off: every change a script
+  makes is listed (`hive script show`, `hive script audit -f`, method
+  `audit.list`, event `script_acted`) and shows for a few seconds on the
+  pane it touched. A script can be put in watch mode (`hive script watch`,
+  `script.set_mode`): it may look, mark panes and notify, and every change
+  it tries is refused and listed. Scripts declare switches (`options` in
+  the manifest, `h.options`, `hive script set`, `script.set_option`), and a
+  notification can offer `hive.set_option` and `hive.set_mode` buttons,
+  which the server runs for whoever presses them. Only people change
+  modes, switches and grants. The Mac app has a Scripts window (Hive →
+  Scripts…) and the phone a Scripts page, with all of this.
+- Starter scripts: `hive script add` lists and installs `limit-resume`,
+  `needs-you`, `stall-watch`, `digest`, `lane-keeper`, `team`,
+  `keep-awake` and `dev-panes`.
+- Agents stopped by an error, such as Claude Code at its usage limit, are
+  `done` with `kind: "error"` and the reason, and the apps show them as
+  Stopped. `agent.act` takes `expect_state`, to nudge an agent that is
+  idle or done. Mac client action `client.reveal` brings a pane forward;
+  `action.run` from the Mac carries the app's `client_id`.
+
+
 - Scripts: TypeScript or JavaScript the server runs, with the same methods
   and events as the CLI. `hive script run FILE` runs one once, with its log
   on stderr and its result on stdout; `hive script stop`, `hive script ls`,
@@ -70,6 +91,9 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ### Changed
 
+- `client.perform` needs `control` for app actions that change your layout
+  (new tabs, splits, closing, resizing); `ui` still covers showing things.
+  A script can mark only its own notifications seen.
 - Hive.app takes its shortcuts from the server's keymap, with sequences and
   modes, and lists scripts' actions in the command palette. Every default
   has a key a Portuguese keyboard types without Option (⌃⇥ and ⌃⇧⇥ for

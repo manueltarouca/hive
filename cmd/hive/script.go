@@ -9,21 +9,28 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
 
+	"github.com/manueltarouca/hive/examples"
 	"github.com/manueltarouca/hive/internal/client"
+	"github.com/manueltarouca/hive/internal/config"
 	"github.com/manueltarouca/hive/internal/script"
 )
 
 const scriptUsage = `usage: hive script run FILE|-e CODE|- [KEY=VALUE...] [--args JSON] [--allow PERMS] [--for DUR] [--all]
        hive script stop RUN_ID
        hive script ls
+       hive script show NAME
        hive script grant|revoke|enable|disable NAME
+       hive script watch|act NAME
+       hive script set NAME KEY=VALUE...
+       hive script add [NAME...]
        hive script reload [NAME]
        hive script logs NAME [--tail N] [-f]
-       hive script audit [NAME] [--tail N]
+       hive script audit [NAME] [--tail N] [-f]
        hive script check FILE
        hive script types [--out FILE]`
 
@@ -52,6 +59,33 @@ func cmdScript(g globals, args []string) error {
 			return usagef("usage: hive script %s NAME", args[0])
 		}
 		return cmdScriptAdmin(g, args[0], args[1])
+	case "watch", "act":
+		if len(args) != 2 {
+			return usagef("usage: hive script %s NAME", args[0])
+		}
+		x, err := open(g)
+		if err != nil {
+			return err
+		}
+		var r script.Resident
+		if err := x.call("script.set_mode", map[string]any{"name": args[1], "mode": args[0]}, &r); err != nil {
+			return err
+		}
+		if r.Mode == script.ModeWatch {
+			fmt.Printf("%s watches: it may look, mark panes and notify; every change it tries is refused and listed in hive script audit\n", r.Name)
+		} else {
+			fmt.Printf("%s acts: it may do what it was granted (%s)\n", r.Name, strings.Join(r.Permissions, ", "))
+		}
+		return nil
+	case "set":
+		return cmdScriptSet(g, args[1:])
+	case "show":
+		if len(args) != 2 {
+			return usagef("usage: hive script show NAME")
+		}
+		return cmdScriptShow(g, args[1])
+	case "add":
+		return cmdScriptAdd(g, args[1:])
 	case "reload":
 		x, err := open(g)
 		if err != nil {
@@ -259,7 +293,7 @@ func cmdScriptLs(g globals) error {
 	_ = json.Unmarshal(raw, &out)
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	if len(out.Scripts) > 0 {
-		fmt.Fprintln(tw, "SCRIPT\tSTATE\tPERMISSIONS\tERRORS\tNOTE")
+		fmt.Fprintln(tw, "SCRIPT\tSTATE\tMODE\tPERMISSIONS\tERRORS\tNOTE")
 		for _, r := range out.Scripts {
 			perms, note := strings.Join(r.Permissions, ","), firstLine(r.Error)
 			if r.State == script.StatePending {
@@ -269,7 +303,11 @@ func cmdScriptLs(g globals) error {
 			if perms == "" {
 				perms = "read"
 			}
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\n", r.Name, r.State, perms, r.Errors, note)
+			mode := r.Mode
+			if mode == "" {
+				mode = script.ModeAct
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\n", r.Name, r.State, mode, perms, r.Errors, note)
 		}
 		fmt.Fprintln(tw)
 	}
@@ -398,6 +436,7 @@ func printLog(t time.Time, level, text string) {
 func cmdScriptAudit(g globals, args []string) error {
 	fs := flags("script audit")
 	tail := fs.Int("tail", 50, "")
+	follow := fs.Bool("f", false, "")
 	var name string
 	for {
 		if err := parse(fs, args); err != nil {
@@ -412,23 +451,222 @@ func cmdScriptAudit(g globals, args []string) error {
 	if err != nil {
 		return err
 	}
-	raw, err := x.c.CallRaw(x.ctx, "audit.list", map[string]any{"name": name, "tail": *tail})
+	var last uint64
+	fetch := func(n int) ([]script.Entry, json.RawMessage, error) {
+		params := map[string]any{"name": name, "tail": n}
+		if n == 0 {
+			params = map[string]any{"name": name, "since": max(last, 1)}
+		}
+		raw, err := x.c.CallRaw(x.ctx, "audit.list", params)
+		if err != nil {
+			return nil, nil, err
+		}
+		var out struct {
+			Entries []script.Entry `json:"entries"`
+		}
+		_ = json.Unmarshal(raw, &out)
+		return out.Entries, raw, nil
+	}
+	entries, raw, err := fetch(*tail)
 	if err != nil {
 		return err
 	}
-	if g.json {
+	if g.json && !*follow {
 		return printRaw(raw)
 	}
-	var out struct {
-		Entries []script.Entry `json:"entries"`
-	}
-	_ = json.Unmarshal(raw, &out)
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "TIME\tSCRIPT\tMETHOD\tRESULT")
-	for _, e := range out.Entries {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", e.Time.Local().Format("01-02 15:04:05"), strings.TrimPrefix(e.Principal, "script:"), e.Method, e.Result)
+	fmt.Fprintln(tw, "TIME\tSCRIPT\tWHAT\tRESULT")
+	show := func(es []script.Entry) {
+		for _, e := range es {
+			if e.Seq != 0 && e.Seq <= last {
+				continue
+			}
+			last = max(last, e.Seq)
+			who := e.Script
+			if who == "" {
+				who = strings.TrimPrefix(e.Principal, "script:")
+			}
+			what := e.Summary
+			if what == "" {
+				what = e.Method
+			}
+			if e.Preview != "" {
+				what += fmt.Sprintf(" %q", e.Preview)
+			}
+			if !strings.HasPrefix(e.Principal, "script:") {
+				what += " (by " + e.Principal + ")"
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", e.Time.Local().Format("01-02 15:04:05"), who, what, e.Result)
+		}
+		tw.Flush()
+	}
+	show(entries)
+	for *follow {
+		time.Sleep(time.Second)
+		es, _, err := fetch(0) // what's new, from the server's memory
+		if err != nil {
+			return err
+		}
+		show(es)
+	}
+	return nil
+}
+
+func cmdScriptSet(g globals, args []string) error {
+	if len(args) < 2 {
+		return usagef("usage: hive script set NAME KEY=VALUE...")
+	}
+	x, err := open(g)
+	if err != nil {
+		return err
+	}
+	var list struct {
+		Scripts []script.Resident `json:"scripts"`
+	}
+	if err := x.call("script.list", nil, &list); err != nil {
+		return err
+	}
+	types := map[string]string{}
+	for _, r := range list.Scripts {
+		if r.Name == args[0] {
+			for _, o := range r.Options {
+				types[o.Key] = o.Type
+			}
+		}
+	}
+	var r script.Resident
+	for _, kv := range args[1:] {
+		key, val, ok := strings.Cut(kv, "=")
+		if !ok {
+			return usagef("%s: KEY=VALUE", kv)
+		}
+		var v any = val
+		switch types[key] {
+		case "bool":
+			b, err := strconv.ParseBool(val)
+			if err != nil {
+				return fmt.Errorf("%s takes true or false", key)
+			}
+			v = b
+		case "number":
+			f, err := strconv.ParseFloat(val, 64)
+			if err != nil {
+				return fmt.Errorf("%s takes a number", key)
+			}
+			v = f
+		}
+		if err := x.call("script.set_option", map[string]any{"name": args[0], "key": key, "value": v}, &r); err != nil {
+			return err
+		}
+	}
+	return printOptions(r)
+}
+
+func printOptions(r script.Resident) error {
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "OPTION\tVALUE\tWHAT")
+	for _, o := range r.Options {
+		v := fmt.Sprint(o.Value)
+		if s, ok := o.Value.(string); ok {
+			v = fmt.Sprintf("%q", s)
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", o.Key, v, o.Title)
 	}
 	return tw.Flush()
+}
+
+// cmdScriptShow is one script in full: what it is, may do, its switches,
+// and what it did lately.
+func cmdScriptShow(g globals, name string) error {
+	x, err := open(g)
+	if err != nil {
+		return err
+	}
+	var list struct {
+		Scripts []script.Resident `json:"scripts"`
+	}
+	if err := x.call("script.list", nil, &list); err != nil {
+		return err
+	}
+	var r *script.Resident
+	for i := range list.Scripts {
+		if list.Scripts[i].Name == name {
+			r = &list.Scripts[i]
+		}
+	}
+	if r == nil {
+		return fmt.Errorf("no script named %s in the scripts folder", name)
+	}
+	if g.json {
+		return printJSON(os.Stdout, r)
+	}
+	fmt.Printf("%s: %s\n", r.Name, r.State)
+	if r.Description != "" {
+		fmt.Println(r.Description)
+	}
+	perms := append([]string{"read"}, r.Permissions...)
+	if r.State == script.StatePending {
+		fmt.Printf("Asks for: %s (hive script grant %s)\n", strings.Join(r.Asks, ", "), r.Name)
+	} else {
+		fmt.Printf("May: %s\n", strings.Join(perms, ", "))
+	}
+	if r.Mode == script.ModeWatch {
+		fmt.Println("Mode: watch (changes are refused)")
+	} else {
+		fmt.Println("Mode: act")
+	}
+	if r.Error != "" {
+		fmt.Println("Error: " + firstLine(r.Error))
+	}
+	fmt.Println(r.Path)
+	if len(r.Options) > 0 {
+		fmt.Println()
+		if err := printOptions(*r); err != nil {
+			return err
+		}
+	}
+	fmt.Println()
+	return cmdScriptAudit(g, []string{name, "--tail", "10"})
+}
+
+// cmdScriptAdd lists the starter scripts, or copies some into the scripts
+// folder, where they wait for a grant.
+func cmdScriptAdd(g globals, names []string) error {
+	if len(names) == 0 {
+		tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(tw, "STARTER\tASKS\tDOES")
+		for _, s := range examples.Starters() {
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", s.Name, s.Permissions, s.Description)
+		}
+		tw.Flush()
+		fmt.Fprintln(os.Stderr, "\nhive script add NAME copies one into "+config.Scripts()+"; hive script grant NAME starts it.")
+		return nil
+	}
+	if g.explicitServer {
+		return fmt.Errorf("add copies into this machine's scripts folder; for another host, copy the file there")
+	}
+	dir := config.Scripts()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	for _, n := range names {
+		s, ok := examples.Get(n)
+		if !ok {
+			return fmt.Errorf("no starter named %s (hive script add lists them)", n)
+		}
+		p := filepath.Join(dir, n+".ts")
+		if _, err := os.Stat(p); err == nil {
+			return fmt.Errorf("%s already exists: remove it first to get the starter again", p)
+		}
+		if _, err := os.Stat(filepath.Join(dir, n)); err == nil {
+			return fmt.Errorf("%s already exists as a folder", filepath.Join(dir, n))
+		}
+		if err := os.WriteFile(p, []byte(s.Code), 0o644); err != nil {
+			return err
+		}
+		fmt.Printf("added %s: it asks for %s. Start it with: hive script grant %s\n", p, s.Permissions, n)
+	}
+	return nil
 }
 
 func firstLine(s string) string {

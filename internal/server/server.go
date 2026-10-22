@@ -543,8 +543,14 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 			// The agent's own report of its state wins over the last hook:
 			// an interrupt runs no hook, but Claude Code reports going idle.
 			if a := r.st.Agent; a != nil && a.State != "ended" {
-				if st, ok := agents.StateFromStatus(a.Harness, rec.App, rec.State); ok && st != a.State {
-					a.State, a.Message, a.Kind, a.UpdatedAt = st, rec.Message, "", time.Now().UTC()
+				// error: failed and stopped (Claude Code at its usage limit) is
+				// done, with kind error and the reason.
+				kind := ""
+				if rec.State == "error" {
+					kind = "error"
+				}
+				if st, ok := agents.StateFromStatus(a.Harness, rec.App, rec.State); ok && (st != a.State || (kind == "error") != (a.Kind == "error")) {
+					a.State, a.Message, a.Kind, a.UpdatedAt = st, rec.Message, kind, time.Now().UTC()
 					a.Revision++
 					s.publishAgent(r.st.SessionID, e.BlockID, a, "program_status")
 				}

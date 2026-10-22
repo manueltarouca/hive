@@ -103,7 +103,7 @@ export default () => ({ sessions: sessions.map((s: any) => s.label) });
 	if out, _, _ := hive("", "script", "logs", "hello"); !strings.Contains(out, "hello from the folder") {
 		t.Fatalf("logs: %s", out)
 	}
-	if out, _, _ := hive("", "script", "audit"); !strings.Contains(out, "session.set_label") {
+	if out, _, _ := hive("", "script", "audit"); !strings.Contains(out, "set label") {
 		t.Fatalf("audit: %s", out)
 	}
 

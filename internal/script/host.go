@@ -68,6 +68,9 @@ type Host struct {
 	runs      map[string]*Run
 	finished  []*Run // the latest, for script.result and script.list
 	closed    bool
+	// activity keeps each script's latest entries, with typed previews.
+	activity map[string][]Entry
+	actSeq   uint64
 }
 
 // keepFinished is how many ended runs are remembered.
@@ -79,7 +82,8 @@ func New(cfg Config) *Host {
 	if log == nil {
 		log = slog.Default()
 	}
-	h := &Host{cfg: cfg, log: log, runs: map[string]*Run{}, causes: newCauses()}
+	h := &Host{cfg: cfg, log: log, runs: map[string]*Run{}, causes: newCauses(),
+		actSeq: uint64(time.Now().UnixMicro())} // above any entry of an earlier start
 	h.trig = newTriggerSet(h)
 	if cfg.StateDir != "" {
 		h.audit = &auditLog{path: filepath.Join(cfg.StateDir, "scripts", "audit.jsonl")}
@@ -186,6 +190,7 @@ func (h *Host) Start(o RunOptions) (*Run, error) {
 	}
 	h.runs[r.ID] = r
 	parent := h.runs[o.Parent]
+	r.parent = parent
 	h.mu.Unlock()
 	if parent != nil {
 		parent.pmu.Lock()
@@ -323,6 +328,23 @@ func (h *Host) call(r *Run, method, argsJSON string, depth int) (string, error) 
 	if !perms.Has(need) {
 		return "", api.PermissionDenied("%s needs the %s permission, which this script doesn't have", method, need)
 	}
+	logged := audited[need] || auditedMethods[method]
+	var plain map[string]any
+	if logged {
+		_ = json.Unmarshal(raw, &plain)
+	}
+	entry := func(res string) {
+		typed := typedText(method, plain)
+		bid, sid := target(plain)
+		h.record(Entry{Time: time.Now().UTC(), Principal: "script:" + r.Name, OnBehalfOf: r.identity.Principal,
+			RunID: r.ID, Method: method, Permission: need, Args: auditArgs(raw), Result: res,
+			Script: r.owner(), Summary: summarize(method, plain, typed), BlockID: bid, SessionID: sid}, preview(typed))
+	}
+	if logged && r.watching() {
+		entry("watching")
+		return "", &api.Error{Status: 403, Code: "permission_denied",
+			Message: fmt.Sprintf("%s refused: %s is in watch mode (it may look, not change)", method, r.owner())}
+	}
 	if depth >= maxDepth {
 		return "", &api.Error{Status: 409, Code: "loop_suspected",
 			Message: fmt.Sprintf("%s refused: scripts have been waking each other %d times in a row", method, depth)}
@@ -336,17 +358,16 @@ func (h *Host) call(r *Run, method, argsJSON string, depth int) (string, error) 
 		callID = h.causes.begin(start)
 	}
 	out, err := reg.Call(ctx, method, raw)
-	if audited[need] {
-		h.causes.end(callID, window{start: start, end: bus.Seq(), sessions: sessionsOf(raw, out), run: r.ID, depth: depth})
-		h.wake()
-	}
-	if audited[need] {
+	if logged {
 		res := "ok"
 		if err != nil {
 			res = errCode(err)
 		}
-		h.audit.write(Entry{Time: time.Now().UTC(), Principal: "script:" + r.Name, OnBehalfOf: r.identity.Principal,
-			RunID: r.ID, Method: method, Permission: need, Args: auditArgs(raw), Result: res})
+		entry(res) // inside the window: its script_acted event is the script's own
+	}
+	if audited[need] {
+		h.causes.end(callID, window{start: start, end: bus.Seq(), sessions: sessionsOf(raw, out), run: r.ID, depth: depth})
+		h.wake()
 	}
 	if err != nil {
 		return "", err

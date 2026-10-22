@@ -106,6 +106,9 @@ type Run struct {
 	endedAt      time.Time
 	logLines     int
 	manifestDone bool
+	declared     []Option // a one-shot's options: their defaults
+
+	parent *Run // the run that started this one
 }
 
 type jsTimer struct {
@@ -607,6 +610,14 @@ func (r *Run) install() error {
 		return re.MatchString(text)
 	})
 	set("storeGet", func(key string) string { return r.st().get(key) })
+	set("optionGet", func(key string) string {
+		v, ok := r.option(key)
+		if !ok {
+			return ""
+		}
+		b, _ := json.Marshal(v)
+		return string(b)
+	})
 	set("storeSet", func(key, value string) {
 		if err := r.st().set(key, value); err != nil {
 			panic(r.rt.NewTypeError("%v", err))
@@ -731,7 +742,8 @@ func (r *Run) jsManifest(manifestJSON string) bool {
 	var m struct {
 		Name        string   `json:"name"`
 		Description string   `json:"description"`
-		Permissions []string `json:"permissions"`
+		Permissions []string                   `json:"permissions"`
+		Options     map[string]json.RawMessage `json:"options"`
 	}
 	if err := json.Unmarshal([]byte(manifestJSON), &m); err != nil {
 		panic(r.rt.NewTypeError("manifest: %v", err))
@@ -740,10 +752,17 @@ func (r *Run) jsManifest(manifestJSON string) bool {
 	if err != nil {
 		panic(r.rt.NewTypeError("manifest: %v", err))
 	}
+	opts, err := parseOptions(m.Options)
+	if err != nil {
+		panic(r.rt.NewTypeError("manifest: %v", err))
+	}
+	r.pmu.Lock()
+	r.declared = opts
+	r.pmu.Unlock()
 	r.gotManifest = true
 	defer func() { r.pmu.Lock(); r.manifestDone = true; r.pmu.Unlock() }()
 	if res := r.opts.Resident; res != nil {
-		granted, ok := r.host.res.manifest(res, p.List(), m.Description)
+		granted, ok := r.host.res.manifest(res, p.List(), m.Description, opts)
 		if !ok {
 			r.logLine("warn", fmt.Sprintf("waiting for permission: hive script grant %s (it asks for %s)", r.Name, strings.Join(p.List(), ", ")))
 			r.end()
@@ -878,6 +897,10 @@ func (r *Run) dispatch(s *jsSub, ev event) {
 		return
 	}
 	if !matches(s.filter, ev.Payload) {
+		return
+	}
+	// Its own activity, refusals included, never wakes it: that would loop.
+	if ev.Name == "script_acted" && !s.self && ev.Payload["run_id"] == r.ID {
 		return
 	}
 	depth := 0

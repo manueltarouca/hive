@@ -1190,6 +1190,16 @@ func (s *Server) registerAgentMethods() {
 			if in.State != "blocked" {
 				a.Kind = ""
 			}
+			// The agent said it failed and stopped (OSC 7501 error, such as
+			// Claude Code at its usage limit); its Stop hook, before or
+			// after, says only done: the error and its reason stay.
+			if in.State == "done" && in.Message == "" {
+				for _, rec := range rr.st.Status {
+					if st, ok := agents.StateFromStatus(a.Harness, rec.App, rec.State); ok && st == "done" && rec.State == "error" {
+						a.Kind, a.Message = "error", rec.Message
+					}
+				}
+			}
 			a.EndedBy, a.Before = "", ""
 			if endedByShell {
 				a.EndedBy, a.Before, a.State = "shell", in.State, "ended"

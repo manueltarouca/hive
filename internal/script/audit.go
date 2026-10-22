@@ -28,6 +28,17 @@ type Entry struct {
 	Permission string         `json:"permission"`
 	Args       map[string]any `json:"args,omitempty"`
 	Result     string         `json:"result"`
+	// Seq numbers entries, newest highest.
+	Seq uint64 `json:"seq,omitempty"`
+	// Script is the folder script it belongs to: a one-shot a script
+	// started counts as that script's.
+	Script    string `json:"script,omitempty"`
+	Summary   string `json:"summary,omitempty" desc:"What it did, in a few words."`
+	BlockID   string `json:"block_id,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+	// Preview is the start of typed text: kept in memory only, shown to
+	// the owner's apps, never written to the file.
+	Preview string `json:"preview,omitempty"`
 }
 
 // auditLog appends entries to scripts/audit.jsonl in the state folder.
@@ -40,6 +51,7 @@ func (a *auditLog) write(e Entry) {
 	if a == nil || a.path == "" {
 		return
 	}
+	e.Preview = ""
 	line, err := json.Marshal(e)
 	if err != nil {
 		return
@@ -66,6 +78,10 @@ func auditArgs(raw []byte) map[string]any {
 	var args map[string]any
 	if json.Unmarshal(raw, &args) != nil {
 		return nil
+	}
+	if w, ok := args["write"].(string); ok { // agent.act
+		sum := sha256.Sum256([]byte(w))
+		args["write"] = map[string]any{"length": len(w), "sha256": hex.EncodeToString(sum[:8])}
 	}
 	if inner, ok := args["args"].(map[string]any); ok {
 		if d, ok := inner["data"].(string); ok {

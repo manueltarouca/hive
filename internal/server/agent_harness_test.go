@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"io"
 	"os"
 	"os/exec"
@@ -297,4 +298,80 @@ func testShell(t *testing.T) ([]string, string) {
 	}
 	t.Skip("no zsh or bash")
 	return nil, ""
+}
+
+// Claude Code at its usage limit reports "error" (failed and stopped): the
+// agent is done, with kind error and the reason, until its next state.
+func TestAgentStoppedByAnErrorSaysSo(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	msg := base64.StdEncoding.EncodeToString([]byte("You've hit your session limit · resets 3am"))
+	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
+		`sleep 0.6; printf '\033]7501;state=error:app=claude-code:msg=` + msg + `\033\\'; sleep 1.2; printf '\033]7501;state=working:app=claude-code\033\\'; exec cat`}})
+	bid := strs(created["block_ids"])[0]
+	sid, _ := created["session_id"].(string)
+	h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working"})
+	agent := func() map[string]any {
+		out := h.call("session.view", map[string]any{"session_id": sid})
+		b, _ := out["blocks"].(map[string]any)[bid].(map[string]any)
+		a, _ := b["agent"].(map[string]any)
+		return a
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for a := agent(); a["kind"] != "error"; a = agent() {
+		if time.Now().After(deadline) {
+			t.Fatalf("never stopped with kind error: %v", a)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if a := agent(); a["state"] != "done" || a["message"] != "You've hit your session limit · resets 3am" {
+		t.Fatalf("stopped agent = %v", a)
+	}
+	for a := agent(); a["state"] != "working"; a = agent() {
+		if time.Now().After(deadline.Add(3 * time.Second)) {
+			t.Fatalf("never went back to working: %v", a)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if a := agent(); a["kind"] != nil && a["kind"] != "" {
+		t.Fatalf("kind kept after working again: %v", a)
+	}
+}
+
+// The Stop hook says only done: after the agent's own error report it
+// keeps the error and its reason, and an error report after the hook
+// still marks it.
+func TestAgentErrorSurvivesTheStopHook(t *testing.T) {
+	for _, hookFirst := range []bool{false, true} {
+		h := start(t, t.TempDir(), nil)
+		msg := base64.StdEncoding.EncodeToString([]byte("limit · resets 3am"))
+		created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
+			`sleep 0.8; printf '\033]7501;state=error:app=claude-code:msg=` + msg + `\033\\'; exec cat`}})
+		bid := strs(created["block_ids"])[0]
+		sid, _ := created["session_id"].(string)
+		h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working"})
+		agent := func() map[string]any {
+			out := h.call("session.view", map[string]any{"session_id": sid})
+			b, _ := out["blocks"].(map[string]any)[bid].(map[string]any)
+			a, _ := b["agent"].(map[string]any)
+			return a
+		}
+		if hookFirst {
+			h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "done"})
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for a := agent(); a["kind"] != "error"; a = agent() {
+			if time.Now().After(deadline) {
+				t.Fatalf("hookFirst=%v: never kind error: %v", hookFirst, a)
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		if !hookFirst {
+			h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "done"})
+		}
+		if a := agent(); a["kind"] != "error" || a["message"] != "limit · resets 3am" || a["state"] != "done" {
+			t.Fatalf("hookFirst=%v: after the hook: %v", hookFirst, a)
+		}
+		h.stop()
+	}
 }

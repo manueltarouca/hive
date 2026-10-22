@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -112,6 +113,19 @@ func (s *Server) registerUIMethods() {
 			}
 			c, isScript := script.CallerFrom(ctx)
 			for _, a := range in.Actions {
+				if builtinNoteAction(a.Action) {
+					// Run by the server for whoever presses it, never by the
+					// script: it can offer to turn itself off, not do it.
+					if !isScript {
+						return Notification{}, api.BadRequest("%s buttons are for scripts", a.Action)
+					}
+					a.Title = clip(a.Title, 40)
+					if err := s.checkBuiltinButton(c.Name, &a); err != nil {
+						return Notification{}, err
+					}
+					n.Actions = append(n.Actions, a)
+					continue
+				}
 				// A button runs with the sending script's rights: it may only
 				// name that script's own actions.
 				owner, ok := s.scripts.ActionOwner(a.Action)
@@ -188,8 +202,14 @@ func (s *Server) registerUIMethods() {
 			u := &s.ui
 			u.mu.Lock()
 			found := false
+			src, isScript := script.CallerFrom(ctx)
 			for i := range u.notes {
 				if u.notes[i].ID == in.ID {
+					// A script marks only its own seen: never what else wants you.
+					if isScript && u.notes[i].Source != "script:"+src.Name {
+						u.mu.Unlock()
+						return empty{}, api.PermissionDenied("a script can only mark its own notifications seen")
+					}
 					u.notes[i].Acked, found = true, true
 				}
 			}
@@ -372,6 +392,13 @@ func (s *Server) registerActionMethods() {
 			if _, isScript := script.CallerFrom(ctx); isScript {
 				origin = "script"
 			}
+			if builtinNoteAction(in.Name) {
+				if err := notByScript(ctx, "press "+in.Name); err != nil {
+					return nil, err
+				}
+				s.bus.Server("action_run", map[string]any{"name": in.Name, "origin": "notification", "client_id": in.ClientID})
+				return s.runBuiltinButton(ctx, in.NotificationID, in.Name, in.Args)
+			}
 			if in.NotificationID != "" || origin == "notification" {
 				if err := s.checkNoteAction(in.NotificationID, in.Name); err != nil {
 					return nil, err
@@ -389,8 +416,9 @@ func (s *Server) registerActionMethods() {
 		SendKey  []string `json:"send_key,omitempty"`
 		Write    string   `json:"write,omitempty"`
 		Confirm  string   `json:"confirm,omitempty" desc:"A pattern (RE2) the pane's last 10 lines must match."`
+		Expect   []string `json:"expect_state,omitempty" desc:"The states the agent must still be in. Default blocked; idle or done to nudge an agent that stopped; working to interrupt one."`
 	}
-	api.Register(s.reg, "agent.act", "Answer a blocked agent: press keys or type, only if it is still blocked on what was seen.",
+	api.Register(s.reg, "agent.act", "Answer or nudge an agent: press keys or type, only if it is still in the state and revision that was seen.",
 		func(ctx context.Context, in actIn) (map[string]any, error) {
 			if len(in.SendKey) == 0 && in.Write == "" {
 				return nil, api.BadRequest("send_key or write")
@@ -413,7 +441,16 @@ func (s *Server) registerActionMethods() {
 			if r != nil {
 				a = r.st.Agent
 			}
-			stale := a == nil || a.State != "blocked" || a.Revision != in.Revision
+			expect := in.Expect
+			if len(expect) == 0 {
+				expect = []string{"blocked"}
+			}
+			for _, e := range expect {
+				if e != "blocked" && e != "idle" && e != "done" && e != "working" {
+					return nil, api.BadRequest("expect_state: blocked, idle, done or working")
+				}
+			}
+			stale := a == nil || !slices.Contains(expect, a.State) || a.Revision != in.Revision
 			s.mu.Unlock()
 			if r == nil {
 				return nil, api.NotFound("no block %s", in.BlockID)

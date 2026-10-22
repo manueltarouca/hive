@@ -81,7 +81,7 @@ lists every change.
 | Actions and keys | `action.list`, `action.run`, `keymap.get`, `client.perform` |
 | Settings | `config.get`, `config.set`, `config.reload` (the server's own settings file; see [Settings](./settings)) |
 | Server | `server.version`, `server.flush`, `server.shutdown`, `api.list`, `api.describe`, `target.resolve`, `client.list`, `whoami` |
-| Scripts | `script.run`, `script.stop`, `script.list`, `script.result`, `script.grant`, `script.revoke`, `script.enable`, `script.disable`, `script.reload`, `script.logs`, `audit.list` (see [Scripts](./scripts)) |
+| Scripts | `script.run`, `script.stop`, `script.list`, `script.result`, `script.grant`, `script.revoke`, `script.enable`, `script.disable`, `script.set_mode`, `script.set_option`, `script.reload`, `script.logs`, `audit.list` (see [Scripts](./scripts)) |
 
 Each method also says which permission a [script](./scripts#permissions)
 needs to call it: `hive api list --json` and `hive api describe` show it as

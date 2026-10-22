@@ -62,7 +62,7 @@ func (s *Server) registerKeyMethods() {
 
 	type performIn struct {
 		ClientID string          `json:"client_id" required:"true"`
-		Action   string          `json:"action" required:"true" desc:"A client action, such as client.zoom or client.palette."`
+		Action   string          `json:"action" required:"true" desc:"A client action, such as client.reveal or client.palette."`
 		Args     json.RawMessage `json:"args,omitempty"`
 	}
 	api.Register(s.reg, "client.perform", "Ask a connected app to do one of its own actions (client.zoom, client.mode, client.palette). Apps take these only from the server on their own machine.",
@@ -80,5 +80,5 @@ func (s *Server) registerKeyMethods() {
 				}
 			}
 			return empty{}, api.NotFound("no connected client %s", in.ClientID)
-		}, api.Perm("ui"))
+		}, api.PermBy("ui", "control for actions that change the layout (new tabs, splits, closing, resizing)", permOfClientAction))
 }

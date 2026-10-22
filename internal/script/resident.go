@@ -56,6 +56,10 @@ type Resident struct {
 	Errors      int       `json:"errors" desc:"Errors its handlers threw since it loaded."`
 	Overruns    int       `json:"overruns" desc:"Handlers stopped for running over their budget, in the last 5 minutes."`
 	LoadedAt    time.Time `json:"loaded_at,omitzero"`
+	// Mode is act, or watch: it may look and tell, and every change it
+	// tries is refused.
+	Mode    string   `json:"mode" enum:"act,watch"`
+	Options []Option `json:"options" desc:"Its switches: what it declares, with the values set."`
 
 	life     *sync.Mutex // one unload-and-start at a time
 	sig      string      // the files' sizes and times when last loaded
@@ -225,7 +229,11 @@ func (rs *residents) check(first bool) {
 		sig := rs.signature(entry)
 		r := rs.all[name]
 		if r == nil {
-			r = &Resident{Name: name, Path: entry, State: StateFailed, Permissions: []string{}, life: &sync.Mutex{}}
+			r = &Resident{Name: name, Path: entry, State: StateFailed, Permissions: []string{}, Options: []Option{},
+				Mode: ModeAct, life: &sync.Mutex{}}
+			if m := rs.modes()[name]; m == ModeWatch {
+				r.Mode = m
+			}
 			rs.all[name] = r
 			r.pending, r.seen = sig, stableChecks
 			if !first {
@@ -268,8 +276,9 @@ func (rs *residents) load(r *Resident) {
 	sig := r.pending
 	r.sig, r.pending, r.seen = sig, "", 0
 	disabled := rs.disabled()[r.Name]
+	path := r.Path // check writes it, under the lock
 	rs.mu.Unlock()
-	js, err := Bundle(r.Path, "", "")
+	js, err := Bundle(path, "", "")
 	if err != nil {
 		rs.mu.Lock()
 		running := r.run != nil
@@ -366,7 +375,7 @@ func (rs *residents) unload(r *Resident, why string) {
 
 // manifest is called by a resident run once its top level ran: it decides
 // whether setup may run, with which permissions.
-func (rs *residents) manifest(r *Resident, perms []string, description string) (Perms, bool) {
+func (rs *residents) manifest(r *Resident, perms []string, description string, opts []Option) (Perms, bool) {
 	p, err := ParsePerms(perms...)
 	if err != nil {
 		return nil, false
@@ -374,6 +383,7 @@ func (rs *residents) manifest(r *Resident, perms []string, description string) (
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	r.Description = description
+	r.Options = rs.applyValues(r.Name, opts)
 	g, ok := rs.grants()[r.Name]
 	if ok && g.Hash == permsHash(p.List()) {
 		r.State, r.Permissions, r.Asks = StateRunning, p.List(), nil
@@ -448,7 +458,9 @@ func (rs *residents) list() []Resident {
 	defer rs.mu.Unlock()
 	out := make([]Resident, 0, len(rs.all))
 	for _, r := range rs.all {
-		out = append(out, *r)
+		c := *r
+		c.Options = append([]Option{}, r.Options...) // SetOption changes the original's
+		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out

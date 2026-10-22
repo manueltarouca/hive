@@ -47,12 +47,19 @@ declare global {
       readonly seq?: number;
     }
 
+    /** A switch or value people set from the apps or hive script set. */
+    type OptionSpec =
+      | { title?: string; type?: "bool"; default: boolean }
+      | { title?: string; type?: "number"; default: number; min?: number; max?: number }
+      | { title?: string; type?: "text"; default: string };
     interface Script {
       /** Letters, digits, - and _. */
       name: string;
       description?: string;
       /** What the script may do. Every script may read. */
       permissions: Permission[];
+      /** Its switches: the apps show them, people change them, h.options reads them. */
+      options?: Record<string, OptionSpec>;
       setup?(h: Hive): unknown | Promise<unknown>;
       teardown?(h: Hive): unknown | Promise<unknown>;
     }
@@ -63,6 +70,7 @@ declare global {
     interface AgentRow {
       block_id: BlockId; session_id: SessionId; session_label?: string; window_id?: string; label?: string; title?: string;
       agent: { harness: string; session_id?: string; cwd?: string; state: AgentState; message?: string;
+        /** Blocked: what on (permission_prompt...). Done with kind "error": it failed and stopped, such as at a usage limit; message says why. */
         kind?: string; revision: number; updated_at: string };
       foreground?: { pid: number; name: string; cwd?: string; program?: string };
     }
@@ -211,6 +219,8 @@ declare global {
       /** Declare a mode: its keys (MODE/KEY) apply once client.mode enters it, until Escape. */
       mode(name: string, opts?: { exclusive?: boolean }): void;
 
+      /** This script's switches, as people set them now. Read them when you act: they can change at any time (h.on("options_changed")). */
+      readonly options: Record<string, any>;
       /** This script's own values, kept across reloads and restarts (1 MB). */
       store: {
         get<T = any>(key: string): Promise<T | undefined>;

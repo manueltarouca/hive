@@ -92,16 +92,24 @@ func (s *Server) registerScriptMethods() {
 		Name string `json:"name" required:"true" desc:"A script in the scripts folder."`
 	}
 	api.Register(s.reg, "script.grant", "Allow a script the permissions its manifest asks for, and start it.",
-		func(ctx context.Context, in nameIn) (script.Resident, error) { return s.scripts.Grant(in.Name) },
+		func(ctx context.Context, in nameIn) (script.Resident, error) {
+			return s.scriptManage(ctx, "grant", "granted", in.Name, func() (script.Resident, error) { return s.scripts.Grant(in.Name) })
+		},
 		api.Perm("server"))
 	api.Register(s.reg, "script.revoke", "Take a script's permissions away. It waits for a new grant.",
-		func(ctx context.Context, in nameIn) (script.Resident, error) { return s.scripts.Revoke(in.Name) },
+		func(ctx context.Context, in nameIn) (script.Resident, error) {
+			return s.scriptManage(ctx, "revoke", "revoked", in.Name, func() (script.Resident, error) { return s.scripts.Revoke(in.Name) })
+		},
 		api.Perm("server"))
 	api.Register(s.reg, "script.enable", "Turn a script back on, quarantined ones included.",
-		func(ctx context.Context, in nameIn) (script.Resident, error) { return s.scripts.Enable(in.Name, true) },
+		func(ctx context.Context, in nameIn) (script.Resident, error) {
+			return s.scriptManage(ctx, "enable", "turned on", in.Name, func() (script.Resident, error) { return s.scripts.Enable(in.Name, true) })
+		},
 		api.Perm("server"))
 	api.Register(s.reg, "script.disable", "Turn a script off without removing it.",
-		func(ctx context.Context, in nameIn) (script.Resident, error) { return s.scripts.Enable(in.Name, false) },
+		func(ctx context.Context, in nameIn) (script.Resident, error) {
+			return s.scriptManage(ctx, "disable", "turned off", in.Name, func() (script.Resident, error) { return s.scripts.Enable(in.Name, false) })
+		},
 		api.Perm("server"))
 	type reloadIn struct {
 		Name string `json:"name,omitempty" desc:"One script; all of them without it."`
@@ -124,17 +132,22 @@ func (s *Server) registerScriptMethods() {
 			return map[string]any{"lines": s.scripts.Logs(in.Name, n)}, nil
 		}, api.Perm("read"))
 	type auditIn struct {
-		Name string `json:"name,omitempty" desc:"One script's entries."`
-		Tail int    `json:"tail,omitempty" desc:"The last N entries. Default 100."`
+		Name  string `json:"name,omitempty" desc:"One script's entries."`
+		Tail  int    `json:"tail,omitempty" desc:"The last N entries. Default 100."`
+		Since uint64 `json:"since,omitempty" desc:"Only entries after this seq, from memory: to follow along."`
 	}
-	api.Register(s.reg, "audit.list", "What scripts changed: every call that arranged, ran, typed or changed settings.",
+	api.Register(s.reg, "audit.list", "What scripts did: every call that arranged, ran, typed, changed settings or asked an app to act, every change refused in watch mode, and what people did to scripts. The owner's apps also see the start of typed text (preview), kept in memory only.",
 		func(ctx context.Context, in auditIn) (map[string]any, error) {
 			n := in.Tail
 			if n <= 0 {
 				n = 100
 			}
-			return map[string]any{"entries": s.scripts.Audit(in.Name, n)}, nil
+			if in.Since > 0 {
+				return map[string]any{"entries": nonNilEntries(s.scripts.ActivitySince(in.Name, in.Since, s.ownerCaller(ctx)))}, nil
+			}
+			return map[string]any{"entries": nonNilEntries(s.scripts.Activity(in.Name, n, s.ownerCaller(ctx)))}, nil
 		}, api.Perm("read"))
+	s.registerScriptControlMethods()
 	type resultIn struct {
 		RunID   string  `json:"run_id" required:"true"`
 		Timeout float64 `json:"timeout,omitempty" desc:"Wait up to this many seconds for it to end, at most 60. Default: don't wait."`
@@ -154,6 +167,13 @@ func (s *Server) registerScriptMethods() {
 			}
 			return info, err
 		}, api.Perm("read"))
+}
+
+func nonNilEntries(e []script.Entry) []script.Entry {
+	if e == nil {
+		return []script.Entry{}
+	}
+	return e
 }
 
 func nonNilRuns(rs []script.RunInfo) []script.RunInfo {

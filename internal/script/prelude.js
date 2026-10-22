@@ -275,6 +275,9 @@
     sessions: () => call("session.list", {}).then((r) => r.sessions.map((s) => session(s.session_id))),
     agents: { list: () => call("agent.list", {}).then((r) => r.agents || []), on_state, rule },
     actions,
+    // This script's switches, as people set them: read them when you act,
+    // they can change at any time (options_changed).
+    options: new Proxy({}, { get: (_, key) => { if (typeof key !== "string") return undefined; const v = host.optionGet(key); return v === "" ? undefined : JSON.parse(v); } }),
     // This script's own storage: JSON values by key, kept across reloads
     // and restarts (1 MB).
     store: {
