@@ -56,6 +56,8 @@ func TestKeymapLayers(t *testing.T) {
 		t.Fatal("unbind didn't")
 	}
 	h.call("script.grant", map[string]any{"name": "keys"})
+	// Grant answers once the script read its manifest; setup binds just after.
+	h.until("keys bound", func() bool { m, _, _ := h.keymap("mac"); _, ok := m["/cmd+e"]; return ok })
 	m, modes, warns := h.keymap("mac")
 	if b := m["/ctrl+b>c"]; b.Action != "client.new_tab" || b.Source != "script:keys" {
 		t.Fatalf("script: %+v", b)
