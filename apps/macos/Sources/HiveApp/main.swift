@@ -1,6 +1,7 @@
 import AppKit
 import UserNotifications
 import HiveCore
+import HiveKit
 import Combine
 import HiveRender
 import SwiftUI
@@ -160,6 +161,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             }
         }.store(in: &bag)
         buildMenu()
+        // Keys come from this Mac's server (keymap.get): the menu shows
+        // them, and a monitor in front of the menus resolves them, with
+        // sequences and modes. Until the keymap arrives, the menu's own keys.
+        model.clientAction = { [weak self] action, args in self?.runClientAction(action, args) }
+        model.$keys.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.buildMenu() } }.store(in: &bag)
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+            guard let self, e.window === self.window, !self.model.keys.isEmpty, let c = KeyChord(event: e) else { return e }
+            return self.model.handleKey(c) ? nil : e
+        }
         followSystemAppearance()
         window.makeKeyAndOrderFront(nil)
         if ProcessInfo.processInfo.environment["HIVE_DEBUG"] != nil, let b = window.standardWindowButton(.closeButton) {
@@ -341,6 +351,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     // MARK: palette and picker
 
     func showPalette(query: String = "") {
+        for h in model.hosts where h.connected { model.reloadActions(h) }
         palette.show(over: window, width: 460, placeholder: "Search commands…", style: model.style, query: query) { [weak self] q in
             (self?.commands() ?? []).filter { fuzzy($0.title, q) }
         }
@@ -465,10 +476,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
             PaletteItem(title: "Add Remote Host…", symbol: "globe") { [weak self] in DispatchQueue.main.async { self?.showAddHost() } },
-        ] + hostCommands() + Appearance.allCases.map { a in
+        ] + actionCommands() + hostCommands() + Appearance.allCases.map { a in
             PaletteItem(title: "Theme: \(a.title)", symbol: a == .night ? "moon" : a == .day ? "sun.max" : "circle.lefthalf.filled",
                         checked: m.appearance == a) { m.setAppearance(a) }
         }
+    }
+
+    /// Scripts' actions: this Mac's with their keys, other hosts' under
+    /// their name. Keys never run another host's actions; the palette does.
+    private func actionCommands() -> [PaletteItem] {
+        var rows: [PaletteItem] = []
+        for h in model.hosts where h.connected {
+            for a in h.actions {
+                guard let name = a["name"].string else { continue }
+                let title = a["title"].string.flatMap { $0.isEmpty ? nil : $0 } ?? name
+                let key = h.isLocal ? model.keys.chord(for: name).map(\.display) ?? "" : ""
+                rows.append(PaletteItem(title: title, detail: h.isLocal ? key : h.displayName, symbol: "bolt") { [weak self] in
+                    self?.model.runAction(name, on: h, origin: "palette")
+                })
+            }
+        }
+        return rows
     }
 
     /// The palette's host commands, one row per action (rows ending in >), each
@@ -589,6 +617,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         model.split(horizontal: horizontal, cols: s?.0, rows: s?.1)
     }
 
+    private var keyMonitor: Any?
+
+    /// The app's own actions by name, as keys, the palette and the server
+    /// (client.perform) call them.
+    func runClientAction(_ action: String, _ args: JSON) {
+        let m = model
+        switch action {
+        case "client.settings": showSettings()
+        case "client.palette": showPalette()
+        case "client.new_session": m.newSession()
+        case "client.session_picker": showSessionPicker()
+        case "client.new_tab": m.newTab()
+        case "client.split_right": split(true)
+        case "client.split_down": split(false)
+        case "client.close_pane": m.closePane()
+        case "client.close_tab": m.closeTab()
+        case "client.sidebar": m.sidebar.toggle()
+        case "client.zoom": m.toggleZoom()
+        case "client.next_tab": m.selectWindow(offset: 1)
+        case "client.previous_tab": m.selectWindow(offset: -1)
+        case "client.shortcuts": toggleShortcuts()
+        case "client.focus": if let d = args["direction"].string { m.focus(d) }
+        case "client.resize": if let d = args["direction"].string { m.resizePane(d) }
+        case "client.tab": if let i = args["index"].int { m.selectWindow(index: i) }
+        case "client.mode":
+            m.keys.enter(args["mode"].string)
+            m.keyMode = args["mode"].string
+        default: NSLog("hive: no client action %@", action)
+        }
+    }
+
     // MARK: menu
 
     private func buildMenu() {
@@ -605,57 +664,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             i.keyEquivalentModifierMask = mods
             return i
         }
+        let keys = model.keys
+        // An item of one of the app's actions: its key from the keymap once
+        // it's loaded (none if unbound or bound to a sequence), else the
+        // app's own default.
+        func bound(_ title: String, _ name: String, _ args: JSON = .null, _ key: String, _ mods: NSEvent.ModifierFlags = .command,
+                   _ action: @escaping () -> Void) -> NSMenuItem {
+            guard !keys.isEmpty else { return item(title, key, mods, action) }
+            guard let c = keys.chord(for: name, args: args), let k = c.menuKey else { return item(title, "", [], action) }
+            var mm: NSEvent.ModifierFlags = []
+            if c.cmd { mm.insert(.command) }
+            if c.ctrl { mm.insert(.control) }
+            if c.alt { mm.insert(.option) }
+            if c.shift { mm.insert(.shift) }
+            return item(title, k, mm, action)
+        }
         let arrows: [(String, String)] = [("Left", "\u{F702}"), ("Right", "\u{F703}"), ("Up", "\u{F700}"), ("Down", "\u{F701}")]
         let m = model
 
         menu("Hive", [
             NSMenuItem(title: "About Hive", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""),
             .separator(),
-            item("Settings…", ",") { [weak self] in self?.showSettings() },
+            bound("Settings…", "client.settings", .null, ",") { [weak self] in self?.showSettings() },
             item("Add Remote Host…", "") { [weak self] in self?.showAddHost() },
             item("Share Hosts with Phone…", "") { [weak self] in self?.showShareHosts() },
             .separator(),
-            item("Command Palette…", "p", [.command, .shift]) { [weak self] in self?.showPalette() },
+            bound("Command Palette…", "client.palette", .null, "p", [.command, .shift]) { [weak self] in self?.showPalette() },
             .separator(),
             NSMenuItem(title: "Hide Hive", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"),
             NSMenuItem(title: "Quit Hive", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"),
         ])
         menu("Shell", [
-            item("New Session", "n", [.command, .shift]) { m.newSession() },
-            item("Change Session…", "k") { [weak self] in self?.showSessionPicker() },
-            item("New Tab", "t") { m.newTab() },
-            item("Split Right", "d") { [weak self] in self?.split(true) },
-            item("Split Down", "d", [.command, .shift]) { [weak self] in self?.split(false) },
+            bound("New Session", "client.new_session", .null, "n", [.command, .shift]) { m.newSession() },
+            bound("Change Session…", "client.session_picker", .null, "k") { [weak self] in self?.showSessionPicker() },
+            bound("New Tab", "client.new_tab", .null, "t") { m.newTab() },
+            bound("Split Right", "client.split_right", .null, "d") { [weak self] in self?.split(true) },
+            bound("Split Down", "client.split_down", .null, "d", [.command, .shift]) { [weak self] in self?.split(false) },
             .separator(),
-            item("Close Pane", "w") { m.closePane() },
-            item("Close Tab", "w", [.command, .shift]) { m.closeTab() },
+            bound("Close Pane", "client.close_pane", .null, "w") { m.closePane() },
+            bound("Close Tab", "client.close_tab", .null, "w", [.command, .shift]) { m.closeTab() },
         ])
         menu("Edit", [
             NSMenuItem(title: "Copy", action: #selector(PaneView.copy(_:)), keyEquivalent: "c"),
             NSMenuItem(title: "Paste", action: #selector(PaneView.paste(_:)), keyEquivalent: "v"),
         ])
         appearanceItems = Appearance.allCases.map { a in (a, item(a.title, "") { m.setAppearance(a) }) }
-        menu("View", [item("Toggle Agents Sidebar", "s", [.command, .shift]) { m.sidebar.toggle() }, .separator()]
+        menu("View", [bound("Toggle Agents Sidebar", "client.sidebar", .null, "s", [.command, .shift]) { m.sidebar.toggle() }, .separator()]
              + appearanceItems.map(\.1))
-        var paneItems: [NSMenuItem] = [item("Zoom Pane", "\r", [.command, .shift]) { m.toggleZoom() }, .separator()]
+        var paneItems: [NSMenuItem] = [bound("Zoom Pane", "client.zoom", .null, "\r", [.command, .shift]) { m.toggleZoom() }, .separator()]
         for (name, key) in arrows {
-            paneItems.append(item("Focus \(name)", key, [.command, .option]) { m.focus(name.lowercased()) })
+            let dir: JSON = ["direction": .string(name.lowercased())]
+            paneItems.append(bound("Focus \(name)", "client.focus", dir, key, [.command, .option]) { m.focus(name.lowercased()) })
         }
         paneItems.append(.separator())
         for (name, key) in arrows {
-            paneItems.append(item("Resize \(name)", key, [.command, .control]) { m.resizePane(name.lowercased()) })
+            let dir: JSON = ["direction": .string(name.lowercased())]
+            paneItems.append(bound("Resize \(name)", "client.resize", dir, key, [.command, .control]) { m.resizePane(name.lowercased()) })
         }
         menu("Pane", paneItems)
         var windowItems: [NSMenuItem] = [
-            item("Next Tab", "]", [.command, .shift]) { m.selectWindow(offset: 1) },
-            item("Previous Tab", "[", [.command, .shift]) { m.selectWindow(offset: -1) },
+            bound("Next Tab", "client.next_tab", .null, "]", [.command, .shift]) { m.selectWindow(offset: 1) },
+            bound("Previous Tab", "client.previous_tab", .null, "[", [.command, .shift]) { m.selectWindow(offset: -1) },
             .separator(),
         ]
         for i in 1...9 {
-            windowItems.append(item("Tab \(i)", "\(i)") { m.selectWindow(index: i - 1) })
+            windowItems.append(bound("Tab \(i)", "client.tab", ["index": .number(Double(i - 1))], "\(i)") { m.selectWindow(index: i - 1) })
         }
         menu("Window", windowItems)
-        menu("Help", [item("Keyboard Shortcuts", "/") { [weak self] in self?.toggleShortcuts() }])
+        menu("Help", [bound("Keyboard Shortcuts", "client.shortcuts", .null, "/") { [weak self] in self?.toggleShortcuts() }])
         NSApp.mainMenu = main
     }
 }

@@ -130,6 +130,10 @@ final class HostConnection {
     var onConnected: ((HostConnection) -> Void)?
     var onEvents: ((HostConnection, [JSON], Bool) -> Void)?
     var onResync: ((HostConnection) -> Void)?
+    /// client.perform from this host's server.
+    var onPerform: ((HostConnection, String, JSON) -> Void)?
+    /// Its scripts' actions, for the palette.
+    var actions: [JSON] = []
     var onDisconnected: ((HostConnection) -> Void)?
 
     private var closing = false
@@ -223,6 +227,12 @@ final class HostConnection {
                 Task { @MainActor in
                     guard let self, self.engine === engine else { return } // a replaced engine's
                     self.disconnected()
+                }
+            }
+            engine.client.onPerform = { action, args in
+                Task { @MainActor in
+                    guard let self, self.engine === engine else { return }
+                    self.onPerform?(self, action, args)
                 }
             }
             engine.client.onError = { kind, block, err in NSLog("hive error (%@ %@): %@", kind ?? "-", block ?? "-", err.description) }

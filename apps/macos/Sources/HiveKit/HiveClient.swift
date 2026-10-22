@@ -47,6 +47,8 @@ public final class HiveClient {
     public var onEventsResync: (() -> Void)?
     /// An error not tied to a call: (request type, block ID, error).
     public var onError: ((String?, String?, HiveError) -> Void)?
+    /// The server asks the app to do one of its own actions (client.perform).
+    public var onPerform: ((String, JSON) -> Void)?
     public var onClose: ((Error?) -> Void)?
 
     public let endpoint: ServerEndpoint
@@ -150,6 +152,8 @@ public final class HiveClient {
             if !j["error"].isNull { cb(.failure(HiveError(j["error"]))) } else { cb(.success(j["result"])) }
         case "event":
             onEvent?(j["event"])
+        case "perform":
+            if let a = j["action"].string { onPerform?(a, j["args"]) }
         case "events_subscribed":
             onEventsSubscribed?(UInt64(j["seq"].double ?? 0))
         case "events_resync":

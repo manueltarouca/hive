@@ -57,6 +57,25 @@ if [ "${BADGES:-0}" = 1 ]; then
   badge "{\"target\":\"$tests\",\"id\":\"lint\",\"state\":\"done\",\"msg\":\"lint ok\"}"
 fi
 
+# KEYS=1 changes keys: New Tab moves to shift+cmd+y, cmd+t goes, and a
+# script binds its action to ctrl+cmd+n (palette and shortcuts window).
+if [ "${KEYS:-0}" = 1 ]; then
+  $H config set keybind "cmd+t=unbind" >/dev/null
+  $H config set keybind "shift+cmd+y=client.new_tab" >/dev/null
+  mkdir -p "$HIVE_SCRIPTS"
+  cat > "$HIVE_SCRIPTS/scratch.ts" <<'TS'
+export default hive.script({
+  name: "scratch", permissions: ["control", "ui"],
+  setup(h) {
+    h.actions.register({ name: "scratch-window", title: "Open a scratch window",
+      run: async (ctx) => { await h.session.new_window({ session_id: ctx.session_id!, label: "scratch" }); } });
+    h.bind("ctrl+cmd+n", "scratch-window");
+  },
+});
+TS
+  $H script reload >/dev/null; $H script grant scratch >/dev/null
+fi
+
 # EXTRA_TABS=n adds plain tabs, to check the title bar with many tabs.
 i=1; while [ "$i" -le "${EXTRA_TABS:-0}" ]; do  # not seq: on macOS, seq 1 0 counts down
   $H -s hive-demo run --label "extra-tab-$i" --focus=false >/dev/null; i=$((i + 1))

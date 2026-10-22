@@ -21,7 +21,8 @@ public struct ScriptBadge: Equatable, Sendable, Identifiable {
         progress = j["progress"].int
     }
 
-    var key: String { app + "/" + id }
+    /// Unique on a pane: the same name from two senders is two badges.
+    public var key: String { app + "/" + id }
 
     /// What it says: its message, else its title, else its name.
     public var text: String { !msg.isEmpty ? msg : !title.isEmpty ? title : id }

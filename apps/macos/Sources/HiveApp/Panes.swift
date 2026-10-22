@@ -476,7 +476,7 @@ struct PaneHeader: View {
             }
             // Scripts' badges: the first two, those that need you first.
             let badges = model.paneBadges.badges(for: blockID)
-            ForEach(badges.prefix(2)) { b in ScriptBadgeView(badge: b, style: s) }
+            ForEach(badges.prefix(2), id: \.key) { b in ScriptBadgeView(badge: b, style: s) }
             if badges.count > 2 {
                 Text("+\(badges.count - 2)").font(.system(size: 10, weight: .medium)).foregroundStyle(s.secondary.swiftUI)
                     .help(badges.dropFirst(2).map(\.text).joined(separator: "\n"))

@@ -213,6 +213,13 @@ final class AppModel: ObservableObject {
     @Published var blocks: [String: BlockInfo] = [:]
     /// Badges scripts put on the current host's panes.
     @Published var paneBadges = BadgeBook()
+    /// The keys, from this Mac's server: the app's defaults, scripts' and
+    /// the settings file's. Other hosts' keys never apply here.
+    @Published var keys = KeyResolver()
+    /// The current key mode, for the title bar.
+    @Published var keyMode: String?
+    /// Runs one of the app's own actions (client.*), set by the app delegate.
+    var clientAction: ((String, JSON) -> Void)?
     @Published var style: Style = .light
     /// The settings file (~/.config/hive/config), read through the bundled hive.
     let settingsStore = SettingsStore()
@@ -334,6 +341,8 @@ final class AppModel: ObservableObject {
             if h === self.current { self.reloadView() }
             self.reloadBadges(h)
             self.replayNotes(h)
+            self.reloadKeys(h)
+            self.reloadActions(h)
         }
         h.onDisconnected = { [weak self] h in
             guard let self else { return }
@@ -344,6 +353,11 @@ final class AppModel: ObservableObject {
                 self.status = h.shortProblem ?? h.status
                 self.attached.removeAll() // the new engine attaches afresh
             }
+        }
+        h.onPerform = { [weak self] h, action, args in
+            // Only this Mac's server may drive the app.
+            guard h.isLocal, action.hasPrefix("client.") else { return }
+            self?.clientAction?(action, args)
         }
         h.onResync = { [weak self] h in
             self?.reloadSessions(h)
@@ -699,11 +713,69 @@ final class AppModel: ObservableObject {
             if type == "block_closed" || type == "block_created" { reloadSessions(h) }
         case "notification":
             showScriptNote(ScriptNote(ev["payload"]["notification"]), from: h)
+        case "keymap_changed":
+            reloadKeys(h)
+            reloadActions(h)
         case "notification_acked":
             if let id = ev["payload"]["notification_id"].string {
                 UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["\(h.id)-\(id)"])
             }
         default: break
+        }
+    }
+
+    // MARK: keys and actions
+
+    func reloadKeys(_ h: HostConnection) {
+        guard h.isLocal else { return }
+        h.call("keymap.get", ["client_kind": "mac"]) { [weak self] j in
+            guard let self else { return }
+            let mode = self.keys.mode
+            self.keys = KeyResolver(j)
+            if mode != nil { self.keyMode = nil }
+        }
+    }
+
+    func reloadActions(_ h: HostConnection) {
+        h.call("action.list") { [weak self, weak h] j in
+            guard let self, let h else { return }
+            h.actions = j["actions"].array.filter { !($0["name"].string ?? "").hasPrefix("rule:") }
+            self.objectWillChange.send()
+        }
+    }
+
+    /// Runs a script's action on its host, in the pane you're in when it's
+    /// that host's.
+    func runAction(_ name: String, args: JSON = .null, on h: HostConnection, origin: String) {
+        var p: [String: JSON] = ["name": .string(name), "origin": .string(origin)]
+        if args != .null { p["args"] = args }
+        if h === current {
+            if let b = focusedBlock { p["block_id"] = .string(b) }
+            if let s = currentSession { p["session_id"] = .string(s) }
+        }
+        h.call("action.run", .object(p)) { r in
+            guard case .failure(let e) = r else { return }
+            let c = UNMutableNotificationContent()
+            c.title = "\(name) didn't run"
+            c.body = e.message
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "action-\(name)", content: c, trigger: nil))
+        }
+    }
+
+    /// A key press, from the app's key monitor: true if hive used it.
+    func handleKey(_ c: KeyChord) -> Bool {
+        switch keys.press(c) {
+        case .pass: return false
+        case .pending, .swallowed: return true
+        case .enteredMode(let m): keyMode = m; return true
+        case .leftMode: keyMode = nil; return true
+        case .action(let action, let args):
+            if action.hasPrefix("client.") {
+                clientAction?(action, args)
+            } else if let l = host(id: HostConnection.localID) {
+                runAction(action, args: args, on: l, origin: "key")
+            }
+            return true
         }
     }
 
@@ -754,6 +826,7 @@ final class AppModel: ObservableObject {
         c.body = n.bodyWithSteps
         var info: [String: Any] = ["host": h.id, "notification_id": n.id]
         if let b = n.block { info["block_id"] = b }
+        if let sid = n.session { info["session_id"] = sid }
         if !n.actions.isEmpty {
             let category = "hive.note.\(n.id)"
             let buttons = n.actions.enumerated().map { i, a in
@@ -775,15 +848,22 @@ final class AppModel: ObservableObject {
     /// pane; either way, every app counts it as seen.
     func noteResponse(_ info: [AnyHashable: Any], action identifier: String) {
         guard let id = info["notification_id"] as? String, let h = host(id: info["host"] as? String ?? "") else { return }
-        h.call("notification.ack", ["notification_id": .string(id)])
+        let ack = { h.call("notification.ack", ["notification_id": .string(id)]) }
         let block = info["block_id"] as? String
         if identifier.hasPrefix("act."), let i = Int(identifier.dropFirst(4)),
            let actions = info["actions"] as? [[String: String]], actions.indices.contains(i) {
             let a = actions[i]
             var params: [String: JSON] = ["name": .string(a["action"] ?? ""), "args": (try? JSON.parse(Data((a["args"] ?? "{}").utf8))) ?? [:],
-                                          "origin": "notification"]
+                                          "origin": "notification", "notification_id": .string(id)]
             if let block { params["block_id"] = .string(block) }
             h.call("action.run", .object(params)) { r in
+                // Seen once it ran, or once there's nothing left to answer;
+                // otherwise it stays, for another try.
+                switch r {
+                case .success: ack()
+                case .failure(let e) where e.code == "conflict": ack()
+                default: break
+                }
                 if case .failure(let e) = r {
                     let c = UNMutableNotificationContent()
                     c.title = "Nothing was sent"
@@ -793,6 +873,7 @@ final class AppModel: ObservableObject {
             }
             return
         }
+        ack()
         if let block, let a = agents.first(where: { $0.blockID == block && $0.host == h.id }) {
             jump(to: a)
         } else if let sid = info["session_id"] as? String {
