@@ -71,7 +71,10 @@ patch, and this file lists it under "Changed" or "Removed".
 ### Changed
 
 - Hive.app takes its shortcuts from the server's keymap, with sequences and
-  modes, and lists scripts' actions in the command palette. Both apps show
+  modes, and lists scripts' actions in the command palette. Every default
+  has a key a Portuguese keyboard types without Option (⌃⇥ and ⌃⇧⇥ for
+  tabs, ⌘' for the shortcuts), and the menus show the keys your keyboard
+  types instead of letting macOS move them to other keys. Both apps show
   scripts' badges in pane headers and their notifications, with buttons
   that run the script's action, and show what they missed while closed.
 - hive for Android previews what an agent did on the tab sheet's cards, not

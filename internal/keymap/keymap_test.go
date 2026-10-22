@@ -94,3 +94,22 @@ func TestDefaultsAreValid(t *testing.T) {
 		}
 	}
 }
+
+// Every default action has a key a Portuguese (PT-PT) keyboard types
+// without Option: letters, digits, named keys, and , . - ' + < on it.
+func TestDefaultsTypeOnPortuguese(t *testing.T) {
+	direct := "abcdefghijklmnopqrstuvwxyz0123456789,.-'+<"
+	ok := map[string]bool{}
+	for _, b := range Defaults("mac") {
+		k, _ := Parse(b.Key)
+		key := k[0].Key
+		if len(k) == 1 && (len(key) > 1 || strings.Contains(direct, key)) {
+			ok[b.Action] = true
+		}
+	}
+	for _, b := range Defaults("mac") {
+		if !ok[b.Action] {
+			t.Errorf("%s (%s) has no key a PT-PT keyboard types without Option", b.Action, b.Key)
+		}
+	}
+}

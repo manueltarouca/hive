@@ -277,6 +277,12 @@ func Defaults(clientKind string) []Binding {
 		d("shift+cmd+]", "client.next_tab", "Next Tab", nil),
 		d("shift+cmd+[", "client.previous_tab", "Previous Tab", nil),
 		d("cmd+/", "client.shortcuts", "Keyboard Shortcuts", nil),
+		// Keys any layout types without Option: on a Portuguese keyboard
+		// [, ] and / need Option or Shift. Apps show the first binding of an
+		// action the keyboard in use can type.
+		d("ctrl+tab", "client.next_tab", "Next Tab", nil),
+		d("ctrl+shift+tab", "client.previous_tab", "Previous Tab", nil),
+		d("cmd+'", "client.shortcuts", "Keyboard Shortcuts", nil),
 	}
 	for _, dir := range []string{"left", "right", "up", "down"} {
 		name := strings.ToUpper(dir[:1]) + dir[1:]

@@ -16,10 +16,11 @@ is no copy mode.
 
 ## Shortcuts
 
-Press ⌘/ (or **Help → Keyboard Shortcuts**) to see them all in the app, with
-the editing keys and mouse gestures. The window reads the menu bar, so it
-shows the keys as your keyboard layout types them: on some layouts ⇧⌘[ and
-⇧⌘] are other keys.
+Press ⌘/ or ⌘' (or **Help → Keyboard Shortcuts**) to see them all in the
+app, with the editing keys and mouse gestures. Some keys have a second one
+for keyboards that need Option for `[`, `]` or `/`, such as Portuguese:
+the menus show the one your keyboard types. You can change any of them in
+the [settings](./settings#keys).
 
 | Keys | Does |
 | --- | --- |
@@ -29,12 +30,12 @@ shows the keys as your keyboard layout types them: on some layouts ⇧⌘[ and
 | ⇧⌘↩ | Zoom the pane |
 | ⌥⌘ arrows | Focus the pane in that direction |
 | ⌃⌘ arrows | Move the border in that direction |
-| ⌘1…⌘9, ⇧⌘[ ⇧⌘] | Switch tabs (pinned tabs count first) |
+| ⌘1…⌘9, ⇧⌘[ ⇧⌘] or ⌃⇧⇥ ⌃⇥ | Switch tabs (pinned tabs count first) |
 | ⌘K | Change session |
 | ⇧⌘N | New session |
 | ⇧⌘P | Command palette |
 | ⇧⌘S | Agents sidebar |
-| ⌘/ | Keyboard shortcuts |
+| ⌘/ or ⌘' | Keyboard shortcuts |
 | ⌘, | Settings |
 
 ## Icons

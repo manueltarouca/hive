@@ -52,4 +52,17 @@ import HiveKit
         #expect(r.chord(for: "client.tab", args: .object(["index": 0]))?.key == "1")
         #expect(r.chord(for: "client.tab", args: .object(["index": 1])) == nil)
     }
+
+    @Test func menuKeysFollowTheKeyboard() {
+        let km = JSON.object(["bindings": .array([b("shift+cmd+]", "client.next_tab"), b("ctrl+tab", "client.next_tab"),
+                                                  b("cmd+/", "client.shortcuts"), b("cmd+'", "client.shortcuts")])])
+        let r = KeyResolver(km)
+        // A Portuguese keyboard has no plain key for ] or /.
+        let pt: (String) -> Bool = { !["]", "[", "/"].contains($0) }
+        #expect(r.chord(for: "client.next_tab", typeable: pt) == KeyChord(ctrl: true, key: "tab"))
+        #expect(r.chord(for: "client.shortcuts", typeable: pt) == KeyChord(cmd: true, key: "'"))
+        // A US one types them: its usual keys.
+        #expect(r.chord(for: "client.next_tab") == KeyChord(shift: true, cmd: true, key: "]"))
+        #expect(r.chord(for: "client.shortcuts") == KeyChord(cmd: true, key: "/"))
+    }
 }

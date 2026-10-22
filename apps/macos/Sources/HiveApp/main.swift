@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import UserNotifications
 import HiveCore
 import HiveKit
@@ -166,6 +167,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         // sequences and modes. Until the keymap arrives, the menu's own keys.
         model.clientAction = { [weak self] action, args in self?.runClientAction(action, args) }
         model.$keys.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.buildMenu() } }.store(in: &bag)
+        // Another keyboard layout: the menu shows the keys it can type.
+        DistributedNotificationCenter.default().publisher(for: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String))
+            .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.buildMenu() }.store(in: &bag)
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
             guard let self, e.window === self.window, !self.model.keys.isEmpty, let c = KeyChord(event: e) else { return e }
             return self.model.handleKey(c) ? nil : e
@@ -625,7 +629,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let m = model
         switch action {
         case "client.settings": showSettings()
-        case "client.palette": showPalette()
+        case "client.palette": showPalette(query: args["query"].string ?? "")
         case "client.new_session": m.newSession()
         case "client.session_picker": showSessionPicker()
         case "client.new_tab": m.newTab()
@@ -665,19 +669,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             return i
         }
         let keys = model.keys
+        let plain = KeyboardLayout.plainCharacters()
+        let typeable: (String) -> Bool = { plain.isEmpty || plain.contains($0) }
         // An item of one of the app's actions: its key from the keymap once
         // it's loaded (none if unbound or bound to a sequence), else the
         // app's own default.
         func bound(_ title: String, _ name: String, _ args: JSON = .null, _ key: String, _ mods: NSEvent.ModifierFlags = .command,
                    _ action: @escaping () -> Void) -> NSMenuItem {
             guard !keys.isEmpty else { return item(title, key, mods, action) }
-            guard let c = keys.chord(for: name, args: args), let k = c.menuKey else { return item(title, "", [], action) }
+            guard let c = keys.chord(for: name, args: args, typeable: typeable), let k = c.menuKey else { return item(title, "", [], action) }
             var mm: NSEvent.ModifierFlags = []
             if c.cmd { mm.insert(.command) }
             if c.ctrl { mm.insert(.control) }
             if c.alt { mm.insert(.option) }
             if c.shift { mm.insert(.shift) }
-            return item(title, k, mm, action)
+            let i = item(title, k, mm, action)
+            // The key as the keymap says, not moved to another key for the
+            // layout: the keymap already chose one this keyboard has.
+            i.allowsAutomaticKeyEquivalentLocalization = false
+            return i
         }
         let arrows: [(String, String)] = [("Left", "\u{F702}"), ("Right", "\u{F703}"), ("Up", "\u{F700}"), ("Down", "\u{F701}")]
         let m = model

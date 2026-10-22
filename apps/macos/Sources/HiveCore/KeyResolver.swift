@@ -111,7 +111,11 @@ public struct KeyResolver: Sendable {
 
     /// The single chord bound to an action (with these arguments), for a
     /// menu item's key; nil when it has none or only a sequence or mode key.
-    public func chord(for action: String, args: JSON = .null) -> KeyChord? {
-        bindings.first { $0.mode.isEmpty && $0.action == action && $0.keys.count == 1 && (args == .null || $0.args == args) }?.keys[0]
+    /// typeable says whether the keyboard in use has a key for a character
+    /// without Option (on a Portuguese one, [ and / need it): the first such
+    /// binding wins, so the menu shows keys you can press.
+    public func chord(for action: String, args: JSON = .null, typeable: (String) -> Bool = { _ in true }) -> KeyChord? {
+        let all = bindings.filter { $0.mode.isEmpty && $0.action == action && $0.keys.count == 1 && (args == .null || $0.args == args) }
+        return (all.first { b in b.keys[0].key.count > 1 || typeable(b.keys[0].key) } ?? all.first)?.keys[0]
     }
 }

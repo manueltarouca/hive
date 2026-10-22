@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import HiveCore
 
 extension KeyChord {
@@ -32,7 +33,9 @@ extension KeyChord {
         if key.hasPrefix("f"), let i = Int(key.dropFirst()), (1...12).contains(i) {
             return String(UnicodeScalar(0xF704 + i - 1)!)
         }
-        return key.count == 1 && !key.hasPrefix("[") ? key : nil
+        // One character, "[" included; a physical key ("[KeyA]") has no
+        // menu spelling.
+        return key.count == 1 ? key : nil
     }
 
     /// As macOS draws it: ⌃⌥⇧⌘ then the key.
@@ -40,5 +43,31 @@ extension KeyChord {
         let names = ["enter": "↩", "escape": "⎋", "tab": "⇥", "space": "Space", "backspace": "⌫", "delete": "⌦",
                      "left": "←", "right": "→", "up": "↑", "down": "↓"]
         return (ctrl ? "⌃" : "") + (alt ? "⌥" : "") + (shift ? "⇧" : "") + (cmd ? "⌘" : "") + (names[key] ?? key.uppercased())
+    }
+}
+
+/// The characters the keyboard in use types with a key alone (no Shift, no
+/// Option), for choosing which of an action's keys a menu shows.
+enum KeyboardLayout {
+    static func plainCharacters() -> Set<String> {
+        guard let src = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let ptr = TISGetInputSourceProperty(src, kTISPropertyUnicodeKeyLayoutData) else { return [] }
+        let data = Unmanaged<CFData>.fromOpaque(ptr).takeUnretainedValue() as Data
+        var out: Set<String> = []
+        data.withUnsafeBytes { raw in
+            guard let layout = raw.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return }
+            // Not the numeric keypad: a laptop has none, and its / would
+            // make / look plain on a Portuguese layout.
+            let keypad: Set<UInt16> = [65, 67, 69, 71, 75, 76, 78, 81, 82, 83, 84, 85, 86, 87, 88, 89, 91, 92]
+            for code in UInt16(0)..<128 where !keypad.contains(code) {
+                var dead: UInt32 = 0
+                var chars = [UniChar](repeating: 0, count: 4)
+                var n = 0
+                let err = UCKeyTranslate(layout, code, UInt16(kUCKeyActionDown), 0, UInt32(LMGetKbdType()),
+                                         OptionBits(kUCKeyTranslateNoDeadKeysBit), &dead, 4, &n, &chars)
+                if err == noErr, n == 1 { out.insert(String(utf16CodeUnits: chars, count: 1).lowercased()) }
+            }
+        }
+        return out
     }
 }
