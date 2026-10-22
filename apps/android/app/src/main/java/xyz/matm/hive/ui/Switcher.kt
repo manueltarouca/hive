@@ -47,11 +47,13 @@ import xyz.matm.hive.model.SessionInfo
 /** What a session's agents are up to, in the Mac's words: "1 blocked and 1 done", "7 agents". */
 fun agentSummary(h: HostConnection, s: SessionInfo): Pair<String?, String?> {
     val agents = h.agents.filter { it.sessionID == s.id }
-    val blocked = agents.count { it.state == "blocked" }
-    val done = agents.count { it.state == "done" }
-    val parts = listOfNotNull(blocked.takeIf { it > 0 }?.let { "$it blocked" }, done.takeIf { it > 0 }?.let { "$it done" })
+    val blocked = agents.count { it.shown == "blocked" }
+    val stopped = agents.count { it.shown == "stopped" }
+    val done = agents.count { it.shown == "done" }
+    val parts = listOfNotNull(blocked.takeIf { it > 0 }?.let { "$it blocked" }, stopped.takeIf { it > 0 }?.let { "$it stopped" }, done.takeIf { it > 0 }?.let { "$it done" })
     val state = when {
         blocked > 0 -> "blocked"
+        stopped > 0 -> "stopped"
         agents.any { it.state == "working" } -> "working"
         done > 0 -> "done"
         else -> null

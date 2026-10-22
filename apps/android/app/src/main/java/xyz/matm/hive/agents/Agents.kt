@@ -10,7 +10,16 @@ data class Agent(
     val state: String,
     val message: String,
     val title: String,
-)
+    /** done with kind error: it failed and stopped (a usage limit, a crash); message says why. */
+    val kind: String = "",
+) {
+    /** The state as the app shows it: stopped for done with kind error. */
+    val shown: String get() = shownState(state, kind)
+
+    companion object {
+        fun shownState(state: String, kind: String?) = if (state == "done" && kind == "error") "stopped" else state
+    }
+}
 
 object Harness {
     fun name(harness: String): String = Programs.lookup(harness).name.takeIf { harness.isNotEmpty() && it != harness } ?: when (harness.lowercase()) {
@@ -29,7 +38,7 @@ object Notices {
     /** before: each block's last state, or null on the first load (nothing is news then). */
     fun changes(before: Map<String, String>?, now: List<Agent>): List<Agent> {
         if (before == null) return emptyList()
-        return now.filter { (it.state == "blocked" || it.state == "done") && before[it.blockID] != it.state }
+        return now.filter { it.shown in setOf("blocked", "done", "stopped") && before[it.blockID] != it.shown }
     }
 
     /**
@@ -46,7 +55,10 @@ object Notices {
     /** Allow is Claude Code's "1. Yes"; other harnesses ask differently, so they get Reply and Deny only. */
     fun offersAllow(a: Agent) = a.state == "blocked" && a.harness.lowercase() == "claude"
 
-    fun title(a: Agent) = Harness.name(a.harness) + if (a.state == "blocked") " needs you" else " is done"
+    fun title(a: Agent) = Harness.name(a.harness) + when (a.shown) { "blocked" -> " needs you"; "stopped" -> " stopped"; else -> " is done" }
+
+    /** The notification's text: what it said; for a stopped agent, why it stopped. */
+    fun text(a: Agent) = a.message.ifEmpty { if (a.shown == "stopped") "It stopped on an error." else a.title }
 
     /** Where it is: the session, and the host unless it's this phone's own (never, today) or the only one. */
     fun subtitle(a: Agent, hostName: String, local: Boolean): String {

@@ -403,6 +403,25 @@ def step_agent(srv):
     shot("replied")
 
 
+def step_stopped(srv):
+    """An agent that failed and stopped (Claude Code at its usage limit) reads Stopped, with why: not done."""
+    import base64
+    msg = base64.b64encode("You've hit your session limit, resets 3am".encode()).decode()
+    srv.hive("new", "limit", "--cwd", "/tmp", "--", "sh", "-c",
+             f"sleep 3; printf '\\033]7501;state=error:app=claude-code:msg={msg}\\033\\\\'; exec cat")
+    block = srv.view("limit")["windows"][0]["layout"]["block_id"]
+    srv.call("agent.report", {"block_id": block, "harness": "claude", "state": "working"})
+    until("the server says stopped", lambda: srv.view("limit")["blocks"][block].get("agent", {}).get("kind") == "error", timeout=15)
+    open_switcher()
+    wait("1 stopped")
+    shot("switcher-stopped")
+    tap("limit", exact=True)
+    wait("Claude Code stopped")
+    wait("Stopped", exact=True)
+    wait("resets 3am")
+    shot("agent-stopped")
+
+
 def hold(key, exact=False):
     """A long press, for a tab's actions."""
     a, b, c, d = bounds(wait(key, exact=exact))
@@ -669,6 +688,173 @@ await h.notify.send({{ title: "Tests failed in api", body: "2 failures", target:
         adb("shell", "cmd", "statusbar", "collapse")
 
 
+TYPIST = """
+export default hive.script({
+  name: "typist",
+  description: "Watches every agent's terminal for a usage limit and, once it resets, types a short message asking the agent to go on where it left off. Turn it off here any time.",
+  permissions: ["screen", "input"],
+  options: { message: { title: "What to type", type: "text", default: "go on" } },
+  setup(h) {},
+});
+"""
+
+
+def scripts_state(srv):
+    return {s["name"]: s for s in srv.call("script.list")["scripts"]}
+
+
+def option(srv, name, key):
+    return next(o for o in scripts_state(srv)[name]["options"] if o["key"] == key)["value"]
+
+
+def scroll_to(key, times=8, back=False):
+    """Swipes (mid-screen, away from the edges) until [key] is on screen: up when it's below or not there yet (back: down), down when above."""
+    for _ in range(times):
+        n = find(dump(), key)
+        if n is not None:
+            top, bottom = bounds(n)[1], bounds(n)[3]
+            if bottom < 2250 and top > 260 and bottom - top > 20:  # on screen, not under the bars
+                return
+            if bottom <= 260:
+                adb("shell", "input", "swipe", "540", "900", "540", "1500", "300")
+                time.sleep(0.6)
+                continue
+        if back:
+            adb("shell", "input", "swipe", "540", "900", "540", "1600", "300")
+        else:
+            adb("shell", "input", "swipe", "540", "1700", "540", "1000", "300")
+        time.sleep(0.6)
+    wait(key)
+
+
+def tap_on_screen(key):
+    scroll_to(key)
+    tap(key)
+
+
+def open_scripts():
+    """From the desk: Settings, then this host's scripts."""
+    open_switcher()
+    tap("Settings", exact=True)
+    wait("Appearance")
+    scroll_to(f"Scripts on {LABEL}")  # the Scripts section sits below the fold
+    tap(f"Scripts on {LABEL}")
+
+
+def step_script_page(srv):
+    """The Scripts screen: empty, can't read, then scripts to allow, turn off, watch, and set; a chip when one acts."""
+    folder = srv.env["HIVE_SCRIPTS"]
+    os.makedirs(folder, exist_ok=True)
+    open_scripts()
+    wait("No scripts on this server")
+    shot("scripts-empty")
+    # The server goes: the screen says it couldn't read them, and reads them when it's back.
+    srv.stop()
+    wait("Couldn't read the scripts", timeout=15)
+    shot("scripts-error")
+    srv.start()
+    wait("No scripts on this server", timeout=30)
+    # Two examples (they ask for ui) and one that asks to read and type; one allowed from here.
+    for f in ("digest.ts", "needs-you.ts"):
+        shutil.copy(os.path.join(ROOT, "examples", "scripts", f), folder)
+    with open(os.path.join(folder, "typist.ts"), "w") as f:
+        f.write(TYPIST)
+    srv.call("script.reload")
+    until("three scripts, pending", lambda: len(scripts_state(srv)) == 3 and all(x["state"] == "pending" for x in scripts_state(srv).values()), timeout=20)
+    srv.call("script.grant", {"name": "needs-you"})
+    until("needs-you running", lambda: scripts_state(srv)["needs-you"]["state"] == "running")
+    tap("Back")
+    wait("Appearance")
+    scroll_to(f"Scripts on {LABEL}")
+    until("the Settings row counts them", lambda: find(dump(), "1 running, 2 waiting for you") is not None, timeout=10)
+    shot("settings-scripts")
+    tap(f"Scripts on {LABEL}")
+    wait("digest", exact=True)
+    wait("Waiting for your OK")
+    wait("It asks to notify you, mark panes and bring hive to the front.")
+    shot("scripts-pending")
+    # Allow digest.
+    tap("Allow digest")
+    until("digest allowed", lambda: scripts_state(srv)["digest"]["state"] == "running")
+    wait("Allow digest", gone=True)
+    # Off and on again.
+    tap_on_screen("needs-you on")
+    until("needs-you off", lambda: scripts_state(srv)["needs-you"]["state"] == "disabled")
+    wait("Turned off")
+    shot("scripts-off")
+    tap_on_screen("needs-you on")
+    until("needs-you on again", lambda: scripts_state(srv)["needs-you"]["state"] == "running")
+    # Watch only.
+    tap_on_screen("Watch only, needs-you")
+    until("needs-you watches", lambda: scripts_state(srv)["needs-you"]["mode"] == "watch")
+    wait("Running, watch only")
+    scroll_to("set to watch only by you")
+    # An option: + once, then typed, then one out of range.
+    tap_on_screen("More, Remind me after this many minutes")
+    until("remind_min 11", lambda: option(srv, "needs-you", "remind_min") == 11)
+    tap_on_screen("Remind me after this many minutes, needs-you")
+    until("the keyboard", keyboard_up)
+    adb("shell", "input", "keycombination", "113", "29")  # select all
+    type_text("30")
+    time.sleep(0.8)
+    shot("scripts-keyboard")
+    adb("shell", "input", "keyevent", "KEYCODE_ENTER")  # Done
+    until("remind_min 30", lambda: option(srv, "needs-you", "remind_min") == 30)
+    tap_on_screen("Remind me after this many minutes, needs-you")
+    adb("shell", "input", "keycombination", "113", "29")
+    type_text("999")
+    adb("shell", "input", "keyevent", "KEYCODE_ENTER")
+    wait("At most 240.")
+    assert option(srv, "needs-you", "remind_min") == 30, "an out of range value was sent"
+    sets = [e for e in srv.call("audit.list", {"name": "needs-you"})["entries"] if e.get("summary") == "remind_min = 30"]
+    assert len(sets) == 1, f"remind_min = 30 was sent {len(sets)} times"
+    hide_keyboard()
+    # Text: typed, saved on Done.
+    scroll_to("Send it each day at (HH:MM, empty: never), digest", back=True)
+    tap("Send it each day at (HH:MM, empty: never), digest")
+    until("the keyboard", keyboard_up)
+    type_text("08:30")
+    time.sleep(0.8)
+    shot("scripts-text-keyboard")
+    adb("shell", "input", "keyevent", "KEYCODE_ENTER")
+    until("morning 08:30", lambda: option(srv, "digest", "morning") == "08:30")
+    hide_keyboard()
+    tap_on_screen("Also agents that finished, needs-you")
+    until("include_done on", lambda: option(srv, "needs-you", "include_done") is True)
+    shot("scripts-options")
+    # The one that asks to read and type, still pending, says so plainly.
+    for _ in range(6):
+        if find(dump(), "It can read your terminals and type into them") is not None:
+            break
+        adb("shell", "input", "swipe", "540", "1900", "540", "700", "300")
+        time.sleep(0.6)
+    wait("It can read your terminals and type into them")
+    adb("shell", "input", "swipe", "540", "1500", "540", "900", "300")  # the whole card in view
+    time.sleep(0.6)
+    shot("scripts-typist")
+    tap("Back")
+    tap("Back")
+    # A script acts on the pane on screen: a chip says so, and opens the scripts.
+    srv.hive("new", "acts", "--cwd", "/tmp", "--", "sh")  # one pane: the one on screen
+    open_switcher()
+    tap("acts", exact=True)
+    wait("Fit to phone")
+    block = srv.view("acts")["windows"][0]["layout"]["block_id"]
+    time.sleep(1)  # the shell's prompt
+    srv.hive("script", "run", "--allow", "input", "-e", f'const b = await h.block("{block}"); await b.write("echo acted\\n");')
+    until("the script typed", lambda: "acted" in srv.text(block))
+    wait("typed")
+    shot("scripts-chip")
+    root = dump()
+    chip = next(n for n in root.iter("node") if "typed" in (n.get("content-desc") or n.get("text") or ""))
+    a, b, c, d = bounds(chip)
+    adb("shell", "input", "tap", str((a + c) // 2), str((b + d) // 2))
+    wait("Recent activity")
+    tap("Back")
+    wait("Switch session")
+    wait("typed", gone=True, timeout=14)  # it goes after about 10 seconds
+
+
 def step_previews(srv):
     """The tab sheet previews what agents did, not their input box and status bar; their glyphs draw."""
     srv.hive("new", "look", "--cwd", "/tmp", "--", "python3", os.path.join(HERE, "fake-claude-screen.py"), "bypass")
@@ -922,7 +1108,7 @@ def step_away(srv):
     shot("back")
 
 
-STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_notify, step_scripts, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
+STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
 
 
 def main():

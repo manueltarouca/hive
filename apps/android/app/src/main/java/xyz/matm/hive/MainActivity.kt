@@ -27,6 +27,8 @@ sealed class Screen {
     object Scan : Screen()
     object Settings : Screen()
     object Hosts : Screen()
+    /** A host's scripts; back to where it was opened from. */
+    class Scripts(val host: String, val focus: String?, val back: Screen) : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -51,7 +53,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 when (val s = screen) {
-                    Screen.Desk -> Desk(model, openSwitcher = { screen = if (model.hosts.isEmpty()) Screen.AddHost else Screen.Switcher }, openLink = ::open)
+                    Screen.Desk -> Desk(model, openSwitcher = { screen = if (model.hosts.isEmpty()) Screen.AddHost else Screen.Switcher }, openLink = ::open,
+                        openScript = { h, name -> screen = Screen.Scripts(h.id, name, Screen.Desk) })
                     Screen.Switcher -> {
                         BackHandler { screen = Screen.Desk }
                         Switcher(model, close = { screen = Screen.Desk }, addHost = { screen = Screen.AddHost }, settings = { screen = Screen.Settings },
@@ -59,7 +62,13 @@ class MainActivity : ComponentActivity() {
                     }
                     Screen.Settings -> {
                         BackHandler { screen = Screen.Switcher }
-                        xyz.matm.hive.ui.Settings(model, close = { screen = Screen.Switcher })
+                        xyz.matm.hive.ui.Settings(model, close = { screen = Screen.Switcher }, scripts = { h -> screen = Screen.Scripts(h.id, null, Screen.Settings) })
+                    }
+                    is Screen.Scripts -> {
+                        BackHandler { screen = s.back }
+                        val h = model.hosts.firstOrNull { it.id == s.host }
+                        if (h == null) androidx.compose.runtime.SideEffect { screen = s.back }
+                        else xyz.matm.hive.ui.ScriptsScreen(model, h, s.focus, close = { screen = s.back })
                     }
                     Screen.Hosts -> {
                         BackHandler { screen = Screen.Switcher }

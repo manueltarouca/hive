@@ -65,11 +65,13 @@ object Notifier {
             .setSmallIcon(R.drawable.ic_hive)
             .setContentTitle(Notices.title(a))
             .setSubText(Notices.subtitle(a, h.name, local = false))
-            .setContentText(a.message.ifEmpty { a.title })
+            .setContentText(Notices.text(a))
+            .setStyle(Notification.BigTextStyle().bigText(Notices.text(a)))
             .setContentIntent(open)
             .setAutoCancel(true)
             .setCategory(if (a.state == "blocked") Notification.CATEGORY_MESSAGE else Notification.CATEGORY_STATUS)
-            .setColor(0xFFF2A93B.toInt())
+            // Stopped is coral, as in the app: it won't go on by itself.
+            .setColor(if (a.shown == "stopped") 0xFFCC6666.toInt() else 0xFFF2A93B.toInt())
         if (a.state == "blocked") {
             fun answer(label: String, key: String?, code: Int): Notification.Action.Builder {
                 val i = Intent(ctx, AnswerReceiver::class.java).putExtra(EXTRA_HOST, h.id).putExtra(EXTRA_BLOCK, a.blockID)

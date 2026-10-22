@@ -59,7 +59,7 @@ fun shortPath(p: String): String {
 
 /** C Desk: the Mac app, small. The title chip, tabs as pills, one pane at a time, the key bar. */
 @Composable
-fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) {
+fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit, openScript: (xyz.matm.hive.model.HostConnection, String) -> Unit = { _, _ -> }) {
     val p = LocalPalette.current
     androidx.compose.runtime.SideEffect { model.setDark(p.night) }
     val h = model.current
@@ -134,7 +134,7 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
                         FadeText(title, Type.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(500)), p.text, Modifier.weight(1f, fill = false))
                         if (where.isNotEmpty()) { Spacer(Modifier.width(8.dp)); FadeText(where, Type.small, p.muted, Modifier.widthIn(max = 110.dp)) }
                         Spacer(Modifier.weight(0.001f))
-                        if (block.agentState in setOf("working", "blocked", "done")) { Spacer(Modifier.width(8.dp)); StateBadge(block.agentState!!) }
+                        if (block.agentState in setOf("working", "blocked", "done", "stopped")) { Spacer(Modifier.width(8.dp)); StateBadge(block.agentState!!) }
                         // Scripts' badges: the first two, those that need you first.
                         val badges = model.paneBadges.badges(block.id)
                         for (b in badges.take(2)) { Spacer(Modifier.width(6.dp)); ScriptBadgeChip(b) }
@@ -158,6 +158,17 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
                         v.onCtrlUsed = { ctrl = false }
                     },
                 )
+            }
+            // A script just acted on this pane: who and what, for a few seconds; tap for the script.
+            // Or elsewhere (another session or host): where, so it's never unseen.
+            val chip = block?.let { model.chipFor(it.id) }
+                ?: model.chipElsewhere()?.let { it.copy(text = "${it.text} in ${it.place}") }
+            var lastChip by remember { mutableStateOf(chip) }
+            if (chip != null) lastChip = chip
+            Box(Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 12.dp, end = 12.dp)) {
+                androidx.compose.animation.AnimatedVisibility(visible = chip != null, enter = fadeIn(tween(180, easing = Quiet)), exit = fadeOut(tween(300, easing = Quiet))) {
+                    lastChip?.let { c -> ActedChipView(c.text, c.refused) { model.hosts.firstOrNull { it.id == c.host }?.let { openScript(it, c.script) } } }
+                }
             }
             if (model.currentSession == null) EmptyDesk(model, openSwitcher)
             // Away: the Mac's card, over the pane, while its host can't be reached.
@@ -193,6 +204,8 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
         }
 
         if (ask != null && block != null) AskCard(ask, Harness.name(block.harness ?: ""), model)
+        // A stopped agent says why, where you'd answer one that asks.
+        if (block?.agentState == "stopped") h?.agents?.firstOrNull { it.blockID == block.id }?.let { StoppedCard(Harness.name(it.harness), it.message) }
 
         confirmPaste?.let { (lines, go) -> PasteCard(lines, paste = { go(); confirmPaste = null }, cancel = { confirmPaste = null }) }
 
@@ -205,16 +218,16 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
     }
 }
 
-/** The Mac's StatusBadge: "Blocked" in words, else the state's hexagon. */
+/** The Mac's StatusBadge: "Blocked" or "Stopped" in words, else the state's hexagon. */
 @Composable
 fun StateBadge(state: String) {
     val p = LocalPalette.current
-    if (state == "blocked") {
+    if (state == "blocked" || state == "stopped") {
         Row(Modifier.clip(RoundedCornerShape(50)).background(p.coral.copy(alpha = 0.14f)).padding(horizontal = 7.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Hexagon("blocked", 7.dp)
+            Hexagon(state, 7.dp)
             Spacer(Modifier.width(4.dp))
-            BasicText("Blocked", style = Type.tiny.copy(color = p.coral, fontWeight = androidx.compose.ui.text.font.FontWeight(600)))
+            BasicText(if (state == "blocked") "Blocked" else "Stopped", style = Type.tiny.copy(color = p.coral, fontWeight = androidx.compose.ui.text.font.FontWeight(600)))
         }
     } else Hexagon(state, 8.dp)
 }
@@ -323,6 +336,27 @@ private fun AskCard(ask: Ask, agent: String, model: AppModel) {
                     .semantics { contentDescription = "Send reply" },
                 contentAlignment = Alignment.Center,
             ) { LineIcon(Icon.Send, if (reply.isBlank()) p.muted else p.onHoney, 18.dp) }
+        }
+    }
+}
+
+/** An agent that failed and stopped (a usage limit, a crash): it won't go on by itself. */
+@Composable
+private fun StoppedCard(agent: String, why: String) {
+    val p = LocalPalette.current
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp).clip(RoundedCornerShape(12.dp))
+            .background(p.coral.copy(alpha = if (p.night) 0.10f else 0.08f)).border(1.dp, p.coral.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp).semantics(mergeDescendants = true) {},
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Hexagon("stopped", 9.dp)
+            Spacer(Modifier.width(8.dp))
+            BasicText("$agent stopped", style = Type.label.copy(color = p.text))
+        }
+        if (why.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            BasicText(why, style = Type.small.copy(color = p.muted), maxLines = 3)
         }
     }
 }

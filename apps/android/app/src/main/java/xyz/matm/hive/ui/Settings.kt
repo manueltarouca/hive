@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -43,9 +44,14 @@ import java.util.Locale
 
 /** Settings, as the Mac's where they apply to a phone: appearance, the terminal, agents, about. Hosts have their own screen. */
 @Composable
-fun Settings(model: AppModel, close: () -> Unit) {
+fun Settings(model: AppModel, close: () -> Unit, scripts: (xyz.matm.hive.model.HostConnection) -> Unit = {}) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        model.settingsShown = true
+        onDispose { model.settingsShown = false }
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) { model.hosts.filter { it.connected }.forEach { model.loadScripts(it, activity = false) } }
     Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
@@ -79,7 +85,7 @@ fun Settings(model: AppModel, close: () -> Unit) {
                     model.openFitted, model::chooseOpenFitted)
             }
             Section("Agents") {
-                Item("Notifications", "When an agent needs you or is done.") {
+                Item("Notifications", "When an agent needs you, stops or is done.") {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         for ((v, label) in listOf("background" to "When hive is in the background", "always" to "Always", "never" to "Never")) {
                             Radio(label, model.notify == v) { model.chooseNotify(v) }
@@ -88,6 +94,29 @@ fun Settings(model: AppModel, close: () -> Unit) {
                 }
                 Link("Notification settings on this phone") {
                     runCatching { ctx.startActivity(Intent(SystemSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(SystemSettings.EXTRA_APP_PACKAGE, ctx.packageName)) }
+                }
+            }
+            if (model.hosts.isNotEmpty()) Section("Scripts") {
+                for (h in model.hosts) {
+                    val page = model.scriptPages[h.id]
+                    val status = when {
+                        !h.connected -> h.shortProblem ?: "Not connected"
+                        page == null || !page.loaded -> "Reading"
+                        page.error != null -> "Couldn't read them"
+                        else -> xyz.matm.hive.model.ScriptWords.summary(page.list)
+                    }
+                    val waiting = page?.list?.any { it.pending } == true
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button) { scripts(h) }
+                        .semantics(mergeDescendants = true) { contentDescription = "Scripts on ${h.name}: $status" }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        LineIcon(Icon.Bolt, if (waiting) p.honey else p.muted, 18.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            BasicText(h.name, style = Type.body.copy(color = p.text))
+                            BasicText(status, style = Type.tiny.copy(color = if (waiting) p.text else p.muted), modifier = Modifier.padding(top = 2.dp))
+                        }
+                        LineIcon(Icon.Chevron, p.muted, 16.dp, Modifier.graphicsLayer { rotationZ = -90f })
+                    }
                 }
             }
             Section("About") {
@@ -105,7 +134,7 @@ fun Settings(model: AppModel, close: () -> Unit) {
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+internal fun Section(title: String, content: @Composable () -> Unit) {
     val p = LocalPalette.current
     BasicText(title, style = Type.small.copy(color = p.muted), modifier = Modifier.padding(top = 18.dp, bottom = 8.dp, start = 4.dp).semantics { heading() })
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.surface).border(1.dp, p.line, RoundedCornerShape(12.dp))
@@ -113,7 +142,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Item(title: String, help: String? = null, control: @Composable () -> Unit) {
+internal fun Item(title: String, help: String? = null, control: @Composable () -> Unit) {
     val p = LocalPalette.current
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         BasicText(title, style = Type.body.copy(color = p.text))
@@ -168,14 +197,14 @@ private fun Toggle(title: String, help: String, on: Boolean, set: (Boolean) -> U
 
 /** An on/off switch in hive's colours (honey when on), with a 48 dp target. */
 @Composable
-private fun Switch(on: Boolean, description: String, set: (Boolean) -> Unit) {
+internal fun Switch(on: Boolean, description: String, set: (Boolean) -> Unit) {
     Box(Modifier.size(56.dp, 48.dp).toggleable(value = on, role = Role.Switch, onValueChange = set)
         .semantics { contentDescription = description }, contentAlignment = Alignment.Center) { Track(on) }
 }
 
 /** The switch's look alone: honey when on; off keeps an outline, or a pale track on a pale card would vanish in Day. */
 @Composable
-private fun Track(on: Boolean) {
+internal fun Track(on: Boolean) {
     val p = LocalPalette.current
     Box(Modifier.size(width = 44.dp, height = 26.dp).clip(RoundedCornerShape(50)).background(if (on) p.honey else p.raised)
         .then(if (on) Modifier else Modifier.border(1.dp, p.muted.copy(alpha = 0.6f), RoundedCornerShape(50)))

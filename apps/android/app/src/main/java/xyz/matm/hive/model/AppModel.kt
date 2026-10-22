@@ -315,12 +315,12 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         return seen.take(2)
     }
 
-    /** The state that matters most among a tab's agents: blocked, working, done; or null. */
+    /** The state that matters most among a tab's agents: blocked, stopped, working, done; or null. */
     fun tabState(w: WindowInfo): String? {
         // The live agents first (agent_changed), as the Mac's summary; the view's state until they're read.
         val live = current?.agents.orEmpty().associateBy { it.blockID }
-        val states = w.blocks.map { b -> live[b]?.state ?: blocks[b]?.agentState }
-        return listOf("blocked", "working", "done").firstOrNull { it in states }
+        val states = w.blocks.map { b -> live[b]?.shown ?: blocks[b]?.agentState }
+        return listOf("blocked", "stopped", "working", "done").firstOrNull { it in states }
     }
 
     fun tabs(): List<TabGroups.Tab> = windows.mapIndexed { i, w -> TabGroups.Tab(i, w.pinned, tabState(w)) }
@@ -363,9 +363,12 @@ class AppModel(private val context: Context) : HostConnection.Listener {
             val b = w.focused ?: w.blocks.firstOrNull() ?: continue
             // Enough lines to see past an agent's input box and status bar.
             h.call("hive.terminal.format", JSONObject().put("block_id", b).put("args", JSONObject().put("trim", true).put("tail", 16))) { r ->
-                val message = h.agents.firstOrNull { it.blockID == b }?.message
+                val agent = h.agents.firstOrNull { it.blockID == b }
+                val message = agent?.message
                 val tail = r.getOrNull()?.optString("content")?.split('\n') ?: emptyList()
-                val lines = xyz.matm.hive.agents.Previews.pick(tail, message)
+                val picked = xyz.matm.hive.agents.Previews.pick(tail, message)
+                // A stopped agent's card says why first.
+                val lines = if (agent?.shown == "stopped" && !message.isNullOrBlank()) listOf("Stopped: " + message) + picked.takeLast(1) else picked
                 if (lines.isEmpty()) return@call
                 previews = previews + (w.id to lines)
             }
@@ -407,18 +410,18 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                     Agent(
                         blockID = a.optString("block_id"), sessionID = a.optString("session_id"), host = h.id,
                         sessionLabel = a.optString("session_label"), harness = agent.optString("harness"),
-                        state = state, message = agent.optString("message"), title = a.optString("title"),
+                        state = state, message = agent.optString("message"), title = a.optString("title"), kind = agent.optString("kind"),
                     )
                 }
                 val news = Notices.changes(h.lastAgentStates, list)
-                h.lastAgentStates = list.associate { it.blockID to it.state }
+                h.lastAgentStates = list.associate { it.blockID to it.shown }
                 h.agents = list
                 if (current === h) {
                     val byBlock = list.associateBy { it.blockID }
                     blocks = blocks.mapValues { (id, b) ->
                         val a = byBlock[id]
                         // Off the list: the agent ended, or its shell is back.
-                        b.copy(harness = a?.harness, agentState = a?.state)
+                        b.copy(harness = a?.harness, agentState = a?.shown)
                     }
                 }
                 // As the Mac's notify setting: in the background (the default), always, or never.
@@ -469,11 +472,11 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                     val pwd = b.optString("pwd")
                     if (pwd.startsWith("file://")) cwd = android.net.Uri.parse(pwd).path ?: cwd
                     if (cwd.isEmpty()) cwd = agent?.optString("cwd").orEmpty().ifEmpty { b.optString("cwd") }
-                    val st = agent?.optString("state").orEmpty()
+                    val st = Agent.shownState(agent?.optString("state").orEmpty(), agent?.optString("kind"))
                     val live = agentsByBlock[id]
                     val harness = live?.harness ?: agent?.optString("harness")?.takeIf { it.isNotEmpty() && st != "ended" }
                     newBlocks[id] = BlockInfo(id, b.optString("title"), cwd, fg.optString("program").ifEmpty { fg.optString("name") },
-                        harness, live?.state ?: st.takeIf { it.isNotEmpty() && it != "ended" }, b.optString("label"), b.optString("size_owner"))
+                        harness, live?.shown ?: st.takeIf { it.isNotEmpty() && it != "ended" }, b.optString("label"), b.optString("size_owner"))
                 }
                 val keepWindow = windows.getOrNull(windowIndex)?.id
                 val keepBlock = visibleBlock
@@ -812,9 +815,120 @@ class AppModel(private val context: Context) : HostConnection.Listener {
             }
             "notification" -> ev.optJSONObject("payload")?.optJSONObject("notification")?.let { showScriptNote(h, ScriptNote.of(it)) }
             "keymap_changed" -> reloadActions(h)
+            "script_acted" -> ev.optJSONObject("payload")?.let { scriptActed(h, it) }
+            "script_changed" -> scriptsChanged(h)
             "notification_acked" -> ev.optJSONObject("payload")?.optString("notification_id")?.let { Notifier.cancelScript(context, h.id, it) }
         }
     }
+
+    // MARK: the Scripts screen: what runs on each host, and turning it off
+
+    /** A host's scripts as the Scripts screen shows them. problems: an error by script name, or "name/key" for an option. */
+    data class ScriptsPage(
+        val loaded: Boolean = false,
+        val error: String? = null,
+        val list: List<Resident> = emptyList(),
+        val activity: Map<String, List<ActivityEntry>> = emptyMap(),
+        val problems: Map<String, String> = emptyMap(),
+        val busy: Set<String> = emptySet(),
+    )
+
+    var scriptPages by mutableStateOf<Map<String, ScriptsPage>>(emptyMap())
+        private set
+    /** The host whose Scripts screen is up, and whether Settings (its summary rows) is: events refresh them. */
+    var scriptsShown: String? = null
+    var settingsShown = false
+
+    private fun page(h: HostConnection) = scriptPages[h.id] ?: ScriptsPage()
+    private fun setPage(h: HostConnection, f: (ScriptsPage) -> ScriptsPage) { scriptPages = scriptPages + (h.id to f(page(h))) }
+
+    /** Reads a host's scripts; with activity, each one's last 10 entries too. */
+    fun loadScripts(h: HostConnection, activity: Boolean = true) {
+        if (!h.connected) {
+            setPage(h) { it.copy(loaded = true, error = (h.problem ?: "Not connected to ${h.name}").removeSuffix("…") + ". hive keeps trying.") }
+            return
+        }
+        h.call("script.list") { r ->
+            r.onFailure { e -> setPage(h) { it.copy(loaded = true, error = errorText(e, "Couldn't read the scripts")) } }
+            r.onSuccess { j ->
+                val list = Resident.list(j)
+                setPage(h) { p -> p.copy(loaded = true, error = null, list = list, activity = p.activity.filterKeys { k -> list.any { it.name == k } }) }
+                if (activity) for (s in list) loadActivity(h, s.name)
+            }
+        }
+    }
+
+    private fun loadActivity(h: HostConnection, name: String) {
+        h.call("audit.list", JSONObject().put("name", name).put("tail", 10)) { r ->
+            val j = r.getOrNull() ?: return@call
+            setPage(h) { it.copy(activity = it.activity + (name to ActivityEntry.list(j))) }
+        }
+    }
+
+    private fun errorText(e: Throwable, fallback: String): String =
+        (e as? xyz.matm.hive.net.HiveError)?.message?.takeIf { it.isNotBlank() && it != "connection closed" }?.replaceFirstChar { it.uppercase() } ?: "$fallback."
+
+    /**
+     * A change to a script: on or off, allow, watch only, an option. The
+     * server answers with the script as it is now; an error shows under it
+     * (problem key: the script's name, or "name/key" for an option).
+     */
+    fun changeScript(h: HostConnection, name: String, method: String, params: JSONObject = JSONObject(), problemKey: String = name, done: (Boolean) -> Unit = {}) {
+        setPage(h) { it.copy(busy = it.busy + problemKey, problems = it.problems - problemKey) }
+        h.call(method, params.put("name", name)) { r ->
+            r.onSuccess { j ->
+                val updated = Resident.of(j)
+                setPage(h) { p -> p.copy(busy = p.busy - problemKey, list = p.list.map { if (it.name == name && updated.name == name) updated else it }) }
+                loadActivity(h, name)
+                done(true)
+            }
+            r.onFailure { e ->
+                setPage(h) { it.copy(busy = it.busy - problemKey, problems = it.problems + (problemKey to errorText(e, "That didn't work"))) }
+                done(false)
+            }
+        }
+    }
+
+    fun clearScriptProblem(h: HostConnection, key: String) = setPage(h) { it.copy(problems = it.problems - key) }
+
+    private val scriptsReloadPending = HashSet<String>()
+
+    /** Something changed a host's scripts: the screen showing them reads them again (once per burst). */
+    private fun scriptsChanged(h: HostConnection) {
+        val watching = scriptsShown == h.id
+        if (!watching && !settingsShown) return
+        if (!scriptsReloadPending.add(h.id)) return
+        main.postDelayed({ scriptsReloadPending.remove(h.id); loadScripts(h, activity = scriptsShown == h.id) }, 300)
+    }
+
+    /** Chips on panes a script just acted on, for about 10 seconds. */
+    var actedChips by mutableStateOf<List<ActedChip>>(emptyList())
+        private set
+
+    private fun scriptActed(h: HostConnection, ev: JSONObject) {
+        scriptsChanged(h)
+        val script = ev.optString("script")
+        val block = ev.optString("block_id")
+        // Only a script's own doing: a person's change to a script isn't news on a pane.
+        if (script.isEmpty() || block.isEmpty() || !ev.optString("by").startsWith("script:")) return
+        val now = android.os.SystemClock.uptimeMillis()
+        val sid = ev.optString("session_id")
+        val label = h.sessions.firstOrNull { it.id == sid }?.label?.ifEmpty { null } ?: "another session"
+        val chip = ActedChip(h.id, script, block, ScriptWords.acted(script, ev.optString("summary"), ev.optString("result")),
+            ev.optString("result").let { it.isNotEmpty() && it != "ok" }, now + CHIP_MS,
+            session = sid, place = if (hosts.size > 1) "$label on ${h.name}" else label)
+        actedChips = actedChips.filter { it.until > now && !(it.host == h.id && it.block == block) } + chip
+        main.postDelayed({ val t = android.os.SystemClock.uptimeMillis(); actedChips = actedChips.filter { it.until > t } }, CHIP_MS + 50)
+    }
+
+    /** A script acted outside the session on screen: the newest such chip. */
+    fun chipElsewhere(): ActedChip? {
+        val t = android.os.SystemClock.uptimeMillis()
+        return actedChips.lastOrNull { it.until > t && (it.host != current?.id || it.session != currentSession) }
+    }
+
+    /** The chip on a pane of the current host, if any. */
+    fun chipFor(block: String): ActedChip? = current?.let { h -> actedChips.lastOrNull { it.host == h.id && it.block == block } }
 
     // MARK: scripts' badges and notifications
 
@@ -963,6 +1077,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
 
     companion object {
         const val LET_GO_MS = 30_000L
+        const val CHIP_MS = 10_000L
     }
 
     /** The agents of every host, blocked first. */

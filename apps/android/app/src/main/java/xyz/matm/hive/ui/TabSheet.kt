@@ -97,7 +97,7 @@ fun TabStrip(model: AppModel, openSheet: () -> Unit, openMenu: (WindowInfo) -> U
     ) {
         if (all) {
             // The count wears the states of what's behind it, as a small comb.
-            val states = listOf("blocked", "done", "working").filter { s -> tabs.any { it.state == s } }
+            val states = listOf("blocked", "stopped", "done", "working").filter { s -> tabs.any { it.state == s } }
             Row(
                 Modifier.clip(RoundedCornerShape(50)).border(1.dp, p.line, RoundedCornerShape(50))
                     .clickable(role = Role.Button, onClick = openSheet)
@@ -131,6 +131,8 @@ fun TabStrip(model: AppModel, openSheet: () -> Unit, openMenu: (WindowInfo) -> U
                 ProgramTile(model.program(w), 20.dp, model.otherPrograms(w))
                 Spacer(Modifier.width(7.dp))
                 FadeText(label, Type.small, if (sel) p.text else p.muted, Modifier.widthIn(max = 140.dp))
+                // A script just acted in this tab.
+                if (w.blocks.any { model.chipFor(it) != null }) { Spacer(Modifier.width(5.dp)); LineIcon(Icon.Bolt, p.honey, 13.dp, description = "A script acted here") }
                 if (state != null) { Spacer(Modifier.width(7.dp)); Hexagon(state, 8.dp) }
             }
         }

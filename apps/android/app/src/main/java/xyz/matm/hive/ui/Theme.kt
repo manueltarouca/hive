@@ -95,9 +95,9 @@ fun HiveTheme(choice: String = "system", content: @Composable () -> Unit) {
 /** The motion curve: quiet, cubic-bezier(0.4, 0, 0.2, 1). */
 val Quiet = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 
-/** An agent's state as a pointy-top hexagon: working honey (pulsing), blocked coral, done sage; idle an outline. */
+/** An agent's state as a pointy-top hexagon: working honey (pulsing), blocked coral, done sage; idle an outline; stopped a coral outline. */
 @Composable
-fun Hexagon(state: String?, size: Dp = 10.dp, modifier: Modifier = Modifier) {
+fun Hexagon(state: String?, size: Dp = 10.dp, modifier: Modifier = Modifier, tint: Color? = null) {
     val p = LocalPalette.current
     val reduce = reducedMotion()
     val pulse = if (state == "working" && !reduce) {
@@ -107,10 +107,10 @@ fun Hexagon(state: String?, size: Dp = 10.dp, modifier: Modifier = Modifier) {
     } else 1f
     val color = when (state) {
         "working" -> p.honey
-        "blocked" -> p.coral
+        "blocked", "stopped" -> p.coral
         "done" -> p.sage
         else -> p.muted
-    }
+    }.let { tint ?: it }
     Canvas(modifier.size(size)) {
         val r = this.size.minDimension / 2
         val path = Path()
@@ -121,8 +121,9 @@ fun Hexagon(state: String?, size: Dp = 10.dp, modifier: Modifier = Modifier) {
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
         path.close()
-        if (state == "working" || state == "blocked" || state == "done") drawPath(path, color.copy(alpha = pulse))
-        else drawPath(path, color, style = Stroke(width = 1.2.dp.toPx()))
+        if (tint != null || state == "working" || state == "blocked" || state == "done") drawPath(path, color.copy(alpha = pulse))
+        // Stopped: a heavier coral ring, apart from blocked's fill and done's sage.
+        else drawPath(path, color, style = Stroke(width = (if (state == "stopped") 1.8.dp else 1.2.dp).toPx()))
     }
 }
 
