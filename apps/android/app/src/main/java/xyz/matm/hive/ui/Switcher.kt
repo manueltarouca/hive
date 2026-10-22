@@ -70,7 +70,7 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
     val focus = remember { FocusRequester() }
     val q = query.trim()
 
-    LaunchedEffect(Unit) { model.hosts.filter { it.connected }.forEach { model.refresh(it) } }
+    LaunchedEffect(Unit) { model.hosts.filter { it.connected }.forEach { model.refresh(it); model.reloadActions(it) } }
 
     Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -149,6 +149,18 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
                             Row(rowModifier(false) { model.newSession(h, q.ifEmpty { null }); close() }, verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.width(26.dp)) { LineIcon(Icon.Plus, p.muted, 15.dp) }
                                 BasicText(if (q.isEmpty()) "New session on ${h.name}" else "New session “$q” on ${h.name}", style = Type.body.copy(color = p.text))
+                            }
+                        }
+                        val acts = (model.actions[h.id] ?: emptyList()).filter { q.isEmpty() || it.second.contains(q, true) }
+                        // Scripts' actions, apart from the sessions: they run, they don't open.
+                        if (acts.isNotEmpty()) item(key = "actions:" + h.id) {
+                            BasicText("Actions", style = Type.tiny.copy(color = p.muted), modifier = Modifier.padding(start = 34.dp, top = 10.dp, bottom = 2.dp))
+                        }
+                        for ((name, title) in acts) item(key = "action:" + h.id + name) {
+                            Row(rowModifier(false) { model.runAction(h, name); close() }.semantics { contentDescription = "Action $title" },
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.width(26.dp)) { LineIcon(Icon.Bolt, p.honey, 16.dp) }
+                                FadeText(title, Type.body, p.text, Modifier.weight(1f))
                             }
                         }
                     }

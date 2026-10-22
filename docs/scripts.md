@@ -127,7 +127,9 @@ await h.status.set({ target: h.ctx.block_id!, id: "tests", state: "error", msg: 
 
 Notifications reach every app, and the server keeps them for a day, so an
 app that was closed shows what it missed. A script can send 10 a minute.
-Its badges go away when it stops. Both need the `ui` permission.
+Badges show in the pane's header, on the Mac and the phone, those that need
+you first; they go away when their script stops. Both need the `ui`
+permission.
 
 `h.agents.on_state` runs when an agent reaches a state, with its row from
 `agent.list` (its folder, its label, what it's doing):
@@ -255,7 +257,8 @@ the rest `hive keymap` lists. `h.bind(key, fn)` binds a function.
 You can change any key in the [settings](./settings#keys) file too, and
 those win over scripts'. `hive keymap` shows every binding and where it
 came from. The app takes keys only from the server on its own Mac; actions
-of other hosts are in the command palette, under the host's name.
+of other hosts are in the command palette, under the host's name. On the
+phone, every host's actions are in the switcher, under the host.
 
 ## Permissions
 

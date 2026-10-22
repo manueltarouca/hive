@@ -135,6 +135,10 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit) 
                         if (where.isNotEmpty()) { Spacer(Modifier.width(8.dp)); FadeText(where, Type.small, p.muted, Modifier.widthIn(max = 110.dp)) }
                         Spacer(Modifier.weight(0.001f))
                         if (block.agentState in setOf("working", "blocked", "done")) { Spacer(Modifier.width(8.dp)); StateBadge(block.agentState!!) }
+                        // Scripts' badges: the first two, those that need you first.
+                        val badges = model.paneBadges.badges(block.id)
+                        for (b in badges.take(2)) { Spacer(Modifier.width(6.dp)); ScriptBadgeChip(b) }
+                        if (badges.size > 2) { Spacer(Modifier.width(6.dp)); BasicText("+${badges.size - 2}", style = Type.tiny.copy(color = LocalPalette.current.muted)) }
                     }
                 }
                 AndroidView(
@@ -213,6 +217,20 @@ fun StateBadge(state: String) {
             BasicText("Blocked", style = Type.tiny.copy(color = p.coral, fontWeight = androidx.compose.ui.text.font.FontWeight(600)))
         }
     } else Hexagon(state, 8.dp)
+}
+
+/** A script's badge: a hexagon in its state's color and its message, fading when long. */
+@Composable
+fun ScriptBadgeChip(b: xyz.matm.hive.model.ScriptBadge) {
+    val p = LocalPalette.current
+    val state = when (b.state) { "error" -> "blocked"; else -> b.state }
+    val color = when (state) { "blocked" -> p.coral; "done" -> p.sage; "working" -> p.honey; else -> p.muted }
+    Row(Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.13f)).padding(horizontal = 7.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Hexagon(state, 7.dp)
+        Spacer(Modifier.width(4.dp))
+        FadeText(b.progress?.let { "${b.text} $it%" } ?: b.text, Type.tiny.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(500)), color, Modifier.widthIn(max = 96.dp))
+    }
 }
 
 @Composable

@@ -90,7 +90,7 @@ fun Pill(text: String, primary: Boolean = false, modifier: Modifier = Modifier, 
 }
 
 /** Simple line icons, drawn so they take the palette's colors. */
-enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, Send, Back, Check, Link, Alert, Camera, Gear, Minus, Pin, Search }
+enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, Send, Back, Check, Link, Alert, Camera, Gear, Minus, Pin, Search, Bolt }
 
 @Composable
 fun LineIcon(icon: Icon, color: Color, size: Dp = 18.dp, modifier: Modifier = Modifier, description: String? = null) {
@@ -106,6 +106,8 @@ private fun DrawScope.drawIcon(icon: Icon, color: Color) {
         drawLine(color, Offset(x1 * s, y1 * s), Offset(x2 * s, y2 * s), strokeWidth = st.width, cap = StrokeCap.Round)
     when (icon) {
         Icon.Plus -> { line(.5f, .2f, .5f, .8f); line(.2f, .5f, .8f, .5f) }
+        // A script's action: a lightning bolt.
+        Icon.Bolt -> { line(.58f, .14f, .32f, .54f); line(.32f, .54f, .62f, .48f); line(.62f, .48f, .4f, .86f) }
         Icon.Chevron -> { line(.3f, .4f, .5f, .6f); line(.5f, .6f, .7f, .4f) }
         Icon.Back -> { line(.6f, .25f, .35f, .5f); line(.35f, .5f, .6f, .75f) }
         Icon.Check -> { line(.22f, .52f, .42f, .72f); line(.42f, .72f, .8f, .3f) }

@@ -70,6 +70,14 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ### Changed
 
+- Hive.app takes its shortcuts from the server's keymap, with sequences and
+  modes, and lists scripts' actions in the command palette. Both apps show
+  scripts' badges in pane headers and their notifications, with buttons
+  that run the script's action, and show what they missed while closed.
+- hive for Android previews what an agent did on the tab sheet's cards, not
+  its input box and status bar, and draws symbols such as ⏵ and ⏸ that its
+  font lacks. Scripts' actions are in the switcher.
+
 - `session.new_split`, `session.move_block` and split layouts refuse a
   `ratio` outside 0 to 1 with `bad_request`. It used to become 0.5 without a
   word, so a percentage such as 30 split the pane in half. Leaving `ratio` out

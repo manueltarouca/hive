@@ -48,7 +48,7 @@ class Server:
     def __init__(self):
         self.dir = tempfile.mkdtemp(prefix="hive-e2e.")
         self.env = dict(os.environ, HIVE_SERVER=f"{self.dir}/s.sock", HIVE_STATE_DIR=f"{self.dir}/state",
-                        HIVE_CONFIG=f"{self.dir}/config", HIVE_SESSION="", HIVE_BLOCK="")
+                        HIVE_CONFIG=f"{self.dir}/config", HIVE_SCRIPTS=f"{self.dir}/scripts", HIVE_SESSION="", HIVE_BLOCK="")
 
     def hive(self, *args):
         return sh(HIVE, *args, env=self.env)
@@ -609,6 +609,100 @@ def step_notify(srv):
     stay_connected(False)
 
 
+def step_scripts(srv):
+    """Scripts' badges on the pane header, and a script's notification whose button runs its action."""
+    open_switcher()
+    tap("agent", exact=True)
+    block = srv.view("agent")["windows"][0]["layout"]["block_id"]
+    for b in ({"id": "tests", "state": "error", "msg": "2 failing"}, {"id": "ci", "state": "working", "msg": "CI", "progress": 40},
+              {"id": "branch", "state": "idle", "msg": "attach-resize-sequencing-with-a-long-name"}):
+        srv.call("status.set", dict(b, target=block))
+    wait("2 failing")
+    wait("CI 40%")
+    wait("+1")
+    shot("badges")
+    srv.call("status.clear", {"target": block})
+    wait("2 failing", gone=True)
+    # A real script: an action, and a notification offering it.
+    code = os.path.join(srv.dir, "ping.ts")
+    with open(code, "w") as f:
+        f.write(f"""
+let runs = 0;
+h.actions.register({{ name: "ping", title: "Ping", run: async () => {{
+  runs++;
+  await h.status.set({{ target: "{block}", id: "ping", state: "done", msg: "pinged " + runs }});
+}} }});
+await h.notify.send({{ title: "Tests failed in api", body: "2 failures", target: "{block}", level: "error",
+  actions: [{{ title: "Ping", action: "ping", step: "Puts a badge on the pane" }}] }});
+""")
+    run = subprocess.Popen([HIVE, "script", "run", "--allow", "ui", "--for", "90s", code], env=srv.env,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        adb("shell", "input", "keyevent", "KEYCODE_HOME")
+        until("the script's notification", lambda: "Tests failed in api" in adb("shell", "dumpsys", "notification", "--noredact"))
+        adb("shell", "cmd", "statusbar", "expand-notifications")
+        wait("Tests failed in api")
+        if find(dump(), "Ping", exact=True) is None:  # collapsed: its Expand control shows the button
+            root = dump()
+            card = bounds(find(root, "Tests failed in api"))
+            exp = [n for n in root.iter("node") if (n.get("content-desc") or "") == "Expand" and abs(bounds(n)[1] - card[1]) < 150]
+            if exp:
+                a, b, c, d = bounds(exp[0])
+                adb("shell", "input", "tap", str((a + c) // 2), str((b + d) // 2))
+        wait("Ping", exact=True)
+        shot("script-notification")
+        tap("Ping", exact=True)
+        until("the action ran", lambda: any(x["id"] == "ping" for x in srv.call("status.list", {"target": block})["badges"]))
+        adb("shell", "cmd", "statusbar", "collapse")
+        launch()
+        wait("pinged 1")
+        shot("action-badge")
+        # The same action from the switcher, under its host.
+        open_switcher()
+        wait("Action Ping")
+        shot("switcher-action")
+        tap("Action Ping")
+        wait("pinged 2")
+    finally:
+        run.terminate()
+        run.wait(timeout=10)
+        adb("shell", "cmd", "statusbar", "collapse")
+
+
+def step_previews(srv):
+    """The tab sheet previews what agents did, not their input box and status bar; their glyphs draw."""
+    srv.hive("new", "look", "--cwd", "/tmp", "--", "python3", os.path.join(HERE, "fake-claude-screen.py"), "bypass")
+    sid = srv.sessions()["look"]["session_id"]
+    for kind in ("manual", "picker"):
+        w = srv.call("session.new_window", {"session_id": sid, "layout": {"cwd": "/tmp", "command": ["python3", os.path.join(HERE, "fake-claude-screen.py"), kind]}})
+        srv.call("session.set_window_label", {"session_id": sid, "window_id": w["window_id"], "label": kind})
+    time.sleep(1)
+    for w, state in zip(srv.view("look")["windows"], ("working", "done", "blocked")):
+        srv.call("agent.report", {"block_id": w["layout"]["block_id"], "harness": "claude", "state": state, "message": "Which database?" if state == "blocked" else ""})
+    for i in range(4):  # quiet tabs: enough that the strip folds into a count
+        srv.call("session.new_window", {"session_id": sid, "layout": {"cwd": "/tmp"}})
+    open_switcher()
+    tap("look", exact=True)
+    wait("Switch session")
+    tap("All 7 tabs", timeout=10)
+    wait("Filter tabs")
+    wait("Updated docs/scripts.md")
+    wait("Looking at the screenshot")
+    wait("Postgres")
+    root = dump()
+    for chrome in ("bypass permissions", "manual mode on", "Enter to select"):
+        # Only the sheet: the pane behind it still shows its own status bar.
+        sheet_top = bounds(find(root, "Filter tabs"))[1]
+        for n in root.iter("node"):
+            if chrome in (n.get("text") or "") and bounds(n)[1] > sheet_top:
+                raise AssertionError(f"a card previews {chrome!r}")
+    shot("previews")
+    tap("Updated docs/scripts.md")  # its card opens it: the pane draws its own status bar, ⏵⏵ included
+    wait("Filter tabs", gone=True)
+    time.sleep(1.5)
+    shot("claude-pane")
+
+
 def background_luma():
     from PIL import Image  # only for this check
     import io
@@ -828,7 +922,7 @@ def step_away(srv):
     shot("back")
 
 
-STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_notify, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
+STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_notify, step_scripts, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
 
 
 def main():

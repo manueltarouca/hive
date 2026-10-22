@@ -16,3 +16,8 @@ class AnswerReceiver : BroadcastReceiver() {
         ConnectionService.answer(ctx, Intent(intent).putExtra(Notifier.REPLY, text))
     }
 }
+
+/** A button on a script's notification: the connection service runs its action. */
+class ActionReceiver : BroadcastReceiver() {
+    override fun onReceive(ctx: Context, intent: Intent) = ConnectionService.runAction(ctx, intent)
+}

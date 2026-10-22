@@ -40,5 +40,6 @@
                 android:value="Keeps the user's own terminal servers connected so their coding agents can notify when blocked or done" />
         </service>
         <receiver android:name=".notify.AnswerReceiver" android:exported="false" />
+        <receiver android:name=".notify.ActionReceiver" android:exported="false" />
     </application>
 </manifest>

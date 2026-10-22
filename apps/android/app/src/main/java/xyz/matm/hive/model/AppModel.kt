@@ -72,6 +72,14 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         private set
     var blocks by mutableStateOf<Map<String, BlockInfo>>(emptyMap())
         private set
+    /** Badges scripts put on the current host's panes. */
+    var paneBadges by mutableStateOf(BadgeBook())
+        private set
+    private val badgeBooks = mutableMapOf<String, BadgeBook>()
+    /** Each host's scripts' actions (name to title), for the switcher. */
+    var actions by mutableStateOf<Map<String, List<Pair<String, String>>>>(emptyMap())
+        private set
+    private val notesShown = mutableMapOf<String, MutableSet<String>>()
     /** The tab and pane on screen: the phone's own choice, not the session's focus (the Mac keeps its own). */
     var windowIndex by mutableStateOf(0)
         private set
@@ -138,7 +146,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         val last = prefs.getString("lastSession", null)
         for (h in hosts) if (h.host.always || h.id == lastHost) h.start()
         val h = hosts.firstOrNull { it.id == lastHost }
-        if (h != null && last != null) { current = h; currentSession = last }
+        if (h != null && last != null) { current = h; currentSession = last; paneBadges = badgeBooks[h.id] ?: BadgeBook() }
     }
 
     // MARK: hosts
@@ -243,6 +251,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
             windowIndex = 0; paneIndex = 0
         }
         current = h
+        paneBadges = badgeBooks[h.id] ?: BadgeBook()
         currentSession = session
         prefs.edit().putString("lastSession", session).putString("lastSessionHost", h.id).apply()
         h.start()
@@ -343,7 +352,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         h.call("session.close_window", JSONObject().put("session_id", sid).put("window_id", w.id)) { scheduleReload() }
     }
 
-    /** The tab sheet's cards: each tab's last two lines, by window. */
+    /** The tab sheet's cards: each tab's last two lines that say something (Previews), by window. */
     var previews by mutableStateOf<Map<String, List<String>>>(emptyMap())
         private set
 
@@ -352,10 +361,12 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         val h = current ?: return
         for (w in windows) {
             val b = w.focused ?: w.blocks.firstOrNull() ?: continue
-            h.call("hive.terminal.format", JSONObject().put("block_id", b).put("args", JSONObject().put("trim", true).put("tail", 2))) { r ->
-                val lines = r.getOrNull()?.optString("content")?.split('\n')?.filter { it.isNotBlank() }
-                    ?: h.agents.firstOrNull { it.blockID == b }?.message?.takeIf { it.isNotBlank() }?.let { listOf(it) }
-                    ?: return@call
+            // Enough lines to see past an agent's input box and status bar.
+            h.call("hive.terminal.format", JSONObject().put("block_id", b).put("args", JSONObject().put("trim", true).put("tail", 16))) { r ->
+                val message = h.agents.firstOrNull { it.blockID == b }?.message
+                val tail = r.getOrNull()?.optString("content")?.split('\n') ?: emptyList()
+                val lines = xyz.matm.hive.agents.Previews.pick(tail, message)
+                if (lines.isEmpty()) return@call
                 previews = previews + (w.id to lines)
             }
         }
@@ -758,6 +769,9 @@ class AppModel(private val context: Context) : HostConnection.Listener {
     override fun connected(h: HostConnection) {
         remember(h)
         reloadSessions(h)
+        reloadBadges(h)
+        replayNotes(h)
+        reloadActions(h)
         if (current === h && currentSession != null) reloadView(focusServer = stream == null && windows.isEmpty())
     }
 
@@ -787,11 +801,105 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                 if (type == "block_event") {
                     val name = inner.optJSONObject("payload")?.optString("name")
                     if (name == "agent_changed") reloadAgents(h)
+                    if (name == "status_changed") {
+                        val badge = inner.optJSONObject("payload")?.optJSONObject("payload")?.optJSONObject("badge")
+                        if (badge != null) setBadges(h, (badgeBooks[h.id] ?: BadgeBook()).apply(badge))
+                    }
                     if (name == "program_status_changed") { scheduleAgentReload(h); if (sid == currentSession) scheduleReload() }
                     if (name in setOf("title_changed", "size_changed", "process_changed", "child_exited", "pwd_changed") && sid == currentSession) scheduleReload()
                 } else if (sid == currentSession) scheduleReload()
                 if (type == "block_closed" || type == "block_created" || type == "session_view_changed") reloadSessions(h)
             }
+            "notification" -> ev.optJSONObject("payload")?.optJSONObject("notification")?.let { showScriptNote(h, ScriptNote.of(it)) }
+            "keymap_changed" -> reloadActions(h)
+            "notification_acked" -> ev.optJSONObject("payload")?.optString("notification_id")?.let { Notifier.cancelScript(context, h.id, it) }
+        }
+    }
+
+    // MARK: scripts' badges and notifications
+
+    fun reloadActions(h: HostConnection) {
+        h.call("action.list") { r ->
+            val arr = r.getOrNull()?.optJSONArray("actions") ?: return@call
+            val list = (0 until arr.length()).map { arr.getJSONObject(it) }
+                .filter { !it.optString("name").startsWith("rule:") }
+                .map { it.optString("name") to it.optString("title").ifEmpty { it.optString("name") } }
+            actions = actions + (h.id to list)
+        }
+    }
+
+    /** Runs a script's action from the switcher: in the pane on screen when it's that host's. */
+    fun runAction(h: HostConnection, name: String) {
+        val p = JSONObject().put("name", name).put("origin", "palette")
+        if (current === h) {
+            currentSession?.let { p.put("session_id", it) }
+            windows.getOrNull(windowIndex)?.let { w -> w.blocks.getOrNull(paneIndex)?.let { p.put("block_id", it) } }
+        }
+        h.call("action.run", p)
+    }
+
+    private fun setBadges(h: HostConnection, b: BadgeBook) {
+        badgeBooks[h.id] = b
+        if (current === h) paneBadges = b
+    }
+
+    private fun reloadBadges(h: HostConnection) {
+        h.call("status.list") { r -> r.getOrNull()?.let { setBadges(h, BadgeBook().load(it)) } }
+    }
+
+    private fun showScriptNote(h: HostConnection, n: ScriptNote) {
+        val shown = notesShown.getOrPut(h.id) { mutableSetOf() }
+        if (n.id.isEmpty() || notify == "never" || !shown.add(n.id)) return
+        if (n.time.isNotEmpty()) prefs.edit().putString("notesSeen." + h.id, n.time).apply()
+        val session = n.session?.let { id -> h.sessions.firstOrNull { it.id == id }?.label }
+        Notifier.postScript(context, h, n, session)
+    }
+
+    /** What a host's scripts said while the phone was away: the newest few, and a line for the rest. */
+    private fun replayNotes(h: HostConnection) {
+        val seen = prefs.getString("notesSeen." + h.id, null)
+        val params = JSONObject().apply { if (seen != null) put("since", seen) }
+        h.call("notification.list", params) { r ->
+            val list = r.getOrNull() ?: return@call
+            val replay = NoteReplay.of(list, seen, notesShown[h.id] ?: emptySet())
+            for (n in replay.show) showScriptNote(h, n)
+            if (replay.more > 0) Notifier.postMore(context, h, replay.more)
+            replay.latest?.let { prefs.edit().putString("notesSeen." + h.id, it).apply() }
+        }
+    }
+
+    /** A script notification's button: run its action on [hostID], connecting first if needed. */
+    fun runActionRemotely(hostID: String, noteID: String, name: String, args: String, blockID: String?, finished: (String?) -> Unit) {
+        var over = false
+        main.removeCallbacks(letGo)
+        val h = hosts.firstOrNull { it.id == hostID }
+        val wasIdle = h?.link == Link.Idle
+        val done = { err: String? ->
+            if (!over) {
+                over = true
+                if (!foreground) { main.postDelayed(letGo, LET_GO_MS); hosts.forEach { it.background = true } }
+                if (wasIdle && h != null) main.postDelayed({ if (h.link != Link.Idle && current !== h) disconnect(h) }, 1500)
+                finished(err)
+            }
+        }
+        main.postDelayed({ done("Its host can't be reached.") }, 10_500)
+        h ?: return done("That host isn't saved anymore.")
+        fun go() {
+            val params = JSONObject().put("name", name).put("args", runCatching { JSONObject(args) }.getOrDefault(JSONObject()))
+                .put("origin", "notification").put("notification_id", noteID)
+            if (blockID != null) params.put("block_id", blockID)
+            h.call("action.run", params) { r ->
+                val e = r.exceptionOrNull()
+                // Seen once it ran, or once there's nothing left to answer; otherwise it stays, for another try.
+                if (e == null || (e as? xyz.matm.hive.net.HiveError)?.code == "conflict") h.call("notification.ack", JSONObject().put("notification_id", noteID))
+                done(e?.let { it.message?.ifEmpty { null } ?: "It didn't run." })
+            }
+        }
+        if (h.connected) go() else {
+            h.background = false
+            h.start()
+            h.retryNow()
+            whenConnected(h, tries = 25) { go() }
         }
     }
 

@@ -45,6 +45,19 @@ class ConnectionService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
+            RUN_ACTION -> {
+                if (n > 0) started = true
+                val host = intent.getStringExtra(Notifier.EXTRA_HOST)
+                val note = intent.getStringExtra(Notifier.EXTRA_NOTE)
+                val action = intent.getStringExtra(Notifier.EXTRA_ACTION)
+                val nid = intent.getIntExtra(Notifier.EXTRA_ID, 0)
+                if (host != null && note != null && action != null) {
+                    model.runActionRemotely(host, note, action, intent.getStringExtra(Notifier.EXTRA_ARGS) ?: "{}", intent.getStringExtra(Notifier.EXTRA_BLOCK)) { err ->
+                        Notifier.actionDone(this, nid, err)
+                        if (!started) { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
+                    }
+                }
+            }
             ANSWER -> {
                 // Started for an answer with hosts kept: it stays, and a later stop must reach it.
                 if (n > 0) started = true
@@ -69,6 +82,7 @@ class ConnectionService : Service() {
     companion object {
         private const val STOP = "xyz.matm.hive.STOP"
         private const val ANSWER = "xyz.matm.hive.ANSWER"
+        private const val RUN_ACTION = "xyz.matm.hive.RUN_ACTION"
         private const val DISCONNECT = "xyz.matm.hive.DISCONNECT"
         @Volatile private var started = false
 
@@ -79,6 +93,13 @@ class ConnectionService : Service() {
         /** An answer from a notification (allowed to start the service: the user just touched it). */
         fun answer(ctx: Context, from: Intent) {
             val i = Intent(ctx, ConnectionService::class.java).setAction(ANSWER)
+            from.extras?.let(i::putExtras)
+            runCatching { ctx.startForegroundService(i) }
+        }
+
+        /** A script notification's button (allowed to start the service: the user just touched it). */
+        fun runAction(ctx: Context, from: Intent) {
+            val i = Intent(ctx, ConnectionService::class.java).setAction(RUN_ACTION)
             from.extras?.let(i::putExtras)
             runCatching { ctx.startForegroundService(i) }
         }
