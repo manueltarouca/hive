@@ -471,7 +471,7 @@ struct PaneHeader: View {
                 + Text(parts.secondary.isEmpty ? "" : "  " + parts.secondary).foregroundColor(s.secondary.swiftUI).fontWeight(.regular))
                 .font(.system(size: 12.5, weight: .semibold))
                 .lineLimit(1).truncationMode(.middle)
-            if let st = info?.agentState, st == "working" || st == "blocked" || st == "done" {
+            if let st = info?.agentState, st == "working" || st == "blocked" || st == "stopped" || st == "done" {
                 StatusBadge(state: st, style: s)
             }
             // Scripts' badges: the first two, those that need you first.
@@ -480,6 +480,11 @@ struct PaneHeader: View {
             if badges.count > 2 {
                 Text("+\(badges.count - 2)").font(.system(size: 10, weight: .medium)).foregroundStyle(s.secondary.swiftUI)
                     .help(badges.dropFirst(2).map(\.text).joined(separator: "\n"))
+            }
+            if let chip = model.actedChips[blockID] {
+                ActedChipView(chip: chip, style: s)
+                    .onTapGesture { model.showScripts?(model.current, chip.script) }
+                    .transition(.opacity)
             }
             if model.copiedBlock == blockID {
                 Text("Copied").font(.system(size: 10, weight: .medium))
@@ -538,13 +543,14 @@ struct StatusBadge: View {
     @State private var pulse = false
     var body: some View {
         switch state {
-        case "blocked":
+        case "blocked", "stopped":
             HStack(spacing: 4) {
                 Image(systemName: "hexagon.fill").font(.system(size: 8)).foregroundStyle(style.blocked.swiftUI)
-                Text("Blocked").font(.system(size: 10, weight: .semibold)).foregroundStyle(style.blocked.swiftUI)
+                Text(state == "stopped" ? "Stopped" : "Blocked").font(.system(size: 10, weight: .semibold)).foregroundStyle(style.blocked.swiftUI)
             }
             .padding(.horizontal, 6).padding(.vertical, 1)
             .background(Capsule().fill(style.blocked.swiftUI.opacity(0.14)))
+            .fixedSize() // in a narrow pane the title gives way, never the label
         case "blocked-dot":
             Image(systemName: "hexagon.fill").font(.system(size: 8)).foregroundStyle(style.blocked.swiftUI)
         case "done":
@@ -555,6 +561,37 @@ struct StatusBadge: View {
                 .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
                 .onAppear { pulse = true }
         }
+    }
+}
+
+/// What a script just did here: a bolt and a few words, for a few seconds.
+/// Clicking it opens the script in the Scripts window.
+struct ActedChipView: View {
+    let chip: ActedChip
+    var style: Style = .dark
+    /// Where it fades: wider in the title bar, which also says where.
+    var maxWidth: CGFloat = ScriptBadgeView.maxText + 40
+
+    var body: some View {
+        let color = chip.refused ? style.blocked.swiftUI : style.accent.swiftUI
+        let width = (chip.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium)]).width
+        let label = Text(chip.text).font(.system(size: 10, weight: .medium)).foregroundStyle(color).fixedSize()
+        HStack(spacing: 3) {
+            Image(systemName: "bolt.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(color)
+            if width > maxWidth {
+                label.frame(width: maxWidth, alignment: .leading).clipped().mask(FadeMask())
+            } else {
+                label
+            }
+        }
+        .fixedSize()
+        .lineLimit(1)
+        .padding(.horizontal, 6).padding(.vertical, 1)
+        .background(Capsule().fill(color.opacity(0.14)))
+        .help("\(chip.text). Click to see the script.")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(chip.text)
+        .accessibilityAddTraits(.isButton)
     }
 }
 

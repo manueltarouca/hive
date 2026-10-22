@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     let palette = PalettePanel()
     let shortcuts = ShortcutsPanel()
     let settingsWindow = SettingsWindow()
+    let scriptsWindow = ScriptsWindow()
     let shareHostsWindow = ShareHostsWindow()
     #if DEBUG
     var debugSignal: DispatchSourceSignal?
@@ -166,6 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         // them, and a monitor in front of the menus resolves them, with
         // sequences and modes. Until the keymap arrives, the menu's own keys.
         model.clientAction = { [weak self] action, args in self?.runClientAction(action, args) }
+        model.showScripts = { [weak self] h, name in self?.showScripts(h, name) }
         model.$keys.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.buildMenu() } }.store(in: &bag)
         // Another keyboard layout: the menu shows the keys it can type.
         DistributedNotificationCenter.default().publisher(for: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String))
@@ -203,6 +205,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 if what == "hostlist:remove" { self?.showHostList(.remove) }
                 if what == "shortcuts" { self?.toggleShortcuts() }
                 if what == "settings" { self?.showSettings() }
+                if what == "scripts" { self?.showScripts() }
+                if what.hasPrefix("scripts:") { self?.showScripts(nil, String(what.dropFirst("scripts:".count))) }
                 if what == "sharehosts" { self?.showShareHosts() }
                 if what == "menubar" { self?.menuBar.open() }
                 #if DEBUG
@@ -415,6 +419,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     func toggleShortcuts() { shortcuts.toggle(over: window, style: model.style) }
 
     func showSettings() { settingsWindow.show(model: model) }
+    func showScripts(_ h: HostConnection? = nil, _ script: String? = nil) { scriptsWindow.show(model: model, host: h, script: script) }
     func showShareHosts() { shareHostsWindow.show(model: model) }
 
     func applyFont() {
@@ -464,6 +469,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 DispatchQueue.main.async { self?.showSettings() }
             },
             PaletteItem(title: "Open Config File", symbol: "doc.text") { m.settingsStore.openInEditor() },
+            PaletteItem(title: "Scripts…", detail: k("Scripts…"), symbol: "bolt") { [weak self] in
+                DispatchQueue.main.async { self?.showScripts() }
+            },
             PaletteItem(title: "New Tab", detail: k("New Tab"), symbol: "plus.square") { m.newTab() },
             PaletteItem(title: m.sidebar ? "Hide Agents Sidebar" : "Show Agents Sidebar", detail: k("Toggle Agents Sidebar"), symbol: "sidebar.left") { m.sidebar.toggle() },
             PaletteItem(title: "New Session", detail: k("New Session"), symbol: "plus.rectangle.on.rectangle") { m.newSession() },
@@ -629,6 +637,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let m = model
         switch action {
         case "client.settings": showSettings()
+        case "client.scripts": showScripts()
         case "client.palette": showPalette(query: args["query"].string ?? "")
         case "client.new_session": m.newSession()
         case "client.session_picker": showSessionPicker()
@@ -696,6 +705,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             NSMenuItem(title: "About Hive", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""),
             .separator(),
             bound("Settings…", "client.settings", .null, ",") { [weak self] in self?.showSettings() },
+            item("Scripts…", "") { [weak self] in self?.showScripts() },
             item("Add Remote Host…", "") { [weak self] in self?.showAddHost() },
             item("Share Hosts with Phone…", "") { [weak self] in self?.showShareHosts() },
             .separator(),

@@ -22,6 +22,11 @@ struct TitleBar: View {
             }
             SessionChip(model: model, action: openPicker)
             AttentionBadge(model: model)
+            if let e = model.actedElsewhere {
+                ActedChipView(chip: ActedChip(copying: e.chip, text: "\(e.chip.text) in \(e.place)"), style: s, maxWidth: 360)
+                    .onTapGesture { model.showScripts?(model.host(id: e.host) ?? model.current, e.chip.script) }
+                    .transition(.opacity)
+            }
             // With the sidebar open, the tabs live there.
             if !model.sidebar { Tabs(model: model) }
             Spacer(minLength: 4)
@@ -172,7 +177,7 @@ struct TabPill: View {
                     .mask(FadeMask())
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if let status { StatusBadge(state: status == "blocked" ? "blocked-dot" : status, style: s) }
+            if let status { StatusBadge(state: status == "blocked" || status == "stopped" ? "blocked-dot" : status, style: s) }
         }
         .padding(.leading, 6).padding(.trailing, 10)
         .frame(minWidth: TabPill.minWidth, maxWidth: 210, minHeight: 28, maxHeight: 28, alignment: .leading)

@@ -105,7 +105,7 @@ struct TabRow: View {
         let active = window.id == model.active?.id
         let info = window.focused.flatMap { model.blocks[$0] }
         let sum = model.summary(of: window)
-        let blocked = sum.state == "blocked"
+        let blocked = sum.state == "blocked" || sum.state == "stopped"
         HStack(alignment: sum.detail == nil ? .center : .top, spacing: 10) {
             AppTile(program: model.program(of: window), behind: model.otherPrograms(of: window), style: s,
                     badge: blocked ? "blocked" : nil)
@@ -119,7 +119,7 @@ struct TabRow: View {
                         .foregroundStyle(s.text.swiftUI.opacity(active ? 1 : 0.86)).lineLimit(1)
                     Spacer(minLength: 4)
                     if blocked {
-                        StatusBadge(state: "blocked", style: s)
+                        StatusBadge(state: sum.state ?? "blocked", style: s)
                     } else if let st = sum.state {
                         StatusBadge(state: st, style: s)
                     }

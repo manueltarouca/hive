@@ -1,6 +1,6 @@
 /// One agent as a tab row needs it.
 public struct AgentSnapshot: Equatable, Sendable {
-    public var state: String   // idle, working, blocked, done, ended
+    public var state: String   // idle, working, blocked, stopped, done, ended
     public var task: String
     public var message: String
     public init(state: String, task: String, message: String = "") {
@@ -16,7 +16,7 @@ public struct AgentSnapshot: Equatable, Sendable {
 public struct TabSummary: Equatable, Sendable {
     public var title: String
     public var detail: String?
-    /// working, blocked or done; nil when there's nothing to report.
+    /// working, blocked, stopped or done; nil when there's nothing to report.
     public var state: String?
     public var isAgent: Bool
 
@@ -24,7 +24,7 @@ public struct TabSummary: Equatable, Sendable {
         self.title = title; self.detail = detail; self.state = state; self.isAgent = isAgent
     }
 
-    static let urgency = ["blocked": 3, "done": 2, "working": 1]
+    static let urgency = ["blocked": 3, "stopped": 3, "done": 2, "working": 1]
 
     /// `doneSeen`: the user has looked at the tab since its agent finished.
     public static func make(label: String, program: String, dir: String, agents: [AgentSnapshot], doneSeen: Bool = false) -> TabSummary {
@@ -36,7 +36,7 @@ public struct TabSummary: Equatable, Sendable {
         if state == "done", doneSeen { state = nil }
         let title = label.isEmpty ? agent.task : label
         let detail: String?
-        if state == "blocked" {
+        if state == "blocked" || state == "stopped" {
             // Why it waits; else which task, when the label hides it.
             detail = !agent.message.isEmpty ? agent.message : title != agent.task ? "\(agent.task) needs you" : "Needs you"
         } else {
@@ -65,7 +65,7 @@ public struct Attention: Equatable, Sendable {
     static func count(_ agents: [AgentPlace]) -> Attention {
         var a = Attention()
         for x in agents {
-            if x.state == "blocked" { a.blocked += 1 }
+            if x.state == "blocked" || x.state == "stopped" { a.blocked += 1 }
             if x.state == "done", !x.doneSeen { a.done += 1 }
         }
         return a

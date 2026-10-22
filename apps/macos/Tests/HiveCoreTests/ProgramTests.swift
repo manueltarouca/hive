@@ -147,7 +147,7 @@ import Testing
         #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "idle") == "idle")
         #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "blocked") == "blocked")
         // error: failed and stopped, such as Claude Code at the usage limit.
-        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "error") == "done")
+        #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "error") == "stopped")
         #expect(AgentStatus.state(harness: "grok", app: "grok", status: "working") == "working")
         #expect(AgentStatus.state(harness: "claude", app: "cargo", status: "working") == nil)
         #expect(AgentStatus.state(harness: "claude", app: "claude-code", status: "clear") == nil)
@@ -159,5 +159,13 @@ import Testing
         #expect(AgentStatus.effective(hook: "working", harness: "claude", records: records) == "idle")
         #expect(AgentStatus.effective(hook: "blocked", harness: "claude", records: []) == "blocked")
         #expect(AgentStatus.effective(hook: "ended", harness: "claude", records: records) == "ended")
+        // At its usage limit: done with kind error, or its own error report.
+        #expect(AgentStatus.effective(hook: "done", kind: "error", harness: "claude", records: []) == "stopped")
+        #expect(AgentStatus.effective(hook: "done", kind: "", harness: "claude", records: []) == "done")
+        #expect(AgentStatus.effective(hook: "done", harness: "claude", records: [(app: "claude-code", status: "error")]) == "stopped")
+        #expect(AgentStatus.effective(hook: "done", kind: "error", harness: "claude", records: [(app: "claude-code", status: "working")]) == "working")
+        #expect(TabSummary.make(label: "oracle", program: "Claude Code", dir: "",
+                                agents: [AgentSnapshot(state: "stopped", task: "t", message: "You've hit your session limit")]).detail == "You've hit your session limit")
+        #expect(Attention.of([AgentPlace(session: "s", state: "stopped", doneSeen: false)], session: "s").blocked == 1)
     }
 }

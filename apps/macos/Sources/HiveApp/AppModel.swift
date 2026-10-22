@@ -213,6 +213,28 @@ final class AppModel: ObservableObject {
     @Published var blocks: [String: BlockInfo] = [:]
     /// Badges scripts put on the current host's panes.
     @Published var paneBadges = BadgeBook()
+    /// What a script just did on a pane: shown for a few seconds.
+    @Published var actedChips: [String: ActedChip] = [:]
+    /// Moves on when scripts change or act, for the Scripts window.
+    @Published var scriptsRevision = 0
+    /// A script acted where you aren't looking (another session or host):
+    /// the title bar says so for a few seconds.
+    @Published var actedElsewhere: ActedElsewhere?
+    struct ActedElsewhere: Equatable {
+        var chip: ActedChip
+        var place: String
+        var host: String
+    }
+    private var scriptsBump: DispatchWorkItem?
+    /// Tells the Scripts window to look again, at most every 0.3 s.
+    func scriptsChanged() {
+        scriptsBump?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.scriptsRevision &+= 1 }
+        scriptsBump = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: w)
+    }
+    /// Opens the Scripts window (on a script, by name).
+    var showScripts: ((HostConnection, String?) -> Void)?
     /// The keys, from this Mac's server: the app's defaults, scripts' and
     /// the settings file's. Other hosts' keys never apply here.
     @Published var keys = KeyResolver()
@@ -340,6 +362,7 @@ final class AppModel: ObservableObject {
             self.reloadSessions(h, create: h.isLocal)
             if h === self.current { self.reloadView() }
             self.reloadBadges(h)
+            self.scriptsChanged() // the Scripts window looks again after a reconnect
             self.replayNotes(h)
             self.reloadKeys(h)
             self.reloadActions(h)
@@ -357,6 +380,11 @@ final class AppModel: ObservableObject {
         h.onPerform = { [weak self] h, action, args in
             // Only this Mac's server may drive the app.
             guard h.isLocal, action.hasPrefix("client.") else { return }
+            if action == "client.reveal" {
+                self?.reveal(block: args["block_id"].string, session: args["session_id"].string, on: h)
+                if !NSApp.isActive { NSApp.activate(ignoringOtherApps: true) }
+                return
+            }
             self?.clientAction?(action, args)
         }
         h.onResync = { [weak self] h in
@@ -427,7 +455,7 @@ final class AppModel: ObservableObject {
         if statusRefused != current.refused { statusRefused = current.refused }
         let all = hosts.flatMap(\.sessions)
         if all != sessions { sessions = all }
-        let order = ["blocked": 0, "done": 1, "working": 2, "idle": 3]
+        let order = ["blocked": 0, "stopped": 0, "done": 1, "working": 2, "idle": 3]
         let list = hosts.flatMap(\.agents).sorted { (order[$0.state] ?? 9) < (order[$1.state] ?? 9) }
         if list != agents { agents = list }
     }
@@ -486,7 +514,7 @@ final class AppModel: ObservableObject {
                 // runs no hook), and a pane back at its shell has no agent.
                 // Servers from 0.1 do both themselves; this covers older ones.
                 let records = a["program_status"].array.map { (app: $0["app"].string ?? "", status: $0["state"].string ?? "") }
-                let state = AgentStatus.effective(hook: a["agent"]["state"].string, harness: harness, records: records) ?? ""
+                let state = AgentStatus.effective(hook: a["agent"]["state"].string, kind: a["agent"]["kind"].string, harness: harness, records: records) ?? ""
                 if Programs.atShell(a["foreground"]["program"].string ?? a["foreground"]["name"].string) { return nil }
                 return AgentInfo(blockID: a["block_id"].string ?? "", sessionID: a["session_id"].string ?? "", host: h.id,
                           sessionLabel: a["session_label"].string ?? "", harness: harness,
@@ -527,9 +555,9 @@ final class AppModel: ObservableObject {
         case "always": break
         default: guard !inFront else { return } // background
         }
-        for a in list where (a.state == "blocked" || a.state == "done") && h.lastAgentStates[a.blockID] != a.state {
+        for a in list where (a.state == "blocked" || a.state == "done" || a.state == "stopped") && h.lastAgentStates[a.blockID] != a.state {
             let c = UNMutableNotificationContent()
-            c.title = "\(Programs.lookup(a.harness).name) \(a.state == "blocked" ? "needs you" : "is done")"
+            c.title = "\(Programs.lookup(a.harness).name) \(a.state == "blocked" ? "needs you" : a.state == "stopped" ? "stopped" : "is done")"
             // Where it is goes in the subtitle (a remote host's agents name
             // the host), what it said in the body.
             let session = a.sessionLabel.isEmpty ? "a session" : a.sessionLabel
@@ -560,6 +588,7 @@ final class AppModel: ObservableObject {
     /// Panes, input and calls go to another host from now on.
     func switchHost(to h: HostConnection) {
         guard h !== current else { return }
+        actedChips.removeAll()
         let old = current.engine
         for b in attached { vt.async { old.detach(block: b) } }
         attached.removeAll()
@@ -597,7 +626,7 @@ final class AppModel: ObservableObject {
                 // notice that themselves).
                 let gone = b["agent"]["state"].string == "ended" || Programs.atShell(foreground)
                 let records = b["program_status"].array.map { (app: $0["app"].string ?? "", status: $0["state"].string ?? "") }
-                let ownState = AgentStatus.effective(hook: b["agent"]["state"].string, harness: b["agent"]["harness"].string, records: records)
+                let ownState = AgentStatus.effective(hook: b["agent"]["state"].string, kind: b["agent"]["kind"].string, harness: b["agent"]["harness"].string, records: records)
                 let agentState = gone && b["agent"]["state"].string != nil ? "ended" : ownState
                 info[bid] = BlockInfo(title: b["title"].string ?? "", label: b["label"].string ?? "",
                                       cols: b["cols"].int ?? 0, rows: b["rows"].int ?? 0, sizeOwner: b["size_owner"].string,
@@ -713,6 +742,35 @@ final class AppModel: ObservableObject {
             if type == "block_closed" || type == "block_created" { reloadSessions(h) }
         case "notification":
             showScriptNote(ScriptNote(ev["payload"]["notification"]), from: h)
+        case "script_acted":
+            scriptsChanged()
+            guard let chip = ActedChip(ev["payload"]), let b = ev["payload"]["block_id"].string else { break }
+            // On screen: a pane of the tab you're looking at.
+            let shown = Set(active?.layout?.rects().map(\.0) ?? [])
+            if h === current, blocks[b] != nil {
+                actedChips[b] = chip // kept for the pane, also when you switch to its tab
+                DispatchQueue.main.asyncAfter(deadline: .now() + ActedChip.life) { [weak self] in
+                    if self?.actedChips[b] == chip { self?.actedChips[b] = nil }
+                }
+            }
+            if !(h === current && shown.contains(b)) {
+                // Not on screen: the title bar names where.
+                let sid = ev["payload"]["session_id"].string
+                var session = h.sessions.first { $0.id == sid }?.label ?? "another session"
+                if h === current, sid == currentSession,
+                   let w = windows.first(where: { $0.layout?.rects().contains { $0.0 == b } == true }) {
+                    let t = w.titleParts(blocks).primary
+                    session = t.isEmpty ? "another tab" : "the \(t) tab"
+                }
+                let place = h.isLocal ? session : "\(session) on \(h.displayName)"
+                let e = ActedElsewhere(chip: chip, place: place, host: h.id)
+                actedElsewhere = e
+                DispatchQueue.main.asyncAfter(deadline: .now() + ActedChip.life) { [weak self] in
+                    if self?.actedElsewhere == e { self?.actedElsewhere = nil }
+                }
+            }
+        case "script_changed":
+            scriptsChanged()
         case "keymap_changed":
             reloadKeys(h)
             reloadActions(h)
@@ -753,6 +811,8 @@ final class AppModel: ObservableObject {
             if let b = focusedBlock { p["block_id"] = .string(b) }
             if let s = currentSession { p["session_id"] = .string(s) }
         }
+        // So the action can ask this app to show something (client.reveal).
+        if let c = h.clientID { p["client_id"] = .string(c) }
         h.call("action.run", .object(p)) { r in
             guard case .failure(let e) = r else { return }
             let c = UNMutableNotificationContent()
@@ -855,6 +915,7 @@ final class AppModel: ObservableObject {
             let a = actions[i]
             var params: [String: JSON] = ["name": .string(a["action"] ?? ""), "args": (try? JSON.parse(Data((a["args"] ?? "{}").utf8))) ?? [:],
                                           "origin": "notification", "notification_id": .string(id)]
+            if let c = h.clientID { params["client_id"] = .string(c) }
             if let block { params["block_id"] = .string(block) }
             h.call("action.run", .object(params)) { r in
                 // Seen once it ran, or once there's nothing left to answer;
@@ -1040,7 +1101,7 @@ final class AppModel: ObservableObject {
     /// then finished and not yet seen.
     var mostUrgentElsewhere: AgentInfo? {
         let others = agents.filter { $0.sessionID != currentSession }
-        return others.first { $0.state == "blocked" } ?? others.first { $0.state == "done" && !doneSeen($0) }
+        return others.first { $0.state == "blocked" || $0.state == "stopped" } ?? others.first { $0.state == "done" && !doneSeen($0) }
     }
 
     /// Agents in other sessions that need the user.
@@ -1125,6 +1186,21 @@ final class AppModel: ObservableObject {
     }
 
     func renameSession(_ label: String) { call("session.set_label", ["session_id": sid, "label": .string(label)]) }
+
+    /// client.reveal: bring a pane (or a session) to the front, on the
+    /// host that asked.
+    func reveal(block: String?, session: String?, on h: HostConnection) {
+        if let block, let a = agents.first(where: { $0.blockID == block && $0.host == h.id }) {
+            jump(to: a)
+            return
+        }
+        guard let session else { return }
+        if h !== current { switchHost(to: h) }
+        if currentSession != session { select(session: session) }
+        if let block {
+            call("session.focus_block", ["session_id": .string(session), "block_id": .string(block)]) { [weak self] _ in self?.reloadView() }
+        }
+    }
 
     func jump(to agent: AgentInfo) {
         // The agent's own host: a session list entry could be stale.

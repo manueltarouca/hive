@@ -44,7 +44,7 @@ public struct MenuBarStatus: Equatable, Sendable {
     public init(hosts: [Host], agents: [Agent]) {
         let reachable = Set(hosts.filter(\.connected).map(\.id))
         let live = agents.filter { reachable.contains($0.host) }
-        needsYou = live.filter { $0.state == "blocked" } + live.filter { $0.state == "done" && !$0.doneSeen }
+        needsYou = live.filter { $0.state == "blocked" || $0.state == "stopped" } + live.filter { $0.state == "done" && !$0.doneSeen }
         working = live.filter { $0.state == "working" }
         quiet = live.filter { $0.state == "idle" }.count
 

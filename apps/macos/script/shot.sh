@@ -76,6 +76,25 @@ TS
   $H script reload >/dev/null; $H script grant scratch >/dev/null
 fi
 
+# SCRIPTS=1 installs starter scripts in every state: running, pending (it
+# waits for a grant), in watch mode, and one with a mark on a pane. Once the
+# app is up, two scripts act on panes, so their chips show.
+if [ "${SCRIPTS:-0}" = 1 ]; then
+  for s in needs-you digest team dev-panes limit-resume; do $H script add "$s" >/dev/null; done
+  $H script reload >/dev/null
+  for s in needs-you digest team dev-panes; do $H script grant "$s" >/dev/null; done
+  $H script watch team >/dev/null
+  $H script set needs-you remind_min=5 >/dev/null
+  # An agent in api-gateway that stopped at its usage limit: Claude Code
+  # reports "error" (OSC 7501) with the reason.
+  msg=$(printf "You've hit your session limit · resets 3am (Europe/Lisbon)" | base64)
+  $H -s api-gateway split --json --cwd "$root" -- sh -c '
+    printf "{\"session_id\":\"a3\",\"cwd\":\"%s\",\"hook_event_name\":\"Stop\"}" "$2" | "$1" agent hook claude
+    printf "\033]2;✳ Port the billing job\007"
+    printf "\033]7501;state=error:app=claude-code:msg=%s\033\\" "$3"
+    printf "  ⎿  You'"'"'ve hit your session limit · resets 3am (Europe/Lisbon)\r\n"; exec cat' sh "$H" "$root" "$msg" >/dev/null
+fi
+
 # EXTRA_TABS=n adds plain tabs, to check the title bar with many tabs.
 i=1; while [ "$i" -le "${EXTRA_TABS:-0}" ]; do  # not seq: on macOS, seq 1 0 counts down
   $H -s hive-demo run --label "extra-tab-$i" --focus=false >/dev/null; i=$((i + 1))
@@ -118,6 +137,14 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
 done
 [ -n "$app" ] || { echo "Hive did not start" >&2; exit 1; }
 sleep 4
+if [ "${SCRIPTS:-0}" = 1 ]; then
+  demo=$($H api call target.resolve '{"kind":"session","target":"hive-demo"}' | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+  logs=$($H api call target.resolve '{"kind":"block","target":"logs"}' | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+  $H api call action.run "{\"name\":\"pause\",\"session_id\":\"$demo\"}" >/dev/null 2>&1 || true
+  printf "await h.terminal.write({ block_id: '%s', args: { data: 'echo ok\\\\r' } });\n" "$logs" > "$D/release-notes.ts"
+  $H script run --allow input "$D/release-notes.ts" >/dev/null 2>&1 || true
+  sleep 1.5
+fi
 W=$($tools/winid "$app")
 # Only Hive's own windows are captured (by window ID), never a screen
 # region, so nothing else on the screen can end up in a shot.

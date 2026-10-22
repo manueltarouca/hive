@@ -254,11 +254,11 @@ final class MenuBar: NSObject, NSMenuDelegate {
         let where_ = model.hostRows.first { $0.id == a.host }
         let session = a.sessionLabel.isEmpty ? "a session" : a.sessionLabel
         let place = where_.map { $0.local ? session : "\(session) on \($0.name)" } ?? session
-        let word = a.state == "blocked" ? "Blocked" : a.state == "done" ? "Done" : "Working"
+        let word = a.state == "blocked" ? "Blocked" : a.state == "stopped" ? "Stopped" : a.state == "done" ? "Done" : "Working"
         let said = a.message.isEmpty ? word : "\(word): \(a.message)"
         i.attributedTitle = twoLines(MenuBarStatus.clip(a.task, max: 44), MenuBarStatus.clip("\(place), \(said)", max: 58))
         i.setAccessibilityLabel("\(a.task), \(word), in \(place)")
-        let color: NSColor = a.state == "blocked" ? model.style.blocked : a.state == "done" ? model.style.done : model.style.accent
+        let color: NSColor = a.state == "blocked" || a.state == "stopped" ? model.style.blocked : a.state == "done" ? model.style.done : model.style.accent
         let conf = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular).applying(.init(paletteColors: [color]))
         i.image = NSImage(systemSymbolName: "hexagon.fill", accessibilityDescription: word)?.withSymbolConfiguration(conf)
         return i
