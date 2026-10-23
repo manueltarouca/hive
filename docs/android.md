@@ -40,8 +40,8 @@ Long press a host for **Stay connected**, **Disconnect** and **Forget**, or
 open **Hosts** from the switcher.
 
 Below the title are the session's tabs, each with its agents' state, then
-one pane at a time. The dots under it are the panes of a split: tap them, or
-swipe sideways. **+** opens a new tab.
+the pane. On a phone a split shows one pane at a time: the dots under it
+are its panes; tap them, or swipe sideways. **+** opens a new tab.
 
 Pinned tabs come first, here and on the Mac. With more than four tabs, the
 strip keeps the pinned ones, the ones that need you and the one you're in,
@@ -50,12 +50,25 @@ every tab: pinned, needs you, working, then the quiet ones, each with its
 last two lines. Filter them by name. Swipe a card right to pin it or unpin
 it. Long press any tab for **Pin tab**, **Rename** and **Close tab**.
 
-Tap the pane to type (or the keyboard key, in a program that takes taps as
-clicks). The key bar has what a phone keyboard lacks: **esc**,
-**ctrl** (for the next letter), **tab**, **⌃C**, **paste**, the arrows and a
-few symbols. Text with several lines asks before pasting when the program
-didn't ask for pasted text, as on the Mac. Drag to scroll. A tap clicks in
-programs that use the mouse and opens links.
+A tap on the pane never brings up the keyboard, so you can read and scroll
+without it covering half the screen. The keyboard key, at the right end of
+the key bar, shows it and hides it; so does a tap with two fingers. A
+hardware keyboard types into the pane without it.
+
+The key bar has what a touch keyboard lacks. On a phone it's two rows:
+**esc**, **⌃C**, **⇧tab**, **home**, **end**, **paste**, **tab**, **ctrl**,
+**alt**, **↵** and the arrows, with ↑ above ← ↓ →. Hold an arrow to repeat
+it. **ctrl** and **alt** apply to the next key; tap twice quickly to keep
+them on, once more to let go. **⋯** opens more keys: control keys (Claude
+Code's own among them), symbols, page up and down, and F1 to F12. While an
+agent asks something, its answers take the first keys of the bar.
+
+Text with several lines asks before pasting when the program didn't ask for
+pasted text, as on the Mac. Drag to scroll. A tap clicks in programs that
+use the mouse and opens links.
+
+Long press to select a word; drag the handles, or keep your finger down and
+drag, to select more. **Copy**, **Select all** and **Paste** show above it.
 
 ## Size
 
@@ -64,11 +77,24 @@ says who that is: "Sized by Hive.app on studio", "Sized by this phone", or
 "Nobody holds this pane's size." A pane sized by another device is zoomed to fit the phone's width,
 so it doesn't reflow there; pinch to read closer.
 
-**Fit to phone** gives the pane the phone's size (the other device shows
+A pane nobody else is using opens at the phone's size. **Fit to phone**
+gives a pane the phone's size when another device holds it (the other device shows
 the rest of the pane empty). **Back to studio** gives it back to whoever
 had it, or **Give back** when nobody did. Using the other device takes it back too: typing or clicking in the
 pane, or bringing its window to the front. A device showing the pane
 without using it never takes it.
+
+## Tablets
+
+hive for Android uses the room it has. On a tablet a split shows its panes
+side by side when each gets at least 60 columns, with the focused one in
+honey; tap a pane to focus it. Every tab shows in the strip. A tablet takes
+a pane's size when you first use it there, as the Mac does, and text starts
+a little larger (13). Settings and the other pages keep a width you can
+read. On a wide screen (1200 points or more), the switcher can stay open
+as a sessions column beside the panes: tap the session's title, or the
+sidebar button, to show it or hide it. With the keyboard up, only the panes
+and the key bar stay.
 
 ## Agents
 

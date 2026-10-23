@@ -24,6 +24,18 @@ patch, and this file lists it under "Changed" or "Removed".
   which the server runs for whoever presses them. Only people change
   modes, switches and grants. The Mac app has a Scripts window (Hive →
   Scripts…) and the phone a Scripts page, with all of this.
+- hive for Android on tablets: splits side by side when each pane gets 60
+  columns, every tab in the strip, pages at a reading width, and on wide
+  screens a sessions column beside the panes. One layout adapts to the
+  width; phones keep one pane at a time.
+- hive for Android: long press selects text, with Copy, Select all and
+  Paste. A two-row key bar on phones with all four arrows (held, they
+  repeat), **alt**, **⇧tab**, **↵**, **home** and **end**, and **⋯** for
+  control keys, symbols, page keys and F1 to F12. **ctrl** and **alt**
+  apply to the next key, or stay on with a second tap.
+- Hive.app: drag tabs to reorder them in the title bar too, with the others
+  making room where the tab will land; Escape puts it back. **Move Tab
+  Left** and **Move Tab Right** in the Window menu and the palette.
 - Starter scripts: `hive script add` lists and installs `limit-resume`,
   `needs-you`, `stall-watch`, `digest`, `lane-keeper`, `team`,
   `keep-awake` and `dev-panes`.
@@ -104,6 +116,12 @@ patch, and this file lists it under "Changed" or "Removed".
 - hive for Android previews what an agent did on the tab sheet's cards, not
   its input box and status bar, and draws symbols such as ⏵ and ⏸ that its
   font lacks. Scripts' actions are in the switcher.
+- hive for Android: a tap on the pane no longer brings up the keyboard; the
+  keyboard key and a two-finger tap do. A pane nobody else is using opens
+  fitted to the device. A hardware keyboard types without the on-screen one.
+- Day theme text reads at 4.5:1: muted is `#6F675C`, honey, coral and sage
+  words use darker text colours, and words on honey are ink. Scripts' state
+  colours follow the brand: honey running, coral waiting for your OK.
 
 - `session.new_split`, `session.move_block` and split layouts refuse a
   `ratio` outside 0 to 1 with `bad_request`. It used to become 0.5 without a

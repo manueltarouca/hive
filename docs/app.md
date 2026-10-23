@@ -101,7 +101,10 @@ Right-click a tab for **Pin Tab**: pinned tabs come first, in the title bar,
 the sidebar and on the phone, and ⌘1…⌘9 count them first. Drag a tab among
 the pinned ones to pin it, or out of them to unpin it.
 
-Drag a tab to move it. When an agent in another session needs you, the
+Drag a tab to move it, in the title bar or the sidebar: the others make
+room where it will land, and Escape puts it back. **Move Tab Left** and
+**Move Tab Right** (the Window menu, the palette, a tab's menu) do the same
+from the keyboard. When an agent in another session needs you, the
 session name in the title bar shows a count, and the session picker (⌘K)
 says which session.
 

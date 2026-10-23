@@ -56,11 +56,21 @@ Never fill a large area with it.
 | Role | Hex |
 | --- | --- |
 | Honey | `#D98A12` |
+| Honey text (honey words) | `#8A5300` |
+| Coral text (blocked words) | `#A8362E` |
+| Sage text (done words) | `#2F6E44` |
 | Paper (background) | `#F6F2EA` |
 | Card | `#FDFBF7` |
 | Ink (text) | `#231F1A` |
-| Muted | `#8C8478` |
+| Muted | `#6F675C` |
 | Line | Ink at 12% |
+
+Text on paper reads at 4.5:1 or more, on its own tints too (a badge's
+14% wash). That's why muted is darker than its first value (`#8C8478` read
+at 3.4:1), and why words in a state's colour use its text variant: honey,
+coral and sage themselves are for fills, outlines, hexagons and the cursor.
+On a honey fill, words are ink, as in Night. Night's colours read on dark as
+they are.
 
 **Hive Night** (dark): the Tomorrow Night surfaces of Ghostty and tmux, with
 a honey accent
