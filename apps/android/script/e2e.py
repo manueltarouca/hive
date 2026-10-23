@@ -727,6 +727,13 @@ def scroll_to(key, times=8, back=False):
     wait(key)
 
 
+def clear_field():
+    """Empties the focused field: to its end, then deletes. Select-all (ctrl+a) sometimes didn't take,
+    and the typed text went in beside the old value."""
+    adb("shell", "input", "keyevent", "KEYCODE_MOVE_END")
+    adb("shell", "input", "keyevent", *(["KEYCODE_DEL"] * 8))
+
+
 def tap_on_screen(key):
     scroll_to(key)
     tap(key)
@@ -764,7 +771,7 @@ def step_script_page(srv):
     srv.call("script.grant", {"name": "needs-you"})
     until("needs-you running", lambda: scripts_state(srv)["needs-you"]["state"] == "running")
     tap("Back")
-    wait("Appearance")
+    wait(f"Scripts on {LABEL}")  # where you left Settings
     scroll_to(f"Scripts on {LABEL}")
     until("the Settings row counts them", lambda: find(dump(), "1 running, 2 waiting for you") is not None, timeout=10)
     shot("settings-scripts")
@@ -789,19 +796,27 @@ def step_script_page(srv):
     until("needs-you watches", lambda: scripts_state(srv)["needs-you"]["mode"] == "watch")
     wait("Running, watch only")
     scroll_to("set to watch only by you")
+    # A long number label keeps one line, on its own: the − and + sit below it.
+    scroll_to("Remind me after this many minutes")
+    root = dump()
+    label = find(root, "Remind me after this many minutes", exact=True)
+    plus = find(root, "More, Remind me after this many minutes")
+    assert label is not None and plus is not None, "the option's label or its + is missing"
+    assert bounds(label)[3] - bounds(label)[1] < 70, f"the option's label wraps: {bounds(label)}"
+    assert bounds(label)[3] <= bounds(plus)[1], "the option's label shares a line with its + button"
     # An option: + once, then typed, then one out of range.
     tap_on_screen("More, Remind me after this many minutes")
     until("remind_min 11", lambda: option(srv, "needs-you", "remind_min") == 11)
     tap_on_screen("Remind me after this many minutes, needs-you")
     until("the keyboard", keyboard_up)
-    adb("shell", "input", "keycombination", "113", "29")  # select all
+    clear_field()
     type_text("30")
     time.sleep(0.8)
     shot("scripts-keyboard")
     adb("shell", "input", "keyevent", "KEYCODE_ENTER")  # Done
     until("remind_min 30", lambda: option(srv, "needs-you", "remind_min") == 30)
     tap_on_screen("Remind me after this many minutes, needs-you")
-    adb("shell", "input", "keycombination", "113", "29")
+    clear_field()
     type_text("999")
     adb("shell", "input", "keyevent", "KEYCODE_ENTER")
     wait("At most 240.")
@@ -833,6 +848,13 @@ def step_script_page(srv):
     time.sleep(0.6)
     shot("scripts-typist")
     tap("Back")
+    # Back in Settings where you left it, not at the top: the first section is out of view.
+    wait("Notifications")
+    root = dump()
+    top = find(root, "Appearance", exact=True)
+    assert top is None or bounds(top)[3] <= 260, "Settings scrolled back to the top"
+    n = find(root, f"Scripts on {LABEL}")
+    assert n is not None and 260 < bounds(n)[1] and bounds(n)[3] < 2250, "the Scripts row isn't in view"
     tap("Back")
     # A script acts on the pane on screen: a chip says so, and opens the scripts.
     srv.hive("new", "acts", "--cwd", "/tmp", "--", "sh")  # one pane: the one on screen
@@ -840,14 +862,22 @@ def step_script_page(srv):
     tap("acts", exact=True)
     wait("Fit to phone")
     block = srv.view("acts")["windows"][0]["layout"]["block_id"]
+    rows0 = srv.view("acts")["blocks"][block]["rows"]
+    tap("Fit to phone")
+    rows = until("the pane took the phone's size", lambda: (r := srv.view("acts")["blocks"][block]["rows"]) != rows0 and r)
     time.sleep(1)  # the shell's prompt
     srv.hive("script", "run", "--allow", "input", "-e", f'const b = await h.block("{block}"); await b.write("echo acted\\n");')
     until("the script typed", lambda: "acted" in srv.text(block))
     wait("typed")
     shot("scripts-chip")
     root = dump()
-    chip = next(n for n in root.iter("node") if "typed" in (n.get("content-desc") or n.get("text") or ""))
+    # The chip's own node (its description starts with the script), not the terminal's text.
+    chip = next(n for n in root.iter("node") if (n.get("content-desc") or "").startswith("script typed"))
     a, b, c, d = bounds(chip)
+    # In the pane's header, above the terminal's text: it covers no line, and the pane keeps its rows.
+    term = next(n for n in root.iter("node") if "echo acted" in (n.get("content-desc") or ""))
+    assert d <= bounds(term)[1], f"the chip {bounds(chip)} is over the terminal {bounds(term)}"
+    assert srv.view("acts")["blocks"][block]["rows"] == rows, "the chip resized the pane"
     adb("shell", "input", "tap", str((a + c) // 2), str((b + d) // 2))
     wait("Recent activity")
     tap("Back")

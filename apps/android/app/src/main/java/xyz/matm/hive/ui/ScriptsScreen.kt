@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -308,11 +309,11 @@ private fun NumberOption(model: AppModel, h: HostConnection, s: Resident, o: Scr
         if (v == null) local = why else save(v)
     }
     Column(Modifier.padding(top = 10.dp, end = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                BasicText(o.label, style = Type.body.copy(color = p.text))
-                o.range?.let { BasicText(it, style = Type.tiny.copy(color = p.muted), modifier = Modifier.padding(top = 2.dp)) }
-            }
+        // The label has the whole width; the range and the controls share the line below,
+        // so a long label never wraps beside the − and +.
+        BasicText(o.label, style = Type.body.copy(color = p.text))
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            BasicText(o.range ?: "", style = Type.tiny.copy(color = p.muted), modifier = Modifier.weight(1f))
             Spacer(Modifier.width(10.dp))
             // Steps from what's in the field, typed or not; the field shows the result.
             val now = o.parseNumber(text).first ?: o.parseNumber(o.shown).first ?: 0.0
@@ -406,17 +407,22 @@ private fun Activity(e: ActivityEntry, tick: Int, options: List<ScriptOption>) {
 
 /** A pane's chip: a script just acted here. Tapping it opens the script. */
 @Composable
-fun ActedChipView(text: String, refused: Boolean, onClick: () -> Unit) {
+fun ActedChipView(text: String, refused: Boolean, compact: Boolean = false, onClick: () -> Unit) {
     val p = LocalPalette.current
     val c = if (refused) p.coral else p.honey
-    Row(
-        Modifier.clip(RoundedCornerShape(50)).background(p.surface).border(1.dp, c.copy(alpha = 0.6f), RoundedCornerShape(50))
-            .clickable(role = Role.Button, onClick = onClick).semantics(mergeDescendants = true) { contentDescription = text }
-            .padding(start = 9.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LineIcon(Icon.Bolt, c, 14.dp)
-        Spacer(Modifier.width(5.dp))
-        FadeText(text, Type.tiny.copy(fontWeight = FontWeight(500)), p.text, Modifier.widthIn(max = 260.dp))
+    val tap = Modifier.clickable(role = Role.Button, onClick = onClick).semantics(mergeDescendants = true) { contentDescription = text }
+    // Compact: in a pane header, as tall as the badges beside it, tapped anywhere in the header's
+    // height; it fades in the room it has.
+    Box(if (compact) Modifier.fillMaxHeight().then(tap) else Modifier, contentAlignment = Alignment.CenterStart) {
+        Row(
+            Modifier.clip(RoundedCornerShape(50)).background(if (compact) c.copy(alpha = 0.13f) else p.surface).border(1.dp, c.copy(alpha = 0.6f), RoundedCornerShape(50))
+                .then(if (compact) Modifier else tap)
+                .padding(start = if (compact) 7.dp else 9.dp, end = if (compact) 9.dp else 12.dp, top = if (compact) 2.dp else 6.dp, bottom = if (compact) 2.dp else 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LineIcon(Icon.Bolt, c, if (compact) 12.dp else 14.dp)
+            Spacer(Modifier.width(if (compact) 4.dp else 5.dp))
+            FadeText(text, Type.tiny.copy(fontWeight = FontWeight(500)), p.text, if (compact) Modifier else Modifier.widthIn(max = 260.dp))
+        }
     }
 }

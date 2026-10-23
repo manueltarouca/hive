@@ -44,7 +44,11 @@ import java.util.Locale
 
 /** Settings, as the Mac's where they apply to a phone: appearance, the terminal, agents, about. Hosts have their own screen. */
 @Composable
-fun Settings(model: AppModel, close: () -> Unit, scripts: (xyz.matm.hive.model.HostConnection) -> Unit = {}) {
+fun Settings(
+    model: AppModel, close: () -> Unit, scripts: (xyz.matm.hive.model.HostConnection) -> Unit = {},
+    // Kept by the caller, so coming back from Scripts lands where you left.
+    scroll: androidx.compose.foundation.ScrollState = rememberScrollState(),
+) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
     androidx.compose.runtime.DisposableEffect(Unit) {
@@ -60,7 +64,7 @@ fun Settings(model: AppModel, close: () -> Unit, scripts: (xyz.matm.hive.model.H
             Spacer(Modifier.width(6.dp))
             BasicText("Settings", style = Type.title.copy(color = p.text))
         }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = 16.dp)) {
             Section("Appearance") {
                 Item("Theme") {
                     Choice(listOf("system" to "System", "night" to "Night", "day" to "Day"), model.themeChoice, model::chooseTheme)

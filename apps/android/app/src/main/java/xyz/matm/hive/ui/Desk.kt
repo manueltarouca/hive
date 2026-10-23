@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -125,18 +126,33 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit, 
         ) {
             Column(Modifier.fillMaxSize()) {
                 if (block != null) {
-                    Row(Modifier.fillMaxWidth().background(p.surface).padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // A fixed height: a badge or a chip showing never resizes the terminal. It follows
+                    // the text size setting (34 dp at the default), so large text isn't clipped.
+                    val headerHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+                        maxOf(Type.tiny.lineHeight.toDp() + 18.dp, Type.small.lineHeight.toDp() + 14.dp)
+                    }
+                    Row(Modifier.fillMaxWidth().background(p.surface).height(headerHeight).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         // The Mac's pane header: the program's mark, the title and where, the state.
                         val (title, where) = block.titleParts
                         ProgramGlyph(block.program, p.text.copy(alpha = 0.9f), 14.dp)
                         Spacer(Modifier.width(8.dp))
-                        // The title takes the room and fades; the folder stays short beside it.
-                        FadeText(title, Type.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(500)), p.text, Modifier.weight(1f, fill = false))
-                        if (where.isNotEmpty()) { Spacer(Modifier.width(8.dp)); FadeText(where, Type.small, p.muted, Modifier.widthIn(max = 110.dp)) }
-                        Spacer(Modifier.weight(0.001f))
+                        // A script just acted (here, or in another session or host): the chip takes
+                        // the title's place for a few seconds, so it covers none of the terminal.
+                        val chip = model.chipFor(block.id) ?: model.chipElsewhere()?.let { it.copy(text = "${it.text} in ${it.place}") }
+                        androidx.compose.animation.Crossfade(chip, Modifier.weight(1f).fillMaxHeight(), animationSpec = tween(220, easing = Quiet), label = "acted") { c ->
+                            Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                                if (c != null) ActedChipView(c.text, c.refused, compact = true) { model.hosts.firstOrNull { it.id == c.host }?.let { openScript(it, c.script) } }
+                                else {
+                                    // The title takes the room and fades; the folder stays short beside it.
+                                    FadeText(title, Type.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(500)), p.text, Modifier.weight(1f, fill = false))
+                                    if (where.isNotEmpty()) { Spacer(Modifier.width(8.dp)); FadeText(where, Type.small, p.muted, Modifier.widthIn(max = 110.dp)) }
+                                }
+                            }
+                        }
                         if (block.agentState in setOf("working", "blocked", "done", "stopped")) { Spacer(Modifier.width(8.dp)); StateBadge(block.agentState!!) }
-                        // Scripts' badges: the first two, those that need you first.
-                        val badges = model.paneBadges.badges(block.id)
+                        // Scripts' badges: the first two, those that need you first. They step aside
+                        // while a chip shows, so its few words have the room.
+                        val badges = if (chip != null) emptyList() else model.paneBadges.badges(block.id)
                         for (b in badges.take(2)) { Spacer(Modifier.width(6.dp)); ScriptBadgeChip(b) }
                         if (badges.size > 2) { Spacer(Modifier.width(6.dp)); BasicText("+${badges.size - 2}", style = Type.tiny.copy(color = LocalPalette.current.muted)) }
                     }
@@ -159,20 +175,19 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit, 
                     },
                 )
             }
-            // A script just acted on this pane: who and what, for a few seconds; tap for the script.
-            // Or elsewhere (another session or host): where, so it's never unseen.
-            val chip = block?.let { model.chipFor(it.id) }
-                ?: model.chipElsewhere()?.let { it.copy(text = "${it.text} in ${it.place}") }
+            if (model.currentSession == null) EmptyDesk(model, openSwitcher)
+            // Away: the Mac's card, over the pane, while its host can't be reached.
+            Box(Modifier.align(Alignment.Center)) { Away(h, show = h != null && model.currentSession != null && h.link != Link.Connected, connect = { h?.let(model::connect) }) }
+            // No pane header to show it in: a script acted elsewhere, so the chip floats here, over
+            // the empty desk.
+            val chip = if (block == null) model.chipElsewhere()?.let { it.copy(text = "${it.text} in ${it.place}") } else null
             var lastChip by remember { mutableStateOf(chip) }
             if (chip != null) lastChip = chip
-            Box(Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 12.dp, end = 12.dp)) {
+            Box(Modifier.align(Alignment.TopCenter).padding(top = 12.dp, start = 12.dp, end = 12.dp)) {
                 androidx.compose.animation.AnimatedVisibility(visible = chip != null, enter = fadeIn(tween(180, easing = Quiet)), exit = fadeOut(tween(300, easing = Quiet))) {
                     lastChip?.let { c -> ActedChipView(c.text, c.refused) { model.hosts.firstOrNull { it.id == c.host }?.let { openScript(it, c.script) } } }
                 }
             }
-            if (model.currentSession == null) EmptyDesk(model, openSwitcher)
-            // Away: the Mac's card, over the pane, while its host can't be reached.
-            Box(Modifier.align(Alignment.Center)) { Away(h, show = h != null && model.currentSession != null && h.link != Link.Connected, connect = { h?.let(model::connect) }) }
         }
 
         // The dots: the panes of a split; swipe sideways between them.

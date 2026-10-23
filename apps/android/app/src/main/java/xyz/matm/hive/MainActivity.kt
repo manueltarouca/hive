@@ -52,17 +52,19 @@ class MainActivity : ComponentActivity() {
                         isAppearanceLightNavigationBars = !night
                     }
                 }
+                // Settings' place survives a visit to Scripts; opened afresh, it starts at the top.
+                var settingsScroll by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(androidx.compose.foundation.ScrollState(0)) }
                 when (val s = screen) {
                     Screen.Desk -> Desk(model, openSwitcher = { screen = if (model.hosts.isEmpty()) Screen.AddHost else Screen.Switcher }, openLink = ::open,
                         openScript = { h, name -> screen = Screen.Scripts(h.id, name, Screen.Desk) })
                     Screen.Switcher -> {
                         BackHandler { screen = Screen.Desk }
-                        Switcher(model, close = { screen = Screen.Desk }, addHost = { screen = Screen.AddHost }, settings = { screen = Screen.Settings },
+                        Switcher(model, close = { screen = Screen.Desk }, addHost = { screen = Screen.AddHost }, settings = { settingsScroll = androidx.compose.foundation.ScrollState(0); screen = Screen.Settings },
                             hosts = { screen = Screen.Hosts })
                     }
                     Screen.Settings -> {
                         BackHandler { screen = Screen.Switcher }
-                        xyz.matm.hive.ui.Settings(model, close = { screen = Screen.Switcher }, scripts = { h -> screen = Screen.Scripts(h.id, null, Screen.Settings) })
+                        xyz.matm.hive.ui.Settings(model, close = { screen = Screen.Switcher }, scripts = { h -> screen = Screen.Scripts(h.id, null, Screen.Settings) }, scroll = settingsScroll)
                     }
                     is Screen.Scripts -> {
                         BackHandler { screen = s.back }
