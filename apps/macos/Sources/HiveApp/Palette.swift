@@ -205,7 +205,8 @@ struct PaletteView: View {
                 .onChange(of: selected) { _, v in proxy.scrollTo(v) }
             }
         }
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(style.card.swiftUI))
+        // A step above the panes it floats over, so it reads as on top (white on paper, a lighter night).
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill((style.dark ? Style.hex(0x30343C) : Style.hex(0xFFFFFF)).swiftUI))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(style.border.swiftUI, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .background(GeometryReader { g in Color.clear.preference(key: CardHeight.self, value: g.size.height) })
@@ -264,11 +265,11 @@ struct PaletteView: View {
         return HStack(spacing: 8) {
             Group {
                 if leadingCheck {
-                    Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(style.accent.swiftUI)
+                    Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(style.accentText.swiftUI)
                         .accessibilityLabel("Current")
                 } else if let sym = item.symbol {
                     Image(systemName: sym)
-                        .foregroundStyle(item.warning ? style.blocked.swiftUI : selected ? style.accent.swiftUI : style.secondary.swiftUI)
+                        .foregroundStyle(item.warning ? style.blockedText.swiftUI : selected ? style.accentText.swiftUI : style.secondary.swiftUI)
                         .accessibilityHidden(true)
                 } else {
                     Color.clear
@@ -278,7 +279,7 @@ struct PaletteView: View {
             Text(item.title).font(.system(size: 13))
                 .foregroundStyle(item.warning || item.inert ? style.secondary.swiftUI : style.text.swiftUI).lineLimit(1)
             Spacer(minLength: 8)
-            if item.checked, !leadingCheck { Image(systemName: "checkmark").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(style.accent.swiftUI) }
+            if item.checked, !leadingCheck { Image(systemName: "checkmark").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(style.accentText.swiftUI) }
             Text(item.detail).font(.system(size: 11.5)).foregroundStyle(style.secondary.swiftUI)
             if item.chevron { Image(systemName: "chevron.right").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(style.secondary.swiftUI) }
         }

@@ -179,7 +179,7 @@ struct ScriptsView: View {
             }
             .listStyle(.sidebar)
             if let p = page.problem {
-                Label(p, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(s.blocked.swiftUI)
+                Label(p, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(s.blockedText.swiftUI)
                     .padding(10)
             }
         }
@@ -211,24 +211,24 @@ struct ScriptRow: View {
     let script: ScriptInfo
     let style: Style
 
+    /// The brand's states: honey is at work, coral needs you (an OK to give, or it failed), quiet is
+    /// watching or off. Sage is an agent's "done", which a script never is.
     static func color(_ sc: ScriptInfo, _ s: Style) -> Color {
         switch sc.state {
-        case "running": return sc.watching ? s.secondary.swiftUI : s.done.swiftUI
-        case "pending": return s.accent.swiftUI
-        case "failed", "quarantined": return s.blocked.swiftUI
+        case "running": return sc.watching ? s.secondary.swiftUI : s.accent.swiftUI
+        case "pending", "failed", "quarantined": return s.blocked.swiftUI
         default: return s.secondary.swiftUI.opacity(0.6)
         }
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: script.watching && script.state == "running" ? "eye" : "hexagon.fill")
-                .font(.system(size: script.watching && script.state == "running" ? 9 : 8))
+            Image(systemName: "hexagon.fill").font(.system(size: 8))
                 .foregroundStyle(Self.color(script, style))
                 .frame(width: 12).padding(.top, 4)
             VStack(alignment: .leading, spacing: 1) {
                 Text(script.name).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
-                Text(script.stateText).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                Text(script.stateText).font(.system(size: 11)).foregroundStyle(style.secondary.swiftUI).lineLimit(1)
             }
         }
         .padding(.vertical, 2)
@@ -267,7 +267,7 @@ struct ScriptDetail: View {
                 }
             }
             Text(script.stateText).font(.callout)
-                .foregroundStyle(script.needsYou && script.state != "pending" ? style.blocked.swiftUI : Color.secondary)
+                .foregroundStyle(script.needsYou && script.state != "pending" ? style.blockedText.swiftUI : style.secondary.swiftUI)
             if !script.description.isEmpty {
                 Text(script.description).font(.body).fixedSize(horizontal: false, vertical: true)
             }
@@ -279,10 +279,12 @@ struct ScriptDetail: View {
             Text("It asks to:").fixedSize(horizontal: false, vertical: true)
             permissionList
             if let w = script.warning {
-                Label(w, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(style.blocked.swiftUI)
+                Label(w, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(style.blockedText.swiftUI)
             }
             HStack {
+                // The decision this page is for: the one honey button.
                 Button("Allow") { page.allow(script) }.keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent).tint(style.accent.swiftUI)
                 Text("You can turn it off, or let it only watch, at any time.").font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -329,7 +331,7 @@ struct ScriptDetail: View {
 
     private var switches: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Switches").font(.headline)
+            Text("Options").font(.headline)
             ForEach(script.options) { o in
                 OptionRow(option: o, problem: page.optionProblem[o.key]) { page.set(script, o, $0) }
             }
@@ -349,7 +351,7 @@ struct ScriptDetail: View {
                         .frame(width: 64, alignment: .leading)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(e.text(options: script.options)).font(.callout).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                        if let p = e.problem { Text(p).font(.caption).foregroundStyle(style.blocked.swiftUI) }
+                        if let p = e.problem { Text(p).font(.caption).foregroundStyle(style.blockedText.swiftUI) }
                     }
                 }
             }

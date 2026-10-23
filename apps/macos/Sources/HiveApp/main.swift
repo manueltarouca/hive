@@ -93,7 +93,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                                                   openPalette: { [weak self] in self?.showPalette() }))
         // It sits in the title bar on purpose: no safe-area inset.
         bar.safeAreaRegions = []
+        bar.tabs = "bar-tabs"
         let sidebar = TitleBarHost(rootView: AgentSidebar(model: model))
+        sidebar.tabs = "sidebar-tabs"
         sidebar.safeAreaRegions = []
         root.sidebarWidth = { [weak self] in (self?.model.sidebar ?? false) ? AgentSidebar.width : 0 }
         root.addSubview(panes)
@@ -237,6 +239,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                         if let e = NSEvent.mouseEvent(with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                                       windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
                             w.sendEvent(e)
+                        }
+                    }
+                }
+                if what.hasPrefix("reorder:"), let self {
+                    // The drag's own steps, without a mouse (SwiftUI takes the mouse only in the key window,
+                    // and the screenshot loop never takes focus): HIVE_OPEN=reorder:bar-tabs:0:2.6 moves the
+                    // first shown tab 2.6 tabs along over a second, holds it 4 s (the preview), then lets go.
+                    let a = what.split(separator: ":")
+                    if a.count == 4, let r = Reorder.live[String(a[1])], let i = Int(a[2]), let by = Double(a[3]) {
+                        let order = self.model.shownWindows.map(\.window.id)
+                        if order.indices.contains(i), let f = r.frames[order[i]] {
+                            let id = order[i], dist = by * (f.length + r.spacing)
+                            r.begin(id, order: order)
+                            for k in 1...30 { DispatchQueue.main.asyncAfter(deadline: .now() + Double(k) * 0.035) { r.move(by: dist * Double(k) / 30) } }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 5.05) {
+                                r.finish { moved, to in self.model.moveShown(moved, to: to) }
+                                r.gestureEnded()
+                                NSLog("hive reorder: released")
+                            }
+                        }
+                    }
+                }
+                if what == "drag", let w = self?.window, let spec = ProcessInfo.processInfo.environment["HIVE_DRAG"] {
+                    // A drag by hand, for the tab reorder: HIVE_DRAG="x1,y1,x2,y2" in window points from the
+                    // top left. Pressed, moved over a second, held there 4 s (the preview, for a capture), let go.
+                    let v = spec.split(separator: ",").compactMap { Double($0) }
+                    if v.count == 4, let content = w.contentView {
+                        let h = content.bounds.height
+                        func at(_ x: Double, _ y: Double) -> NSPoint { content.convert(NSPoint(x: x, y: h - y), to: nil) }
+                        func send(_ t: NSEvent.EventType, _ p: NSPoint) {
+                            if let e = NSEvent.mouseEvent(with: t, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                          windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) { w.sendEvent(e) }
+                        }
+                        send(.leftMouseDown, at(v[0], v[1]))
+                        let steps = 30
+                        for i in 1...steps {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.035) {
+                                let f = Double(i) / Double(steps)
+                                send(.leftMouseDragged, at(v[0] + (v[2] - v[0]) * f, v[1] + (v[3] - v[1]) * f))
+                            }
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + Double(steps) * 0.035 + 4) {
+                            send(.leftMouseUp, at(v[2], v[3]))
+                            NSLog("hive drag: released")
                         }
                     }
                 }
@@ -485,6 +531,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             PaletteItem(title: "Close Tab", detail: k("Close Tab"), symbol: "xmark.square") { m.closeTab() },
             PaletteItem(title: "Next Tab", detail: k("Next Tab"), symbol: "arrow.right") { m.selectWindow(offset: 1) },
             PaletteItem(title: "Previous Tab", detail: k("Previous Tab"), symbol: "arrow.left") { m.selectWindow(offset: -1) },
+            PaletteItem(title: "Move Tab Left", detail: "", symbol: "arrow.left.to.line") { if let w = m.active { m.moveTab(w.id, by: -1) } },
+            PaletteItem(title: "Move Tab Right", detail: "", symbol: "arrow.right.to.line") { if let w = m.active { m.moveTab(w.id, by: 1) } },
             PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
             PaletteItem(title: "Add Remote Host…", symbol: "globe") { [weak self] in DispatchQueue.main.async { self?.showAddHost() } },
@@ -745,6 +793,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         var windowItems: [NSMenuItem] = [
             bound("Next Tab", "client.next_tab", .null, "]", [.command, .shift]) { m.selectWindow(offset: 1) },
             bound("Previous Tab", "client.previous_tab", .null, "[", [.command, .shift]) { m.selectWindow(offset: -1) },
+            .separator(),
+            // Reordering without dragging (the keyboard, VoiceOver): one place along the order shown.
+            item("Move Tab Left", "") { if let w = m.active { m.moveTab(w.id, by: -1) } },
+            item("Move Tab Right", "") { if let w = m.active { m.moveTab(w.id, by: 1) } },
             .separator(),
         ]
         for i in 1...9 {

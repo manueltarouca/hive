@@ -48,7 +48,7 @@ public enum ShortcutGuide {
         ShortcutRow(title: "Select a word / a line", keys: "Double / triple click"),
         ShortcutRow(title: "Select in hive, in programs that use the mouse", keys: "⇧ Drag"),
         ShortcutRow(title: "Scroll hive's history, in programs that use the mouse", keys: "⇧ Scroll"),
-        ShortcutRow(title: "Move a tab", keys: "Drag it in the sidebar"),
+        ShortcutRow(title: "Move a tab", keys: "Drag it, or Move Tab Left and Right"),
     ]
 }
 

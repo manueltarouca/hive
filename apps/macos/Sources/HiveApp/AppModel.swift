@@ -1109,6 +1109,27 @@ final class AppModel: ObservableObject {
 
     func attention(session: String) -> Attention { Attention.of(places, session: session) }
 
+    /// Moves a tab to a place in the shown order (pins first), as a drag in the tab bar or the
+    /// sidebar lands it: among the pins it's pinned, among the rest unpinned. Shown here at once,
+    /// pin and place together, so it doesn't jump when the server's view comes back.
+    func moveShown(_ id: String, to shownIndex: Int) {
+        guard let from = windows.firstIndex(where: { $0.id == id }) else { return }
+        let d = TabOrder.drop(from, to: shownIndex, pinned: windows.map(\.pinned))
+        let w = windows[from]
+        if w.pinned != d.pinned {
+            windows[from].pinned = d.pinned
+            pinTab(w, d.pinned)
+        }
+        moveWindow(id, to: d.sessionIndex)
+    }
+
+    /// Move Tab Left or Right (the menu, the tab's context menu, VoiceOver): one place in the shown order.
+    func moveTab(_ id: String, by step: Int) {
+        let shown = shownWindows.map(\.window.id)
+        guard let i = shown.firstIndex(of: id), shown.indices.contains(i + step) else { return }
+        moveShown(id, to: i + step)
+    }
+
     /// Moves a tab to a new position.
     func moveWindow(_ id: String, to index: Int) {
         // Show it at once; the server's view follows.

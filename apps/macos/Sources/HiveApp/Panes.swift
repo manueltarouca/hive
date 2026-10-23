@@ -465,9 +465,10 @@ struct PaneHeader: View {
         let parts: (primary: String, secondary: String) = info?.titleParts ?? ("shell", "")
         let s = model.style
         HStack(spacing: 7) {
-            ProgramGlyph(program: info?.programInfo ?? Programs.lookup(""), color: s.text.swiftUI.opacity(0.9), size: 13)
+            // Unfocused: the mark and title step back; status and badges don't, as they're what you watch.
+            ProgramGlyph(program: info?.programInfo ?? Programs.lookup(""), color: s.text.swiftUI.opacity(focused ? 0.9 : 0.55), size: 13)
                 .accessibilityHidden(true)  // the title beside it names the pane
-            (Text(parts.primary).foregroundColor(s.text.swiftUI)
+            (Text(parts.primary).foregroundColor(focused ? s.text.swiftUI : s.secondary.swiftUI)
                 + Text(parts.secondary.isEmpty ? "" : "  " + parts.secondary).foregroundColor(s.secondary.swiftUI).fontWeight(.regular))
                 .font(.system(size: 12.5, weight: .semibold))
                 .lineLimit(1).truncationMode(.middle)
@@ -490,7 +491,7 @@ struct PaneHeader: View {
                 Text("Copied").font(.system(size: 10, weight: .medium))
                     .padding(.horizontal, 6).padding(.vertical, 1)
                     .background(Capsule().fill(s.accent.swiftUI.opacity(0.16)))
-                    .foregroundStyle(s.accent.swiftUI)
+                    .foregroundStyle(s.accentText.swiftUI)
                     .transition(.opacity)
             }
             if info?.exited == true {
@@ -511,7 +512,6 @@ struct PaneHeader: View {
                 .foregroundStyle(s.secondary.swiftUI)
             }
         }
-        .opacity(focused ? 1 : 0.62)
         .padding(.horizontal, 12)
         .frame(height: 30)
         .contentShape(Rectangle())
@@ -546,7 +546,7 @@ struct StatusBadge: View {
         case "blocked", "stopped":
             HStack(spacing: 4) {
                 Image(systemName: "hexagon.fill").font(.system(size: 8)).foregroundStyle(style.blocked.swiftUI)
-                Text(state == "stopped" ? "Stopped" : "Blocked").font(.system(size: 10, weight: .semibold)).foregroundStyle(style.blocked.swiftUI)
+                Text(state == "stopped" ? "Stopped" : "Blocked").font(.system(size: 10, weight: .semibold)).foregroundStyle(style.blockedText.swiftUI)
             }
             .padding(.horizontal, 6).padding(.vertical, 1)
             .background(Capsule().fill(style.blocked.swiftUI.opacity(0.14)))
@@ -574,8 +574,9 @@ struct ActedChipView: View {
 
     var body: some View {
         let color = chip.refused ? style.blocked.swiftUI : style.accent.swiftUI
+        let ink = chip.refused ? style.blockedText.swiftUI : style.accentText.swiftUI
         let width = (chip.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium)]).width
-        let label = Text(chip.text).font(.system(size: 10, weight: .medium)).foregroundStyle(color).fixedSize()
+        let label = Text(chip.text).font(.system(size: 10, weight: .medium)).foregroundStyle(ink).fixedSize()
         HStack(spacing: 3) {
             Image(systemName: "bolt.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(color)
             if width > maxWidth {
@@ -610,11 +611,21 @@ struct ScriptBadgeView: View {
         }
     }
 
+    /// Its words: the state's text colour, which reads on the badge's tint in Day too.
+    var ink: Color {
+        switch badge.state {
+        case "error", "blocked": return style.blockedText.swiftUI
+        case "done": return style.doneText.swiftUI
+        case "working": return style.accentText.swiftUI
+        default: return style.secondary.swiftUI
+        }
+    }
+
     static let maxText: CGFloat = 150
 
     var body: some View {
         let string = badge.progress.map { "\(badge.text) \($0)%" } ?? badge.text
-        let label = Text(string).font(.system(size: 10, weight: .medium)).foregroundStyle(color).fixedSize()
+        let label = Text(string).font(.system(size: 10, weight: .medium)).foregroundStyle(ink).fixedSize()
         // Short, it hugs its text; long, it stops at 150 points and fades.
         let width = (string as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium)]).width
         HStack(spacing: 4) {

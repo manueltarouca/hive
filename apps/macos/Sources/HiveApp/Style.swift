@@ -15,6 +15,11 @@ struct Style: Equatable {
     var accent: NSColor
     var blocked: NSColor, done: NSColor
     var sidebar: NSColor
+    /// Honey and coral as words: Night's read on dark as they are; Day's are darker, to read at 4.5:1
+    /// on paper and on their own tints (BRAND.md). The plain ones stay for fills, marks and the cursor.
+    var accentText: NSColor { dark ? accent : Style.hex(0x8A5300) }
+    var blockedText: NSColor { dark ? blocked : Style.hex(0xA8362E) }
+    var doneText: NSColor { dark ? done : Style.hex(0x2F6E44) }
     /// Claude Code's own coral, for its icon tiles.
     var claude: NSColor { Style.hex(0xD97857) }
     var terminal: Theme
@@ -38,7 +43,7 @@ struct Style: Equatable {
         dark: false,
         windowTop: hex(0xF4EFE6), windowBottom: hex(0xEDE6D9),
         card: hex(0xFDFBF7), cardUnfocused: hex(0xF6F2EA),
-        text: hex(0x231F1A), secondary: hex(0x8C8478), border: hex(0xE4DCCD), tabActive: hex(0xFFFFFF),
+        text: hex(0x231F1A), secondary: hex(0x6F675C), border: hex(0xE4DCCD), tabActive: hex(0xFFFFFF),
         accent: hex(0xD98A12), blocked: hex(0xD24E45), done: hex(0x4E9A64), sidebar: hex(0xEFE8DC),
         terminal: Theme(
             foreground: RGB(0x23, 0x1F, 0x1A), background: RGB(0xFD, 0xFB, 0xF7), cursor: RGB(0xD9, 0x8A, 0x12),

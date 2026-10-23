@@ -104,7 +104,7 @@ struct ShortcutsView: View {
             HStack(spacing: 10) {
                 Text("Keyboard Shortcuts").font(.system(size: 14, weight: .semibold)).foregroundStyle(s.text.swiftUI)
                     .accessibilityAddTraits(.isHeader)
-                Text("esc to close").font(.system(size: 11)).foregroundStyle(s.secondary.swiftUI.opacity(0.8))
+                Text("esc to close").font(.system(size: 11)).foregroundStyle(s.secondary.swiftUI)
                 Spacer()
                 ZStack(alignment: .leading) {
                     if query.isEmpty { Text("Filter").foregroundStyle(s.secondary.swiftUI) }

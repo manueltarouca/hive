@@ -23,7 +23,7 @@ struct TitleBar: View {
             SessionChip(model: model, action: openPicker)
             AttentionBadge(model: model)
             if let e = model.actedElsewhere {
-                ActedChipView(chip: ActedChip(copying: e.chip, text: "\(e.chip.text) in \(e.place)"), style: s, maxWidth: 360)
+                ActedChipView(chip: ActedChip(copying: e.chip, text: "\(e.chip.text) in \(e.place)"), style: s, maxWidth: 240)
                     .onTapGesture { model.showScripts?(model.host(id: e.host) ?? model.current, e.chip.script) }
                     .transition(.opacity)
             }
@@ -103,7 +103,7 @@ struct SessionChip: View {
                     // why in its place (the full reason on hover).
                     // Too long, it fades at the edge (never "…").
                     let line = Text(model.trouble ? model.status : model.host).font(.system(size: 10))
-                        .foregroundStyle(!model.trouble ? s.secondary.swiftUI : model.statusRefused ? s.blocked.swiftUI : s.accent.swiftUI)
+                        .foregroundStyle(!model.trouble ? s.secondary.swiftUI : model.statusRefused ? s.blockedText.swiftUI : s.accentText.swiftUI)
                     ViewThatFits(in: .horizontal) {
                         line.fixedSize()
                         line.fixedSize().frame(maxWidth: 220, alignment: .leading).clipped().mask(FadeMask())
@@ -128,18 +128,26 @@ struct SessionChip: View {
 
 struct Tabs: View {
     @ObservedObject var model: AppModel
+    @StateObject private var reorder = Reorder(horizontal: true, spacing: 4)
 
     var body: some View {
         // Pills share the room between the chip and the buttons: they shrink
         // (their titles fade) rather than push the chip or the buttons out.
         HStack(spacing: 4) {
-            // Pinned tabs first, as on the phone.
+            // Pinned tabs first, as on the phone. Drag one to reorder: the others make room where it will land.
             ForEach(model.shownWindows, id: \.window.id) { t in
-                TabPill(model: model, window: t.window, index: t.index, active: t.window.id == model.active?.id)
+                TabPill(model: model, window: t.window, index: t.index, active: t.window.id == model.active?.id, dragged: reorder.dragging == t.window.id)
+                    .reorderable(t.window.id, in: reorder, order: { model.shownWindows.map(\.window.id) }, space: "bar-tabs") { id, to in
+                        model.moveShown(id, to: to)
+                    }
             }
         }
+        .reorderSpace(reorder, name: "bar-tabs", order: model.shownWindows.map(\.window.id))
         .frame(minWidth: 0, alignment: .leading)
+        // Room above and below inside the clip, so a lifted tab's shadow and scale aren't cut off.
+        .padding(.vertical, 6)
         .clipped()
+        .padding(.vertical, -6)
     }
 }
 
@@ -150,6 +158,7 @@ struct TabPill: View {
     let window: WindowInfo
     let index: Int
     let active: Bool
+    var dragged = false
     @State private var hover = false
 
     var body: some View {
@@ -183,19 +192,24 @@ struct TabPill: View {
         .frame(minWidth: TabPill.minWidth, maxWidth: 210, minHeight: 28, maxHeight: 28, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(active ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear))
+                .fill(active || dragged ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear))
                 .shadow(color: .black.opacity(active && !s.dark ? 0.06 : 0), radius: 1, y: 0.5)
         )
         .overlay(
+            // Dragged: outlined in honey, so it reads as the one moving.
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(active ? s.border.swiftUI : .clear, lineWidth: 1)
+                .strokeBorder(dragged ? s.accent.swiftUI.opacity(0.8) : active ? s.border.swiftUI : .clear, lineWidth: dragged ? 1.5 : 1)
         )
         .contentShape(Rectangle())
         .onTapGesture { model.selectWindow(index: index) }
         .onHover { hover = $0 }
         .contextMenu {
             Button(window.pinned ? "Unpin Tab" : "Pin Tab") { model.pinTab(window, !window.pinned) }
+            Button("Move Tab Left") { model.moveTab(window.id, by: -1) }
+            Button("Move Tab Right") { model.moveTab(window.id, by: 1) }
         }
+        .accessibilityAction(named: "Move Tab Left") { model.moveTab(window.id, by: -1) }
+        .accessibilityAction(named: "Move Tab Right") { model.moveTab(window.id, by: 1) }
         .help("Tab \(index + 1) (⌘\(index + 1))")
     }
 }
@@ -231,7 +245,20 @@ struct BarButton: View {
 /// A hosting view in the title bar that still lets the window be dragged
 /// from its empty parts.
 final class TitleBarHost<V: View>: NSHostingView<V> {
-    override var mouseDownCanMoveWindow: Bool { true }
+    /// The reorderable tabs in it (a Reorder space name): a press on a tab drags the tab, not the window.
+    var tabs: String?
+
+    /// Whether the press being handled is on one of the tabs.
+    private func onTab(_ e: NSEvent?) -> Bool {
+        guard let tabs, let e, e.window === window else { return false }
+        let p = convert(e.locationInWindow, from: nil)
+        let q = CGPoint(x: p.x, y: isFlipped ? p.y : bounds.height - p.y)
+        return (Reorder.tabRects[tabs] ?? []).contains { $0.contains(q) }
+    }
+
+    override var mouseDownCanMoveWindow: Bool { !onTab(NSApp.currentEvent) }
+    // A tab takes the first click in a window that isn't in front, as browsers' tabs do: pick or drag it at once.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { onTab(event) || super.acceptsFirstMouse(for: event) }
     // Hidden (the sidebar, closed), it must not take clicks from the panes
     // under it: NSHostingView answers hit tests even then.
     override func hitTest(_ point: NSPoint) -> NSView? { isHidden ? nil : super.hitTest(point) }

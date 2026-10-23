@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 struct AgentSidebar: View {
     @ObservedObject var model: AppModel
     static let width: CGFloat = 248
-    @State private var dragging: String?
+    @StateObject private var reorder = Reorder(horizontal: false, spacing: 2)
 
     var body: some View {
         let s = model.style
@@ -25,16 +25,14 @@ struct AgentSidebar: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(model.shownWindows, id: \.window.id) { t in
                         let i = t.index, w = t.window
-                        TabRow(model: model, window: w, index: i)
-                            .onDrag {
-                                dragging = w.id
-                                return NSItemProvider(object: w.id as NSString)
+                        // Drag to reorder: the others make room where it will land; pins stay first.
+                        TabRow(model: model, window: w, index: i, dragged: reorder.dragging == w.id)
+                            .reorderable(w.id, in: reorder, order: { model.shownWindows.map(\.window.id) }, space: "sidebar-tabs") { id, to in
+                                model.moveShown(id, to: to)
                             }
-                            // Moves use the session's order; pins stay first wherever it lands.
-                            .onDrop(of: [.text], delegate: TabDrop(model: model, target: model.windows.firstIndex { $0.id == w.id } ?? i,
-                                                                   dragging: $dragging))
                     }
                 }
+                .reorderSpace(reorder, name: "sidebar-tabs", order: model.shownWindows.map(\.window.id))
                 .padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 12)
             }
             // Rows fade out under the title bar instead of being cut off.
@@ -48,28 +46,6 @@ struct AgentSidebar: View {
         .overlay(alignment: .trailing) { Rectangle().fill(s.border.swiftUI).frame(width: 1) }
         .contextMenu { HiveContextMenu(model: model) }
     }
-}
-
-/// Dropping a dragged tab onto a row moves it to that row's place.
-struct TabDrop: DropDelegate {
-    let model: AppModel
-    let target: Int
-    @Binding var dragging: String?
-
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-
-    func performDrop(info: DropInfo) -> Bool {
-        defer { dragging = nil }
-        guard let id = dragging, let from = model.windows.firstIndex(where: { $0.id == id }), from != target,
-              model.windows.indices.contains(target) else { return false }
-        // Dropped among the pins, it's pinned; among the rest, unpinned.
-        let w = model.windows[from], onto = model.windows[target]
-        if w.pinned != onto.pinned { model.pinTab(w, onto.pinned) }
-        model.moveWindow(id, to: target)
-        return true
-    }
-
-    func dropExited(info: DropInfo) {}
 }
 
 /// An app tile: the program's icon, and a dot on its corner when the agent
@@ -98,6 +74,7 @@ struct TabRow: View {
     @ObservedObject var model: AppModel
     let window: WindowInfo
     let index: Int
+    var dragged = false
     @State private var hover = false
 
     var body: some View {
@@ -130,22 +107,28 @@ struct TabRow: View {
                 if let detail = sum.detail {
                     // Why it's waiting matters most: up to two lines.
                     Text(detail).font(.system(size: 11))
-                        .foregroundStyle(blocked ? s.blocked.swiftUI.opacity(0.9) : s.secondary.swiftUI)
+                        .foregroundStyle(blocked ? s.blockedText.swiftUI : s.secondary.swiftUI)
                         .lineLimit(blocked ? 2 : 1).truncationMode(sum.isAgent ? .tail : .head)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
         .padding(.horizontal, 8).padding(.vertical, sum.detail == nil ? 7 : 8)
+        // Dragged: lifted on the bar's own surface, outlined in honey, so it reads as the one moving.
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(active ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear)))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(active ? s.border.swiftUI : .clear, lineWidth: 1))
+            .fill(dragged ? s.tabActive.swiftUI : active ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear)))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(dragged ? s.accent.swiftUI.opacity(0.8) : active ? s.border.swiftUI : .clear, lineWidth: dragged ? 1.5 : 1))
         .contentShape(Rectangle())
         .onTapGesture { model.selectWindow(index: index) }
         .onHover { hover = $0 }
         .contextMenu {
             Button(window.pinned ? "Unpin Tab" : "Pin Tab") { model.pinTab(window, !window.pinned) }
+            Button("Move Tab Up") { model.moveTab(window.id, by: -1) }
+            Button("Move Tab Down") { model.moveTab(window.id, by: 1) }
         }
+        .accessibilityAction(named: "Move Tab Up") { model.moveTab(window.id, by: -1) }
+        .accessibilityAction(named: "Move Tab Down") { model.moveTab(window.id, by: 1) }
         .help(info?.shortDir ?? "")
     }
 }
