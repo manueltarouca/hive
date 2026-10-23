@@ -83,9 +83,10 @@ class Server:
 
 # MARK: the UI
 
-def dump():
+def dump(windows=False):
+    """The UI as a tree. windows: every window, popups too (Android's floating text toolbar is one)."""
     for _ in range(5):
-        adb("shell", "uiautomator", "dump", "/sdcard/ui.xml", check=False)
+        adb("shell", "uiautomator", "dump", *(["--windows"] if windows else []), "/sdcard/ui.xml", check=False)
         x = subprocess.run(["adb", "exec-out", "cat", "/sdcard/ui.xml"], capture_output=True).stdout
         try:
             return ET.fromstring(x)
@@ -180,7 +181,19 @@ def hide_keyboard():
 
 # MARK: the steps
 
+def quiet_other_devices():
+    """The app on any other emulator would reconnect to this throwaway server (same address and port)
+    and take panes as a second device: stopped for the run."""
+    me = os.environ.get("ANDROID_SERIAL") or adb("get-serialno").strip()
+    for line in sh("adb", "devices").splitlines()[1:]:
+        serial = line.split("\t")[0].strip()
+        if serial and serial != me and line.endswith("device"):
+            for pkg in ("xyz.matm.hive", "xyz.matm.hive.debug"):
+                sh("adb", "-s", serial, "shell", "am", "force-stop", pkg, check=False)
+
+
 def setup(srv):
+    quiet_other_devices()
     srv.start()
     srv.hive("new", "demo", "--cwd", "/tmp", "--", "sh", "-c", "echo hello from hive; exec sh")
     srv.hive("new", "agent", "--cwd", "/tmp", "--", "python3", os.path.join(HERE, "fake-agent.py"))
@@ -204,7 +217,14 @@ def step_add_host(srv):
     wait("Switch session", timeout=15)
     until("the phone is a client", lambda: any(c.get("platform") == "android" for c in srv.clients()))
     wait("hello from hive", timeout=10)
-    shot("first-session")
+    p = shot("first-session")
+    # The terminal's own background, in either theme: nothing over it (Android's focus veil greyed it once).
+    from PIL import Image
+    term = next(n for n in dump().iter("node") if "hello from hive" in (n.get("content-desc") or ""))
+    a, b, c, d = bounds(term)
+    px = Image.open(p).convert("RGB").getpixel(((a + c) // 2, d - 40))
+    want = (0x28, 0x2C, 0x34) if "--night" in sys.argv else (0xFD, 0xFB, 0xF7)
+    assert all(abs(x - y) <= 3 for x, y in zip(px, want)), f"the pane's background is {px}, not the theme's {want}"
 
 
 def step_add_host_problem(srv):
@@ -232,8 +252,14 @@ def step_switcher(srv):
 
 def step_type(srv):
     block = srv.view("demo")["windows"][0]["layout"]["block_id"]
-    tap("hello from hive")  # the pane: the keyboard comes up
-    time.sleep(0.8)
+    # A tap on the pane only aims: it never brings up the keyboard.
+    tap("hello from hive")
+    time.sleep(1)
+    assert not keyboard_up(), "a tap on the pane brought up the keyboard"
+    tap("Keyboard", exact=True)  # the key bar's keyboard key does
+    until("the keyboard", keyboard_up)
+    wait("Hide keyboard", exact=True)  # and the key says what it does now
+    time.sleep(0.5)
     type_text("echo phone-typed-$((6*7))")
     adb("shell", "input", "keyevent", "KEYCODE_ENTER")
     until("the server ran what the phone typed", lambda: "phone-typed-42\n" in srv.text(block) + "\n")
@@ -286,19 +312,31 @@ def step_paste(srv):
 
 def step_fit(srv):
     block = srv.view("demo")["windows"][0]["layout"]["block_id"]
-    cols0 = srv.view("demo")["blocks"][block]["cols"]
-    wait("Zoomed to fit")
-    shot("mac-size")
-    tap("Fit to phone")
-    cols = until("the pane took the phone's size", lambda: (c := srv.view("demo")["blocks"][block]["cols"]) < cols0 and c)
-    wait("Give back")  # nobody else held it (the CLI made the pane): no one to name
+    # Nobody held the pane (the CLI made it): the phone took it on opening, as the device in use.
+    wait("Give back")  # no one to name
     wait("Sized by this phone")
-    shot(f"fitted-{cols}-cols")
+    cols = srv.view("demo")["blocks"][block]["cols"]
     assert 30 <= cols <= 70, cols
+    shot(f"fitted-{cols}-cols")
     tap("Give back")
     wait("Fit to phone")
-    # Mac size gives the pane its size back at once, not when the Mac is next used.
-    until("the pane is back at the Mac's size", lambda: srv.view("demo")["blocks"][block]["cols"] == cols0)
+    # Giving back returns the size it had at once, not when another device is next used.
+    cols0 = until("the pane is back at its own size", lambda: (c := srv.view("demo")["blocks"][block]["cols"]) > cols and c)
+    wait("Zoomed to fit")
+    shot("mac-size")
+    # Given back, it stays given back: leaving and coming back doesn't take it again.
+    open_switcher()
+    tap("agent", exact=True)
+    wait("Switch session")
+    open_switcher()
+    tap("demo", exact=True)
+    wait("Fit to phone")
+    time.sleep(1.5)
+    assert srv.view("demo")["blocks"][block]["cols"] == cols0, "a pane given back was taken again on reopening"
+    tap("Fit to phone")
+    until("the pane took the phone's size again", lambda: srv.view("demo")["blocks"][block]["cols"] == cols)
+    tap("Give back")
+    until("and gave it back", lambda: srv.view("demo")["blocks"][block]["cols"] == cols0)
     shot("back-to-mac-size")
 
 
@@ -549,6 +587,11 @@ def step_pins(srv):
         if w["window_id"] in made:
             srv.call("session.close_window", {"session_id": sid, "window_id": w["window_id"]})
     wait("All ", gone=True, timeout=10)
+
+
+def streaming(timeout=10):
+    """The desk shows a pane: its size button is there, whichever it says."""
+    until("a pane on the desk", lambda: (r := dump()) is not None and (find(r, "Fit to phone") is not None or find(r, "Give back") is not None), timeout=timeout)
 
 
 def to_desk():
@@ -860,11 +903,9 @@ def step_script_page(srv):
     srv.hive("new", "acts", "--cwd", "/tmp", "--", "sh")  # one pane: the one on screen
     open_switcher()
     tap("acts", exact=True)
-    wait("Fit to phone")
+    wait("Give back")  # nobody held it: the phone took it on opening
     block = srv.view("acts")["windows"][0]["layout"]["block_id"]
-    rows0 = srv.view("acts")["blocks"][block]["rows"]
-    tap("Fit to phone")
-    rows = until("the pane took the phone's size", lambda: (r := srv.view("acts")["blocks"][block]["rows"]) != rows0 and r)
+    rows = srv.view("acts")["blocks"][block]["rows"]
     time.sleep(1)  # the shell's prompt
     srv.hive("script", "run", "--allow", "input", "-e", f'const b = await h.block("{block}"); await b.write("echo acted\\n");')
     until("the script typed", lambda: "acted" in srv.text(block))
@@ -883,6 +924,145 @@ def step_script_page(srv):
     tap("Back")
     wait("Switch session")
     wait("typed", gone=True, timeout=14)  # it goes after about 10 seconds
+
+
+def typed_line(srv, block):
+    """What the fake Claude pane shows in its input box: the keys it got, by name."""
+    for line in srv.text(block).splitlines():
+        if line.startswith("> "):
+            return line[2:]
+    return ""
+
+
+def press(key, ms):
+    """Holds a key on the bar for [ms]."""
+    a, b, c, d = bounds(wait(key, exact=True))
+    adb("shell", "input", "swipe", str((a + c) // 2), str((b + d) // 2), str((a + c) // 2), str((b + d) // 2), str(ms))
+
+
+def step_keys(srv):
+    """The key bar: arrows (held, they repeat), shift+tab, ctrl and alt latches, More; a hardware keyboard, with no keyboard on screen."""
+    srv.hive("new", "keys", "--cwd", "/tmp", "--", "python3", os.path.join(HERE, "fake-claude-long.py"))
+    open_switcher()
+    tap("keys", exact=True)
+    streaming()
+    block = srv.view("keys")["windows"][0]["layout"]["block_id"]
+    until("the pane drew", lambda: "accept edits" in srv.text(block))
+    hide_keyboard()
+    for name in ("Up", "Down", "Left", "Right"):
+        tap(name, exact=True)
+    until("the arrows", lambda: typed_line(srv, block) == "[↑][↓][←][→]")
+    tap("Shift Tab", exact=True)
+    until("shift+tab", lambda: typed_line(srv, block).endswith("[⇧Tab]"))
+    tap("Control C", exact=True)  # the fake clears its line on ^C
+    until("ctrl+c", lambda: typed_line(srv, block) == "")
+    # Held: the arrow repeats.
+    press("Up", 1300)
+    time.sleep(0.5)
+    n = typed_line(srv, block).count("↑") + typed_line(srv, block).count("⎋[A")
+    assert n >= 6, f"a held arrow sent {n}"
+    tap("Control C", exact=True)
+    until("cleared", lambda: typed_line(srv, block) == "")
+    # ctrl once: for the next key only. Typed from the bar's / then a letter from the keyboard.
+    tap("Control", exact=True)
+    wait("Control, on for the next key", exact=True)
+    shot("ctrl-once")
+    adb("shell", "input", "text", "r")
+    until("ctrl+r", lambda: typed_line(srv, block) == "[^R]")
+    adb("shell", "input", "text", "r")
+    until("then a plain r", lambda: typed_line(srv, block) == "[^R]r")
+    # alt: escape first, as terminals send it.
+    tap("Alt", exact=True)
+    adb("shell", "input", "text", "b")
+    until("alt+b", lambda: typed_line(srv, block).endswith("[⎋b]"))
+    # ctrl locked: a second tap at once; it stays for every key until tapped off.
+    a_, b_, c_, d_ = bounds(wait("Control", exact=True))
+    x_, y_ = (a_ + c_) // 2, (b_ + d_) // 2
+    adb("shell", f"input tap {x_} {y_}; input tap {x_} {y_}")  # two taps in a row, as a thumb does
+    wait("Control, locked", exact=True)
+    shot("ctrl-locked")
+    adb("shell", "input", "text", "a")
+    adb("shell", "input", "text", "e")
+    until("ctrl+a then ctrl+e", lambda: typed_line(srv, block).endswith("[^A][^E]"))
+    tap("Control, locked", exact=True)
+    wait("Control", exact=True)
+    tap("Control C", exact=True)
+    until("cleared", lambda: typed_line(srv, block) == "")
+    # More: the keys the bar has no room for, open for several in a row.
+    tap("More keys", exact=True)
+    wait("Control D, end of input", exact=True)  # Control first, Claude Code's own among them
+    shot("more-keys")
+    tap_on_screen("F5")  # the panel scrolls to the function keys
+    tap_on_screen("Page up")
+    until("F5 and page up", lambda: typed_line(srv, block) == "[⎋[15~][PgUp]")
+    tap("Fewer keys", exact=True)
+    wait("Control D, end of input", exact=True, gone=True)
+    assert not keyboard_up(), "a key brought up the keyboard"
+    # A hardware keyboard types into the pane with no keyboard on screen.
+    tap("Control C", exact=True)
+    until("cleared", lambda: typed_line(srv, block) == "")
+    adb("shell", "input", "keyevent", "KEYCODE_ESCAPE")
+    adb("shell", "input", "keycombination", "113", "46")  # ctrl+r
+    adb("shell", "input", "keyevent", "KEYCODE_MOVE_HOME")
+    adb("shell", "input", "text", "hw")
+    until("hardware keys", lambda: typed_line(srv, block) == "[Esc][^R][Home]hw")
+    time.sleep(0.5)
+    assert not keyboard_up(), "a hardware key brought up the on-screen keyboard"
+
+
+def clipboard():
+    out = adb("shell", "am", "broadcast", "-n", f"{PKG}/xyz.matm.hive.DebugClip")
+    m = re.search(r'data="(.*)"', out, re.S)
+    return m.group(1) if m else ""
+
+
+def step_select(srv):
+    """A long press selects the word under the finger; Copy puts it on the clipboard; a tap lets go."""
+    if "keys" not in srv.sessions():
+        srv.hive("new", "keys", "--cwd", "/tmp", "--", "python3", os.path.join(HERE, "fake-claude-long.py"))
+    open_switcher()
+    tap("keys", exact=True)
+    streaming()
+    block = srv.view("keys")["windows"][0]["layout"]["block_id"]
+    time.sleep(1)
+    root = dump()
+    term = next(n for n in root.iter("node") if "accept edits" in (n.get("content-desc") or ""))
+    a, b, c, d = bounds(term)
+    lines = term.get("content-desc").split("\n")
+    cols = srv.view("keys")["blocks"][block]["cols"]
+    rows = srv.view("keys")["blocks"][block]["rows"]
+    density = int(adb("shell", "wm", "density").split(":")[-1].strip()) / 160
+    pad = round(6 * density)
+    cw = (c - a - 2 * pad) / cols
+    ch = (d - b - pad) / rows  # at least the cell height; whole rows fit
+    # A word of letters on a row near the top: the first one of five or more.
+    for r, line in enumerate(lines[:6]):
+        m = re.search(r"[A-Za-z]{5,}", line)
+        if m:
+            break
+    else:
+        raise AssertionError(f"no word to select in {lines[:6]}")
+    x = int(a + pad + (m.start() + 2.5) * cw)
+    y = int(b + pad / 2 + (r + 0.5) * ch)
+    adb("shell", "input", "swipe", str(x), str(y), str(x), str(y), "900")  # a long press
+    copy = until("the Copy button over the selection", lambda: [n for n in [find(dump(windows=True), "Copy", exact=True)] if n is not None], timeout=5)[0]
+    shot("selected")
+    x1, y1, x2, y2 = bounds(copy)
+    adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+    # The word as the app reads it: up to spaces, brackets, quotes; dots and slashes inside (paths stay whole).
+    brk = set(" \t()[]{}<>'\"`,;│|─")
+    a0, b0 = m.start(), m.end() - 1
+    while a0 > 0 and line[a0 - 1] not in brk:
+        a0 -= 1
+    while b0 < len(line) - 1 and line[b0 + 1] not in brk:
+        b0 += 1
+    while b0 > a0 and line[b0] in ".:!?":
+        b0 -= 1
+    word = line[a0:b0 + 1]
+    until(f"{word!r} on the clipboard", lambda: clipboard() == word, timeout=5)
+    time.sleep(0.5)
+    assert find(dump(windows=True), "Copy", exact=True) is None, "the Copy bar stayed after copying"
+    assert not keyboard_up(), "selecting brought up the keyboard"
 
 
 def step_previews(srv):
@@ -955,31 +1135,36 @@ def step_settings(srv):
     shot("settings-larger")
     tap("Back")  # to the switcher, where Settings was opened
     tap("demo", exact=True)
+    streaming()
+    if find(dump(), "Give back") is not None:  # fitted on opening (run alone): start from its own size
+        tap("Give back")
     wait("Fit to phone")
     d = srv.view("demo")
     w = next(x for x in d["windows"] if x["window_id"] == d["active_window_id"])
-    before = d_cols(srv, w)  # the pane's own size: a split's panes are narrower than the Mac's 120
+    cols = lambda: {b: v["cols"] for b, v in srv.view("demo")["blocks"].items() if v["window_id"] == w["window_id"]}
+    before = cols()  # each pane's own size (a split's other pane may be fitted already)
     tap("Fit to phone")
-    cols = until("the pane fitted, fewer columns than the default 55", lambda: (c := d_cols(srv, w)) != before and c)
-    assert cols < 55, f"larger text still fits {cols} columns"
-    shot(f"fitted-larger-{cols}-cols")
+    changed = until("the pane fitted", lambda: [b for b, c in cols().items() if c != before[b]])
+    b = changed[0]
+    assert cols()[b] < 55, f"larger text still fits {cols()[b]} columns"
+    shot(f"fitted-larger-{cols()[b]}-cols")
     tap("Give back")
-    until("Mac size again", lambda: d_cols(srv, w) == before)
-    # Panes open fitted: and Mac size still gives the size back.
+    until("its own size again", lambda: cols()[b] == before[b])
+    # Panes open fitted: and giving back still gives the size back.
     open_switcher()
     tap("Settings", exact=True)
-    tap("Open panes fitted to the phone")
+    tap("Open every pane fitted to the phone")
     tap("Back")
     tap("agent", exact=True)
     wait("Give back")  # it opened fitted
     open_switcher()
     tap("demo", exact=True)
-    until("the pane opened fitted", lambda: d_cols(srv, w) != before)
+    until("the pane opened fitted", lambda: cols()[b] != before[b])
     tap("Give back")
-    until("Mac size gives an auto-fitted pane its size back", lambda: d_cols(srv, w) == before)
+    until("giving back an opened-fitted pane returns its size", lambda: cols()[b] == before[b])
     open_switcher()
     tap("Settings", exact=True)
-    tap("Open panes fitted to the phone")
+    tap("Open every pane fitted to the phone")
     tap("Back")
 
 
@@ -1120,13 +1305,13 @@ def step_code(srv):
     shot("code-added")
     # The saved host kept its own address.
     tap(f"New session on {LABEL}")
-    wait("Fit to phone", timeout=10)
+    streaming(timeout=10)
 
 
 def step_away(srv):
     open_switcher()
     tap("demo", exact=True)
-    wait("Fit to phone")  # the desk, streaming a pane
+    streaming()  # the desk, streaming a pane
     srv.stop()
     wait(f"Reconnecting to {LABEL}", timeout=15, exact=True)
     wait("hive keeps trying")
@@ -1138,7 +1323,7 @@ def step_away(srv):
     shot("back")
 
 
-STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
+STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_keys, step_select, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
 
 
 def main():
@@ -1155,8 +1340,8 @@ def main():
             name = step.__name__.removeprefix("step_")
             if only and name not in only and name != "add_host":
                 continue
-            if PKG == "xyz.matm.hive" and step is step_paste:
-                print("skip  paste (debug builds only)")
+            if PKG == "xyz.matm.hive" and step in (step_paste, step_select):
+                print(f"skip  {name} (debug builds only: it needs the clipboard hook)")
                 continue
             t0 = time.time()
             try:

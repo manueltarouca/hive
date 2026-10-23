@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -62,14 +63,14 @@ fun HostsScreen(model: AppModel, close: () -> Unit, addHost: () -> Unit, scan: (
     var forgetting by remember { mutableStateOf<HostConnection?>(null) }
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.readingWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
                     LineIcon(Icon.Back, p.muted, 20.dp)
                 }
                 Spacer(Modifier.width(6.dp))
                 BasicText("Hosts", style = Type.title.copy(color = p.text), modifier = Modifier.semantics { heading() })
             }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).readingWidth().padding(horizontal = 16.dp)) {
                 if (model.hosts.isEmpty()) {
                     BasicText("No hosts yet. Add one by its address, or bring your Mac's across with its code.",
                         style = Type.body.copy(color = p.muted), modifier = Modifier.padding(vertical = 16.dp))
@@ -194,7 +195,7 @@ fun Sheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val p = LocalPalette.current
     Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.42f))
         .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onDismiss)) {
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+        Column(Modifier.align(Alignment.BottomCenter).widthIn(max = 640.dp).fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
             .background(p.surface).clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}
             .navigationBarsPadding().imePadding().padding(horizontal = 20.dp, vertical = 14.dp)) {
             Box(Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp).clip(CircleShape).background(p.muted.copy(alpha = 0.4f)))

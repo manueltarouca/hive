@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -63,9 +64,13 @@ fun agentSummary(h: HostConnection, s: SessionInfo): Pair<String?, String?> {
     return state to (if (n == 0) null else if (n == 1) "1 agent" else "$n agents")
 }
 
-/** The Mac's ⌘K list as a full screen: one section per host, the same words, the same check. */
+/**
+ * The Mac's ⌘K list: one section per host, the same words, the same check. A full screen, or
+ * ([rail]) a column beside the desk on a wide screen, which stays open after a pick.
+ */
 @Composable
-fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: () -> Unit, hosts: () -> Unit) {
+fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: () -> Unit, hosts: () -> Unit, rail: Boolean = false) {
+    val picked = if (rail) ({}) else close
     val p = LocalPalette.current
     var query by remember { mutableStateOf("") }
     var menuFor by remember { mutableStateOf<HostConnection?>(null) }
@@ -74,9 +79,16 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
 
     LaunchedEffect(Unit) { model.hosts.filter { it.connected }.forEach { model.refresh(it); model.reloadActions(it) } }
 
-    Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
+    Column(
+        if (rail) Modifier.fillMaxHeight().background(p.bg)
+        else Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding(),
+    ) {
+        // A full screen reads at a comfortable width on a tablet; the rail is narrow already.
+        Column(if (rail) Modifier.fillMaxHeight() else Modifier.fillMaxHeight().readingWidth()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
+            if (rail) Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Hide sessions" }.padding(8.dp)) {
+                LineIcon(Icon.Sidebar, p.muted, 20.dp)
+            } else Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
                 LineIcon(Icon.Back, p.muted, 20.dp)
             }
             Spacer(Modifier.width(4.dp))
@@ -89,8 +101,8 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
                         val h = model.current ?: model.hosts.firstOrNull { it.connected }
                         val match = model.hosts.flatMap { hc -> hc.sessions.filter { it.label.contains(q, true) }.map { hc to it } }.firstOrNull()
                         when {
-                            match != null -> { model.select(match.first, match.second.id); close() }
-                            h != null && q.isNotEmpty() -> { model.newSession(h, q); close() }
+                            match != null -> { model.select(match.first, match.second.id); picked() }
+                            h != null && q.isNotEmpty() -> { model.newSession(h, q); picked() }
                         }
                     }),
                     modifier = Modifier.fillMaxWidth().focusRequester(focus).semantics { contentDescription = "Filter or create" },
@@ -137,7 +149,7 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
                         for (s in sessions) item(key = h.id + s.id) {
                             val current = model.current === h && model.currentSession == s.id
                             val (state, summary) = agentSummary(h, s)
-                            Row(rowModifier(current) { model.select(h, s.id); close() }, verticalAlignment = Alignment.CenterVertically) {
+                            Row(rowModifier(current) { model.select(h, s.id); picked() }, verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.width(26.dp)) { if (current) LineIcon(Icon.Check, p.honey, 16.dp) }
                                 FadeText(s.label.ifEmpty { "session" }, Type.body, p.text, Modifier.weight(1f))
                                 if (summary != null) {
@@ -148,7 +160,7 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
                             }
                         }
                         item(key = "new:" + h.id) {
-                            Row(rowModifier(false) { model.newSession(h, q.ifEmpty { null }); close() }, verticalAlignment = Alignment.CenterVertically) {
+                            Row(rowModifier(false) { model.newSession(h, q.ifEmpty { null }); picked() }, verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.width(26.dp)) { LineIcon(Icon.Plus, p.muted, 15.dp) }
                                 BasicText(if (q.isEmpty()) "New session on ${h.name}" else "New session “$q” on ${h.name}", style = Type.body.copy(color = p.text))
                             }
@@ -159,7 +171,7 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
                             BasicText("Actions", style = Type.tiny.copy(color = p.muted), modifier = Modifier.padding(start = 34.dp, top = 10.dp, bottom = 2.dp))
                         }
                         for ((name, title) in acts) item(key = "action:" + h.id + name) {
-                            Row(rowModifier(false) { model.runAction(h, name); close() }.semantics { contentDescription = "Action $title" },
+                            Row(rowModifier(false) { model.runAction(h, name); picked() }.semantics { contentDescription = "Action $title" },
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.width(26.dp)) { LineIcon(Icon.Bolt, p.honey, 16.dp) }
                                 FadeText(title, Type.body, p.text, Modifier.weight(1f))
@@ -185,6 +197,7 @@ fun Switcher(model: AppModel, close: () -> Unit, addHost: () -> Unit, settings: 
                 }
             }
         }
+        }
     }
 }
 
@@ -206,6 +219,6 @@ private fun HostMenu(model: AppModel, h: HostConnection, dismiss: () -> Unit) {
             BasicText(if (always) "Connect on demand" else "Stay connected", style = Type.body.copy(color = p.text))
         }
         if (h.link != Link.Idle) Row(rowModifier(false) { model.disconnect(h); dismiss() }) { BasicText("Disconnect", style = Type.body.copy(color = p.text)) }
-        Row(rowModifier(false) { model.removeHost(h); dismiss() }) { BasicText("Forget ${h.name}", style = Type.body.copy(color = p.coral)) }
+        Row(rowModifier(false) { model.removeHost(h); dismiss() }) { BasicText("Forget ${h.name}", style = Type.body.copy(color = p.coralText)) }
     }
 }

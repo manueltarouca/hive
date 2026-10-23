@@ -51,4 +51,24 @@ class AskTest {
         assertEquals(1, ask.selected)
         assertEquals(listOf("Yes", "No"), ask.choices.map { it.label })
     }
+
+    @Test fun aNarrowPaneWrapsAnswersAtItsEdge() {
+        // 40 columns: the terminal breaks the answers mid-word, with no indent on the rest.
+        val rows = listOf(" Do you want to proceed?", " ❯ 1. Yes", "   2. Yes, and don't ask again this sessi", "on",
+            "   3. No, and tell Claude what to do diff", "erently (esc)")
+        val ask = Ask.find(rows, cols = 40)!!
+        assertEquals(listOf("Yes", "Yes, and don't ask again this session", "No, and tell Claude what to do differently"), ask.choices.map { it.label })
+    }
+
+    @Test fun aLineEndingShortOfTheEdgeDoesNotSwallowTheNextAnswer() {
+        val rows = listOf(" Allow this edit?", " ❯ 1. Yes", "   2. No")
+        assertEquals(listOf("Yes", "No"), Ask.find(rows, cols = 9)!!.choices.map { it.label })
+    }
+
+    @Test fun aWrapAtASpaceStillJoins() {
+        // The terminal broke at a space: the row is one column short of the edge.
+        val rows = listOf(" Do you want to proceed?", " ❯ 1. Yes", "   2. Yes, and don't ask again this", "session", "   3. No")
+        val ask = Ask.find(rows, cols = 36)!!
+        assertEquals("Yes, and don't ask again this session", ask.choices[1].label)
+    }
 }

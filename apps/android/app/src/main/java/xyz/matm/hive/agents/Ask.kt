@@ -22,8 +22,11 @@ class Ask(val question: String, val choices: List<Choice>, val selected: Int) {
         private val option = Regex("""^(\s*)([❯›>]\s*)?(\d)\.\s+(.*)$""")
         private const val WINDOW = 30
 
-        /** The ask in a pane's rows, or null when its last lines aren't one. */
-        fun find(rows: List<String>): Ask? {
+        /**
+         * The ask in a pane's rows, or null when its last lines aren't one. [cols]: the pane's width,
+         * so a line the terminal wrapped at its edge (a narrow pane) reads as one.
+         */
+        fun find(rows: List<String>, cols: Int = 0): Ask? {
             val lines = rows.map { it.trim('│', '┃', '║').trimEnd() }.toMutableList()
             // Below the answers: blanks and the dialog's border only.
             while (lines.isNotEmpty() && (lines.last().isBlank() || lines.last().trim().all { it in "─━═╰╯╭╮└┘┌┐ " })) lines.removeAt(lines.lastIndex)
@@ -32,19 +35,29 @@ class Ask(val question: String, val choices: List<Choice>, val selected: Int) {
             for (q in lines.lastIndex downTo from) {
                 val text = lines[q].trim()
                 if (!text.endsWith("?") || option.matches(lines[q])) continue
-                return parse(text, lines.subList(q + 1, lines.size))
+                return parse(text, lines.subList(q + 1, lines.size), cols)
             }
             return null
         }
 
-        private fun parse(question: String, rest: List<String>): Ask? {
+        private fun parse(question: String, rest: List<String>, cols: Int): Ask? {
             val keys = ArrayList<String>()
             val labels = ArrayList<StringBuilder>()
             var selected = 0
             var indent = 0
+            var full = false
+            var midWord = false
             for (line in rest) {
+                // The row before reached the pane's edge: this one carries on from it, however indented
+                // (with the space the break took, unless it broke mid-word at the very edge).
+                val wrapped = full
+                val join = if (midWord) "" else " "
+                midWord = cols > 0 && line.length >= cols
+                // At the edge, or one short of it: a break at a space leaves the row a column short.
+                full = cols > 0 && line.length >= cols - 1
                 if (line.isBlank()) { if (keys.isEmpty()) continue else return null }
-                val m = option.matchEntire(line)
+                // The next number is always an answer; anything else after a full row is its rest.
+                val m = option.matchEntire(line)?.takeIf { !wrapped || it.groupValues[3] == (keys.size + 1).toString() }
                 if (m != null) {
                     if (m.groupValues[3] != (keys.size + 1).toString()) return null
                     if (m.groupValues[2].isNotEmpty()) selected = keys.size
@@ -54,8 +67,8 @@ class Ask(val question: String, val choices: List<Choice>, val selected: Int) {
                 } else {
                     // A long answer wraps onto the next line, indented at least as far.
                     val lead = line.length - line.trimStart().length
-                    if (keys.isEmpty() || lead < indent) return null
-                    labels.last().append(' ').append(line.trim())
+                    if (keys.isEmpty() || lead < indent && !wrapped) return null
+                    labels.last().append(if (wrapped) join else " ").append(line.trim())
                 }
             }
             if (keys.size < 2) return null

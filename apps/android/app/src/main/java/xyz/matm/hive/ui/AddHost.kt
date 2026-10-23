@@ -67,7 +67,7 @@ fun AddHost(model: AppModel, close: () -> Unit, scan: () -> Unit, offer: (List<O
         model.addHost(a) { r -> busy = false; if (r == null) done() else problem = r }
     }
 
-    Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).readingWidth()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
                 LineIcon(Icon.Back, p.muted, 20.dp)
@@ -80,7 +80,7 @@ fun AddHost(model: AppModel, close: () -> Unit, scan: () -> Unit, offer: (List<O
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.surface).padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.clip(RoundedCornerShape(8.dp)).background(p.honey.copy(alpha = 0.18f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                    BasicText("Add Host", style = Type.small.copy(color = p.honey))
+                    BasicText("Add Host", style = Type.small.copy(color = p.honeyText))
                 }
                 Spacer(Modifier.width(10.dp))
                 Box(Modifier.weight(1f)) {
@@ -169,7 +169,7 @@ fun Offer(model: AppModel, offered: List<Offered>, close: () -> Unit, done: () -
             }
         }
     }
-    Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).readingWidth()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
                 LineIcon(Icon.Back, p.muted, 20.dp)
@@ -197,10 +197,10 @@ fun Offer(model: AppModel, offered: List<Offered>, close: () -> Unit, done: () -
                     Column(Modifier.weight(1f)) {
                         BasicText(o.host.label, style = Type.body.copy(color = p.text))
                         FadeText(o.host.address, Type.small, p.muted)
-                        if (!o.inTailnet) BasicText("Not a tailnet address: whoever runs it could read what you type.", style = Type.tiny.copy(color = p.coral))
-                        if (old != null && old != o.host.address) BasicText("Replaces $old", style = Type.tiny.copy(color = p.coral))
+                        if (!o.inTailnet) BasicText("Not a tailnet address: whoever runs it could read what you type.", style = Type.tiny.copy(color = p.coralText))
+                        if (old != null && old != o.host.address) BasicText("Replaces $old", style = Type.tiny.copy(color = p.coralText))
                         else if (old != null) BasicText("Already saved", style = Type.tiny.copy(color = p.muted))
-                        same[o.host.label]?.let { BasicText("Same server as $it, by another address", style = Type.tiny.copy(color = p.honey)) }
+                        same[o.host.label]?.let { BasicText("Same server as $it, by another address", style = Type.tiny.copy(color = p.honeyText)) }
                     }
                 }
             }

@@ -39,6 +39,11 @@ data class Palette(
     val text: Color,
     val muted: Color,
     val honey: Color,
+    /** Honey as text on the page: Night's honey reads on dark; Day's is darker, to read on paper (4.5:1). */
+    val honeyText: Color,
+    /** Coral and sage as words, for the same reason: Day's darker, to read on their own tints. */
+    val coralText: Color,
+    val sageText: Color,
     val onHoney: Color,
     val coral: Color,
     val sage: Color,
@@ -47,13 +52,14 @@ data class Palette(
 
 val NightPalette = Palette(
     bg = Color(0xFF1D1F21), surface = Color(0xFF282C34), raised = Color(0xFF373B41), line = Color(0xFF373B41),
-    text = Color(0xFFC5C8C6), muted = Color(0xFF969896), honey = Color(0xFFF2A93B), onHoney = Color(0xFF1D1F21),
+    text = Color(0xFFC5C8C6), muted = Color(0xFF969896), honey = Color(0xFFF2A93B), honeyText = Color(0xFFF2A93B), coralText = Color(0xFFCC6666), sageText = Color(0xFFB5BD68), onHoney = Color(0xFF1D1F21),
     coral = Color(0xFFCC6666), sage = Color(0xFFB5BD68), night = true,
 )
 
 val DayPalette = Palette(
     bg = Color(0xFFF6F2EA), surface = Color(0xFFFDFBF7), raised = Color(0xFFEDE7DC), line = Color(0xFFE4DDD0),
-    text = Color(0xFF231F1A), muted = Color(0xFF8C8478), honey = Color(0xFFD98A12), onHoney = Color(0xFFFDFBF7),
+    // Muted and honey text darker than the brand's first values, for 4.5:1 on paper; ink on honey, as Night has.
+    text = Color(0xFF231F1A), muted = Color(0xFF6F675C), honey = Color(0xFFD98A12), honeyText = Color(0xFF8A5300), coralText = Color(0xFFA8362E), sageText = Color(0xFF2F6E44), onHoney = Color(0xFF231F1A),
     coral = Color(0xFFD24E45), sage = Color(0xFF4E9A64), night = false,
 )
 

@@ -16,7 +16,8 @@ import xyz.matm.hive.vt.Frame
 import java.io.File
 
 /** A window's panes, in layout order. */
-data class WindowInfo(val id: String, val label: String, val blocks: List<String>, val focused: String?, val pinned: Boolean = false)
+data class WindowInfo(val id: String, val label: String, val blocks: List<String>, val focused: String?, val pinned: Boolean = false,
+                      val layout: Layout? = null)
 
 /** A pane, from session.view. */
 data class BlockInfo(
@@ -85,22 +86,34 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         private set
     var paneIndex by mutableStateOf(0)
         private set
-    var frame by mutableStateOf<Frame?>(null)
+    /** The panes on screen, by block: the focused one on a phone, a split's all side by side on a wide screen. */
+    var panes by mutableStateOf<Map<String, Pane>>(emptyMap())
         private set
-    /** The pane takes the phone's size (the Mac letterboxes) until the user stops, or the Mac takes it back. */
-    var fitted by mutableStateOf(false)
+    /** Side by side: the UI says whether the window on screen fits all its panes (a wide screen, panes not too small). */
+    var sideBySide by mutableStateOf(false)
         private set
-    private var fitSize: IntArray? = null
-    /** Compose state: the key bar, the size chip and the terminal follow it. */
-    var stream by mutableStateOf<PaneStream?>(null)
-        private set
+    /** A wide screen (tablet): panes fit on first use, as the Mac takes its own back. */
+    var wide = false
+
+    /** The focused pane: the key bar, the ask card and the size button act on it. */
+    val pane: Pane? get() = visibleBlock?.let { panes[it] }
+    val stream: PaneStream? get() = pane?.stream
+    val frame: Frame? get() = pane?.frame
+    val fitted: Boolean get() = pane?.fitted == true
+    val previousHolder: String? get() = pane?.previousHolder
+
+    fun showSideBySide(on: Boolean) {
+        if (on == sideBySide) return
+        sideBySide = on
+        attachVisible()
+    }
     // MARK: settings (Settings screen), kept on the phone.
 
     /** system, night or day. */
     var themeChoice by mutableStateOf(prefs.getString("theme", "system") ?: "system")
         private set
     /** The terminal's text size when fitted to the phone, in sp. */
-    var textSp by mutableStateOf(prefs.getFloat("textSp", 11.5f))
+    var textSp by mutableStateOf(prefs.getFloat("textSp", if (context.resources.configuration.smallestScreenWidthDp >= 600) 13f else 11.5f))
         private set
     /** As the Mac's notify: background, always or never. */
     var notify by mutableStateOf(prefs.getString("notify", "background") ?: "background")
@@ -128,7 +141,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         val t = if (dark) xyz.matm.hive.vt.TermTheme.night else xyz.matm.hive.vt.TermTheme.day
         if (t === termTheme) return
         termTheme = t
-        stream?.setTheme(t)
+        panes.values.forEach { it.stream.setTheme(t) }
     }
 
     /** Whether the app is on screen: notifications are for when it isn't, as on the Mac. */
@@ -247,7 +260,7 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         pendingBlock = block
         if (current !== h || currentSession != session) {
             detach()
-            windows = emptyList(); blocks = emptyMap(); sessionLabel = ""; frame = null
+            windows = emptyList(); blocks = emptyMap(); sessionLabel = ""
             windowIndex = 0; paneIndex = 0
         }
         current = h
@@ -290,6 +303,12 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         val w = windows[i]
         paneIndex = maxOf(0, w.blocks.indexOf(w.focused))
         attachVisible()
+    }
+
+    /** Focuses a pane of the window on screen (side by side: a tap on it). Local: the Mac keeps its own focus. */
+    fun focusPane(block: String) {
+        val i = windows.getOrNull(windowIndex)?.blocks?.indexOf(block) ?: return
+        if (i >= 0 && i != paneIndex) selectPane(i)
     }
 
     fun selectPane(i: Int) {
@@ -458,8 +477,9 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                 val ws = j.optJSONArray("windows") ?: JSONArray()
                 val newWindows = (0 until ws.length()).map { i ->
                     val w = ws.getJSONObject(i)
-                    WindowInfo(w.optString("window_id"), w.optString("label"), layoutBlocks(w.optJSONObject("layout")), w.optString("focused_block_id").ifEmpty { null },
-                        w.optBoolean("pinned"))
+                    val layout = Layout.parse(w.optJSONObject("layout"))
+                    WindowInfo(w.optString("window_id"), w.optString("label"), layout?.blocks.orEmpty(), w.optString("focused_block_id").ifEmpty { null },
+                        w.optBoolean("pinned"), layout)
                 }
                 val bj = j.optJSONObject("blocks") ?: JSONObject()
                 val agentsByBlock = h.agents.associateBy { it.blockID }
@@ -503,47 +523,67 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         }
     }
 
-    private fun layoutBlocks(l: JSONObject?): List<String> = when (l?.optString("type")) {
-        "block" -> listOf(l.optString("block_id"))
-        "split" -> layoutBlocks(l.optJSONObject("a")) + layoutBlocks(l.optJSONObject("b"))
-        else -> emptyList()
-    }
-
-    /** Subscribes to the pane on screen, and only it. */
+    /** Subscribes to the panes on screen, and only them: the focused one, or the window's all side by side. */
     private fun attachVisible() {
         val h = current
         val c = h?.client
-        val b = visibleBlock
-        if (stream?.blockID == b && stream?.client === c && c != null) return
-        // Leaving a fitted pane gives it back its size; the next one starts at the Mac's.
-        if (fitted) unfit()
-        detach()
-        if (c == null || b == null || !h.connected) return
-        val s = PaneStream(c, b, termTheme) { f -> if (stream?.blockID == b) onFrame(f) }
-        stream = s
-        s.start()
+        val focus = visibleBlock
+        val want: List<String> = when {
+            c == null || focus == null || !h.connected -> emptyList()
+            sideBySide -> windows.getOrNull(windowIndex)?.blocks.orEmpty()
+            else -> listOf(focus)
+        }
+        val keep = panes.filter { (id, p) -> id in want && p.stream.client === c }
+        // Leaving a fitted pane gives it back its size; the next one starts at the other device's.
+        for ((id, p) in panes) if (id !in keep) { if (p.fitted) unfit(p); p.stream.stop() }
+        if (c == null) { panes = emptyMap(); return }
+        panes = want.associateWith { id ->
+            keep[id] ?: Pane(id, PaneStream(c, id, termTheme) { f -> panes[id]?.let { onFrame(it, f) } }).also { it.stream.start() }
+        }
     }
 
     private fun detach() {
-        stream?.stop()
-        stream = null
-        frame = null
+        panes.values.forEach { it.stream.stop() }
+        panes = emptyMap()
     }
 
-    /** Panes fitted on opening (Settings), once each: Mac size afterwards sticks. */
-    private val autoFitted = HashSet<String>()
-    private var lastPhone: IntArray? = null
-
-    private fun onFrame(f: Frame) {
-        // Open fitted: on the pane's first frame, so its own size is known and Mac size can give it back.
-        val s = stream
-        val ph = lastPhone
-        if (openFitted && !fitted && s != null && s.cols > 0 && ph != null && autoFitted.add(s.blockID)) fit(ph[0], ph[1], ph[2], ph[3])
-        // A size the phone didn't ask for, after one it did: the Mac took it back. (The phone's own
+    private fun onFrame(p: Pane, f: Frame) {
+        // A size this device didn't ask for, after one it did: the other device took it back. (Its own
         // size changes as the keyboard or the agent's card comes and goes: those are asked for too.)
-        val mine = { c: Int, r: Int -> asked.any { it.first == c && it.second == r } }
-        if (fitted && !mine(f.cols, f.rows) && frame?.let { mine(it.cols, it.rows) } == true) fitted = false
-        frame = f
+        if (p.fitted && !p.mine(f.cols, f.rows) && p.frame?.let { p.mine(it.cols, it.rows) } == true) p.fitted = false
+        p.frame = f
+        maybeAutoFit(p)
+    }
+
+    /**
+     * Fits a pane on opening when nobody holds its size (the device you use picks it up), or
+     * when Settings says so; once each, so giving it back sticks.
+     */
+    private fun maybeAutoFit(p: Pane) {
+        if (p.fitted || p.autoFitDone || p.stream.cols <= 0) return
+        val room = p.room ?: return
+        // Decided once, when the pane opens: after that, whoever uses it takes it (the Mac by use, this
+        // device by the button or, on a tablet, by use). Held by this same connection counts as nobody:
+        // the view can still say so just after a give back.
+        p.autoFitDone = true
+        val holder = blocks[p.blockID]?.sizeOwner.orEmpty()
+        val other = holder.isNotEmpty() && holder != current?.client?.clientID
+        // Settings' "open fitted": every time. Else a pane nobody else holds, unless you gave it back here.
+        if (!openFitted && (other || p.blockID in givenBack)) return
+        fit(p, room)
+    }
+
+    /** Panes you gave back with the button, while the app runs: they aren't taken again by themselves. */
+    private val givenBack = HashSet<String>()
+
+    /** The user acted on a pane (typed, tapped, scrolled): a wide screen takes it, as the Mac does, once. */
+    fun used(block: String) {
+        if (!wide) return
+        val p = panes[block] ?: return
+        if (p.fitted || p.usedFitDone || block in givenBack) return
+        val room = p.room ?: return
+        p.usedFitDone = true
+        fit(p, room)
     }
 
     // MARK: size
@@ -558,58 +598,74 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         prefs.edit().putBoolean("sizeHintSeen", true).apply()
     }
 
-    /** Fit to phone: the pane takes this size (take: the Mac letterboxes). */
-    fun fit(cols: Int, rows: Int, cellWidth: Int, cellHeight: Int) {
-        val s = stream ?: return
-        // The size to give back with Mac size: the pane's own, before the phone took it.
-        if (!fitted && s.cols > 0) {
-            macSize = Triple(s.blockID, intArrayOf(s.cols, s.rows), intArrayOf(s.cellWidth.takeIf { it > 0 } ?: cellWidth, s.cellHeight.takeIf { it > 0 } ?: cellHeight))
-            previousHolder = blocks[s.blockID]?.sizeOwner?.takeIf { it.isNotEmpty() && it != current?.client?.clientID }
-        }
-        fitSize = intArrayOf(cols, rows, cellWidth, cellHeight)
-        asked.addLast(cols to rows)
-        while (asked.size > 6) asked.removeFirst()
-        fitted = true
+    /** Fit to phone (the size button): the focused pane takes this device's size. */
+    fun fit() {
+        val p = pane ?: return
+        val room = p.room ?: return
         sizeLearned()
-        s.client.resize(s.blockID, cols, rows, cellWidth, cellHeight, take = true)
+        givenBack -= p.blockID
+        fit(p, room)
     }
 
-    private var macSize: Triple<String, IntArray, IntArray>? = null
-    /** Who held the pane before Fit to phone: the button gives it back to them. */
-    var previousHolder by mutableStateOf<String?>(null)
-        private set
-    /** The sizes the phone asked for lately. */
-    private val asked = ArrayDeque<Pair<Int, Int>>()
+    /** The pane takes this size (take: the Mac letterboxes). */
+    private fun fit(p: Pane, room: IntArray) {
+        val s = p.stream
+        // The size to give back: the pane's own, before this device took it.
+        if (!p.fitted && s.cols > 0) {
+            p.before = intArrayOf(s.cols, s.rows, s.cellWidth.takeIf { it > 0 } ?: room[2], s.cellHeight.takeIf { it > 0 } ?: room[3])
+            p.previousHolder = blocks[p.blockID]?.sizeOwner?.takeIf { it.isNotEmpty() && it != current?.client?.clientID }
+        }
+        p.fitSize = room.copyOf()
+        p.asked.addLast(room[0] to room[1])
+        while (p.asked.size > 6) p.asked.removeFirst()
+        p.fitted = true
+        s.client.resize(p.blockID, room[0], room[1], room[2], room[3], take = true)
+    }
 
-    /** Back to the Mac's size, at once: the size the pane had before Fit to phone. */
-    fun unfit() {
-        fitted = false
-        fitSize = null
-        asked.clear()
-        val s = stream
-        val m = macSize
-        macSize = null
+    /** Back to the other device's size, at once: the size the focused pane had before it was fitted. */
+    fun unfit() { pane?.let { givenBack += it.blockID; unfit(it) } }
+
+    private fun unfit(p: Pane) {
+        p.fitted = false
+        p.fitSize = null
+        p.asked.clear()
+        val m = p.before ?: return
+        p.before = null
         // The size it had, and nobody holding it: the device you use picks it up again.
-        if (s != null && m != null && m.first == s.blockID) s.client.resize(s.blockID, m.second[0], m.second[1], m.third[0], m.third[1], take = true, release = true)
+        p.stream.client.resize(p.blockID, m[0], m[1], m[2], m[3], take = true, release = true)
     }
 
-    /** The phone's size changed (rotation, the keyboard): a fitted pane follows. */
-    fun phoneSize(cols: Int, rows: Int, cellWidth: Int, cellHeight: Int) {
-        lastPhone = intArrayOf(cols, rows, cellWidth, cellHeight)
-        if (!fitted) return
-        val f = fitSize
-        if (f != null && f[0] == cols && f[1] == rows) return
-        fit(cols, rows, cellWidth, cellHeight)
+    private val refits = HashMap<String, Runnable>()
+
+    /**
+     * A pane's room changed (rotation, the keyboard, the layout): a fitted pane follows, once the
+     * change settles. The keyboard animates its height, and each step would be a resize the program redraws for.
+     */
+    fun paneRoom(block: String, cols: Int, rows: Int, cellWidth: Int, cellHeight: Int) {
+        val p = panes[block] ?: return
+        p.room = intArrayOf(cols, rows, cellWidth, cellHeight)
+        refits.remove(block)?.let(main::removeCallbacks)
+        val r = Runnable {
+            refits.remove(block)
+            val q = panes[block] ?: return@Runnable
+            val room = q.room ?: return@Runnable
+            if (!q.fitted) { maybeAutoFit(q); return@Runnable }
+            val f = q.fitSize
+            if (f != null && f[0] == room[0] && f[1] == room[1]) return@Runnable
+            fit(q, room)
+        }
+        refits[block] = r
+        main.postDelayed(r, 160)
     }
 
     // MARK: answers
 
     /** Answers a blocked agent with a choice's key (Claude Code picks by number). */
-    fun answer(key: String) = stream?.text(key)
+    fun answer(key: String, block: String? = null) = (block?.let { panes[it]?.stream } ?: stream)?.text(key)
 
     /** "Tell Claude what to do": leave the dialog, then send the words. */
-    fun reply(text: String) {
-        val s = stream ?: return
+    fun reply(text: String, block: String? = null) {
+        val s = (block?.let { panes[it]?.stream } ?: stream) ?: return
         s.key("escape")
         main.postDelayed({ s.text(text); main.postDelayed({ s.key("enter") }, 80) }, 250)
     }
@@ -775,11 +831,11 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         reloadBadges(h)
         replayNotes(h)
         reloadActions(h)
-        if (current === h && currentSession != null) reloadView(focusServer = stream == null && windows.isEmpty())
+        if (current === h && currentSession != null) reloadView(focusServer = panes.isEmpty() && windows.isEmpty())
     }
 
     override fun disconnected(h: HostConnection) {
-        if (current === h) { stream?.stop(); stream = null }
+        if (current === h) detach()
     }
 
     override fun changed(h: HostConnection) { hosts = hosts.toList() }

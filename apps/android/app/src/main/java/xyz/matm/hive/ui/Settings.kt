@@ -51,25 +51,27 @@ fun Settings(
 ) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
+    // Say what it is: a tablet isn't a phone.
+    val device = if (androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600) "tablet" else "phone"
     androidx.compose.runtime.DisposableEffect(Unit) {
         model.settingsShown = true
         onDispose { model.settingsShown = false }
     }
     androidx.compose.runtime.LaunchedEffect(Unit) { model.hosts.filter { it.connected }.forEach { model.loadScripts(it, activity = false) } }
     Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.readingWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
                 LineIcon(Icon.Back, p.muted, 20.dp)
             }
             Spacer(Modifier.width(6.dp))
             BasicText("Settings", style = Type.title.copy(color = p.text))
         }
-        Column(Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = 16.dp)) {
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).readingWidth().padding(horizontal = 16.dp)) {
             Section("Appearance") {
                 Item("Theme") {
                     Choice(listOf("system" to "System", "night" to "Night", "day" to "Day"), model.themeChoice, model::chooseTheme)
                 }
-                Item("Text size", "When a pane fits the phone. Pinch to zoom a pane another device sizes.") {
+                Item("Text size", "When a pane fits the $device. Pinch to zoom a pane another device sizes.") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RoundKey(Icon.Minus, "Smaller text") { model.chooseTextSize(model.textSp - 0.5f) }
                         Spacer(Modifier.width(10.dp))
@@ -85,7 +87,7 @@ fun Settings(
             Section("Terminal") {
                 Toggle("Ask before pasting several lines", "When the program didn't ask for pasted text, each line may run as a command.",
                     model.confirmPaste, model::chooseConfirmPaste)
-                Toggle("Open panes fitted to the phone", "A pane opens at the phone's size, not zoomed out to another device's. The button at the top gives the size back.",
+                Toggle("Open every pane fitted to the $device", "Panes nobody else is using always open at this $device's size. With this on, so do panes another device holds; it letterboxes them until it's used again.",
                     model.openFitted, model::chooseOpenFitted)
             }
             Section("Agents") {
@@ -96,7 +98,7 @@ fun Settings(
                         }
                     }
                 }
-                Link("Notification settings on this phone") {
+                Link("Notification settings on this $device") {
                     runCatching { ctx.startActivity(Intent(SystemSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(SystemSettings.EXTRA_APP_PACKAGE, ctx.packageName)) }
                 }
             }
@@ -221,6 +223,6 @@ internal fun Track(on: Boolean) {
 private fun Link(text: String, onClick: () -> Unit) {
     val p = LocalPalette.current
     Row(Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        BasicText(text, style = Type.body.copy(color = p.honey))
+        BasicText(text, style = Type.body.copy(color = p.honeyText))
     }
 }

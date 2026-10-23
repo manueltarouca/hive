@@ -32,8 +32,9 @@ import kotlin.math.min
  * A pane, drawn on a Canvas from the mirror's frames. Two sizes: the Mac's
  * (the pane's own columns, zoomed to the phone's width; pinch to read
  * closer) or the phone's (fitted: as many columns as fit at a readable
- * size). Taps click for programs that track the mouse, open links, or
- * bring up the keyboard; vertical drags scroll.
+ * size). Taps click for programs that track the mouse or open links, and
+ * never bring up the keyboard (the key bar's keyboard key does, and a
+ * two-finger tap); vertical drags scroll; a long press selects text.
  */
 /** A face of the terminal font, with text-style symbol fonts before the system's (whose fallback is colour emoji). */
 internal fun withFallbacks(ctx: Context, file: String): Typeface {
@@ -51,15 +52,27 @@ class TerminalView(context: Context) : View(context) {
     var stream: PaneStream? = null
     var fitted = false
         set(v) { if (field != v) { field = v; zoom = 1f; panX = 0f; requestLayoutMetrics() } }
-    /** Called with the phone's columns and rows (and cell size in px) whenever they change. */
+    /** Called with this device's columns and rows for the pane (and cell size in px) whenever they change. */
     var onPhoneSize: ((Int, Int, Int, Int) -> Unit)? = null
+    /** The user acted on the pane (tap, scroll, key): it gets the focus, and a wide screen takes its size. */
+    var onUsed: (() -> Unit)? = null
+    /** Selecting in a pane focuses it (side by side), so its Paste goes there. */
+    var onFocus: (() -> Unit)? = null
+    /** A two-finger tap: show or hide the keyboard. */
+    var onTwoFingerTap: (() -> Unit)? = null
+    /** The keyboard came or went because of this view (true: wanted). */
+    var onKeyboardWanted: ((Boolean) -> Unit)? = null
+    /** Selection colours: honey, translucent, over the cells (Night and Day differ in strength). */
+    var selectionColor = 0x55F2A93B
+    var handleColor = 0xFFF2A93B.toInt()
     var onLink: ((String) -> Unit)? = null
     var onSwipe: ((Int) -> Unit)? = null
     /** The first pinch: the size hint has been understood. */
     var onPinched: (() -> Unit)? = null
-    /** Ctrl from the key bar: the next typed letter goes as ctrl+letter. */
-    var ctrlLatched = false
-    var onCtrlUsed: (() -> Unit)? = null
+    /** Modifiers from the key bar: "ctrl", "alt" or both, for the next typed key (or every one while locked). */
+    var mods: () -> String = { "" }
+    /** A typed key used the latched modifiers: a once-only latch lets go. */
+    var onModsUsed: (() -> Unit)? = null
 
     private var frame: Frame? = null
     private val density = resources.displayMetrics.density
@@ -118,6 +131,9 @@ class TerminalView(context: Context) : View(context) {
     init {
         isFocusable = true
         isFocusableInTouchMode = true
+        // The pane keeps focus for a hardware keyboard; Android's focus veil (a white wash in keyboard
+        // navigation mode) would grey the whole terminal. Its honey border says it's focused.
+        defaultFocusHighlightEnabled = false
         setBackgroundColor(0xFF000000.toInt() or theme.background)
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
@@ -258,11 +274,31 @@ class TerminalView(context: Context) : View(context) {
             }
         }
         canvas.restore()
+        selection?.let { drawSelection(canvas, it) }
         // In the Mac's size, below its last row: the pane ends here.
         val end = f.rows * cellH + pad / 2
         if (!fitted && end < height - 24 * density) {
             canvas.drawLine(0f, end, width.toFloat(), end, edge)
             canvas.drawText("The pane ends here", width / 2f, end + (height - end) / 2, hint)
+        }
+    }
+
+    private fun drawSelection(canvas: Canvas, s: Selection) {
+        fill.color = selectionColor
+        for (r in s.startRow..s.endRow) {
+            val a = if (r == s.startRow) s.startCol else 0
+            val b = if (r == s.endRow) s.endCol else (frame?.cols ?: 1) - 1
+            canvas.drawRect(sx(a), sy(r), sx(b + 1), sy(r + 1), fill)
+        }
+        // Handles: Android's teardrops in honey, their points at the selection's ends; the start's
+        // hangs to the left, the end's to the right, so two on one word never cover each other.
+        fill.color = handleColor
+        val r = handleR
+        for ((x, row, left) in listOf(Triple(sx(s.startCol), s.startRow, true), Triple(sx(s.endCol + 1), s.endRow, false))) {
+            val top = sy(row + 1)
+            val cx = if (left) x - r else x + r
+            canvas.drawCircle(cx, top + r, r, fill)
+            if (left) canvas.drawRect(x - r, top, x, top + r, fill) else canvas.drawRect(x, top, x + r, top + r, fill)
         }
     }
 
@@ -326,17 +362,35 @@ class TerminalView(context: Context) : View(context) {
         override fun onDown(e: MotionEvent) = true
 
         override fun onSingleTapUp(e: MotionEvent): Boolean {
+            // A tap with text selected only lets go of it.
+            if (selection != null) { clearSelection(); return true }
+            onUsed?.invoke()
             val f = frame ?: return true
             val x = e.x - pad + panX
             val y = e.y - pad / 2
             val col = (x / cellW).toInt().coerceIn(0, max(0, f.cols - 1))
             val row = (y / cellH).toInt()
-            if (row >= f.rows || y < 0) { showKeyboard(); return true }
+            if (row >= f.rows || y < 0) return true
+            // A click for a program that tracks the mouse, or the link under the finger. Never the
+            // keyboard: a tap to read or aim mustn't cover half the screen.
             val s = stream ?: return true
-            s.tap(col, row, gridX(x), y, geometry()) { link ->
-                if (link != null) onLink?.invoke(link) else showKeyboard()
-            }
+            s.tap(col, row, gridX(x), y, geometry()) { link -> if (link != null) onLink?.invoke(link) }
             return true
+        }
+
+        override fun onLongPress(e: MotionEvent) {
+            if (multi) return
+            val f = frame ?: return
+            onFocus?.invoke()
+            val (col, row) = cellAt(e.x, e.y, f) ?: return
+            val (a, b) = Selection.word(f, col, row)
+            selection = Selection(row, a, row, b)
+            anchor = row to a
+            anchorEnd = row to b
+            extending = true
+            stopActions()
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            invalidate()
         }
 
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
@@ -347,6 +401,8 @@ class TerminalView(context: Context) : View(context) {
                 return true
             }
             if (abs(dy) <= abs(dx)) return true
+            if (selection != null) clearSelection()
+            onUsed?.invoke()
             scrollAccum += dy
             val rows = (scrollAccum / cellH).toInt()
             if (rows != 0) {
@@ -380,23 +436,228 @@ class TerminalView(context: Context) : View(context) {
         }
     })
 
+    // MARK: selection and two-finger tap
+
+    /** The selected cells, rows top to bottom, in the frame's coordinates; null when none. */
+    private var selection: Selection? = null
+    /** Where a long press started: the word it selected, kept while the finger extends it. */
+    private var anchor = 0 to 0
+    private var anchorEnd = 0 to 0
+    /** Long pressed and not lifted yet: moving extends the selection. */
+    private var extending = false
+    /** A handle being dragged: 1 the start, 2 the end. */
+    private var dragging = 0
+    private var actions: android.view.ActionMode? = null
+    private val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+    private var twoDown = 0L
+    private var twoMoved = false
+    private var twoX = FloatArray(2)
+    private var twoY = FloatArray(2)
+    private var scaled = false
+
+    private fun cellAt(px: Float, py: Float, f: Frame): Pair<Int, Int>? {
+        val x = px - pad + panX
+        val y = py - pad / 2
+        if (y < 0) return null
+        val row = (y / cellH).toInt()
+        if (row >= f.rows) return null
+        return (x / cellW).toInt().coerceIn(0, max(0, f.cols - 1)) to row
+    }
+
+    /** Selected text, as shown: one line per row, trailing spaces dropped. */
+    fun selectedText(): String? {
+        val f = frame ?: return null
+        return selection?.text(f)
+    }
+
+    fun clearSelection() {
+        if (selection == null) return
+        selection = null
+        extending = false
+        dragging = 0
+        stopActions()
+        invalidate()
+    }
+
+    private fun stopActions() { actions?.finish(); actions = null }
+
+    /** Screen x and y of a cell's corner (the frame's coordinates to the view's). */
+    private fun sx(col: Int) = pad - panX + col * cellW
+    private fun sy(row: Int) = pad / 2 + row * cellH
+
+    private val handleR get() = 9 * density
+
+    /** Which handle is under the finger: 1 the start's, 2 the end's, 0 none. Generous, for a thumb. */
+    private fun handleAt(x: Float, y: Float): Int {
+        val s = selection ?: return 0
+        val reach = 26 * density
+        val hx1 = sx(s.startCol) - handleR; val hy1 = sy(s.startRow + 1) + handleR
+        val hx2 = sx(s.endCol + 1) + handleR; val hy2 = sy(s.endRow + 1) + handleR
+        val d1 = Math.hypot((x - hx1).toDouble(), (y - hy1).toDouble())
+        val d2 = Math.hypot((x - hx2).toDouble(), (y - hy2).toDouble())
+        return when {
+            d2 <= reach && d2 <= d1 -> 2
+            d1 <= reach -> 1
+            else -> 0
+        }
+    }
+
+    /** The floating Copy / Select all / Paste bar over the selection, Android's own. */
+    private fun showActions() {
+        if (selection == null) return
+        stopActions()
+        actions = startActionMode(object : android.view.ActionMode.Callback2() {
+            override fun onCreateActionMode(mode: android.view.ActionMode, menu: android.view.Menu): Boolean {
+                menu.add(0, 1, 0, android.R.string.copy)
+                menu.add(0, 2, 1, android.R.string.selectAll)
+                menu.add(0, 3, 2, android.R.string.paste)
+                return true
+            }
+            override fun onPrepareActionMode(mode: android.view.ActionMode, menu: android.view.Menu) = false
+            override fun onActionItemClicked(mode: android.view.ActionMode, item: android.view.MenuItem): Boolean {
+                when (item.itemId) {
+                    1 -> { selectedText()?.let { onCopy?.invoke(it) }; clearSelection() }
+                    2 -> { frame?.let { f -> selection = Selection.all(f); invalidate(); post { showActions() } } }
+                    3 -> { clearSelection(); onPaste?.invoke() }
+                }
+                return true
+            }
+            override fun onDestroyActionMode(mode: android.view.ActionMode) { if (actions === mode) actions = null }
+            override fun onGetContentRect(mode: android.view.ActionMode, view: View, out: android.graphics.Rect) {
+                val s = selection ?: return out.set(0, 0, width, 0)
+                out.set(0, sy(s.startRow).toInt(), width, sy(s.endRow + 1).toInt())
+            }
+        }, android.view.ActionMode.TYPE_FLOATING)
+    }
+
+    /** Copy (the selection's text) and Paste, from the floating bar. */
+    var onCopy: ((String) -> Unit)? = null
+    var onPaste: (() -> Unit)? = null
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        val f = frame
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                scaled = false
+                twoDown = 0L
+                if (selection != null) {
+                    dragging = handleAt(e.x, e.y)
+                    if (dragging != 0) { stopActions(); parent?.requestDisallowInterceptTouchEvent(true); return true }
+                }
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> if (e.pointerCount == 2) {
+                // Two fingers: a pinch or a two-finger tap, never a long press, a tap or a scroll.
+                cancelGestures(e)
+                twoDown = e.eventTime
+                twoMoved = false
+                for (i in 0..1) { twoX[i] = e.getX(i); twoY[i] = e.getY(i) }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (dragging != 0 && f != null) {
+                    val s = selection ?: return true
+                    // The finger sits on the handle below the line: aim at the line above it.
+                    cellAt(e.x, e.y - handleR - cellH / 2, f)?.let { (c, r) ->
+                        selection = if (dragging == 1) Selection.between(r, c, s.endRow, s.endCol) else Selection.between(s.startRow, s.startCol, r, c)
+                        val n = selection!!
+                        if (n.startRow != s.startRow || n.startCol != s.startCol) dragging = if (n.startRow == r && n.startCol == c) 1 else 2
+                        invalidate()
+                    }
+                    return true
+                }
+                if (extending && f != null) {
+                    cellAt(e.x, e.y, f)?.let { (c, r) ->
+                        // From the pressed word to the finger, either way.
+                        selection = if (r < anchor.first || (r == anchor.first && c < anchor.second)) Selection.between(r, c, anchorEnd.first, anchorEnd.second)
+                        else Selection.between(anchor.first, anchor.second, r, c)
+                        invalidate()
+                    }
+                    return true
+                }
+                if (twoDown != 0L && e.pointerCount >= 2) for (i in 0..1) {
+                    if (abs(e.getX(i) - twoX[i]) > slop || abs(e.getY(i) - twoY[i]) > slop) twoMoved = true
+                }
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (twoDown != 0L && !twoMoved && !scaled && e.eventTime - twoDown < 300) { twoDown = 0L; onTwoFingerTap?.invoke(); return true }
+                twoDown = 0L
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (dragging != 0 || extending) {
+                    dragging = 0
+                    extending = false
+                    // Not an UP for the detector: it would take the lift for a tap and clear the selection.
+                    cancelGestures(e)
+                    if (e.actionMasked == MotionEvent.ACTION_UP) showActions()
+                    return true
+                }
+            }
+        }
+        if (extending || dragging != 0) return true
         scaler.onTouchEvent(e)
-        if (!scaler.isInProgress) gestures.onTouchEvent(e)
+        if (scaler.isInProgress) scaled = true
+        // After a second finger, the rest of the gesture belongs to the pinch or the two-finger tap.
+        if (e.actionMasked == MotionEvent.ACTION_DOWN) multi = false
+        if (!multi && !scaler.isInProgress && e.pointerCount < 2) gestures.onTouchEvent(e)
         return true
+    }
+
+    /** Two fingers came down, or a selection drag ended: the detector forgets the gesture. */
+    private var multi = false
+
+    private fun cancelGestures(e: MotionEvent) {
+        if (e.actionMasked == MotionEvent.ACTION_POINTER_DOWN) multi = true
+        val c = MotionEvent.obtain(e)
+        c.action = MotionEvent.ACTION_CANCEL
+        gestures.onTouchEvent(c)
+        c.recycle()
     }
 
     // MARK: keyboard
 
+    /**
+     * Whether the on-screen keyboard is wanted. Only then is the view a text editor: a view that
+     * always says it is one gets the keyboard on some phones (Samsung's) as soon as it has focus,
+     * and it needs focus for a hardware keyboard.
+     */
+    var keyboardWanted = false
+        private set
+
     fun showKeyboard() {
+        keyboardWanted = true
         requestFocus()
-        context.getSystemService(InputMethodManager::class.java).showSoftInput(this, 0)
+        val imm = context.getSystemService(InputMethodManager::class.java)
+        imm.restartInput(this)
+        imm.showSoftInput(this, 0)
+        onKeyboardWanted?.invoke(true)
     }
 
-    override fun onCheckIsTextEditor() = true
+    fun hideKeyboard() {
+        keyboardWanted = false
+        val imm = context.getSystemService(InputMethodManager::class.java)
+        imm.hideSoftInputFromWindow(windowToken, 0)
+        imm.restartInput(this)
+        onKeyboardWanted?.invoke(false)
+    }
 
-    override fun onCreateInputConnection(out: EditorInfo): InputConnection {
+    /** The keyboard went away by itself (Back, the system): not wanted any more. */
+    fun keyboardGone() {
+        if (!keyboardWanted) return
+        keyboardWanted = false
+        context.getSystemService(InputMethodManager::class.java).restartInput(this)
+    }
+
+    fun toggleKeyboard() = if (keyboardWanted) hideKeyboard() else showKeyboard()
+
+    /** Focus without the keyboard: a hardware keyboard types here. */
+    fun takeFocus() { if (!hasFocus()) requestFocus() }
+
+    override fun onCheckIsTextEditor() = keyboardWanted
+
+    override fun onCreateInputConnection(out: EditorInfo): InputConnection? {
+        // No connection unless the keyboard is wanted: a keyboard bound to the pane shows itself
+        // on the first key typed (adb's, a hardware one's). Hardware keys come to onKeyDown without it.
+        if (!keyboardWanted) return null
         // As terminals do: no suggestions or corrections, each key committed as typed.
         out.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         out.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or EditorInfo.IME_ACTION_NONE
@@ -433,32 +694,45 @@ class TerminalView(context: Context) : View(context) {
     private fun typed(s: String) {
         val st = stream ?: return
         if (s.isEmpty()) return
-        if (ctrlLatched) {
-            ctrlLatched = false
-            onCtrlUsed?.invoke()
-            val c = s[0].lowercaseChar()
-            st.key("ctrl+$c")
+        onUsed?.invoke()
+        val m = mods()
+        if (m.isNotEmpty()) {
+            // The latched modifiers go with the first key, encoded by the server for the program's modes.
+            val c = s[0]
+            st.key(m + "+" + if (c == ' ') "space" else if (c == '\n') "enter" else c.lowercaseChar().toString())
+            onModsUsed?.invoke()
             if (s.length > 1) typed(s.substring(1))
             return
         }
         st.text(s.replace("\n", "\r"))
     }
 
+    /** Back from a real keyboard (some map Esc to it), not the system's: a keyboard's id is positive. */
+    private fun keyboardBack(keyCode: Int, event: KeyEvent) =
+        keyCode == KeyEvent.KEYCODE_BACK && event.deviceId > 0 && event.source and android.view.InputDevice.SOURCE_KEYBOARD == android.view.InputDevice.SOURCE_KEYBOARD &&
+            event.device?.isVirtual == false
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val st = stream ?: return super.onKeyDown(keyCode, event)
+        if (keyboardBack(keyCode, event)) { onUsed?.invoke(); st.key("escape"); return true }
         if (keyCode == KeyEvent.KEYCODE_BACK) return super.onKeyDown(keyCode, event)
+        // Ctrl+Shift+V pastes, as in desktop terminals.
+        if (keyCode == KeyEvent.KEYCODE_V && event.isCtrlPressed && event.isShiftPressed) { onPaste?.invoke(); return true }
+        if (selection != null) clearSelection()
+        onUsed?.invoke()
+        val latched = mods()
         var mods = 0
         if (event.isShiftPressed) mods = mods or 1
-        if (event.isCtrlPressed || ctrlLatched) mods = mods or 2
-        if (event.isAltPressed) mods = mods or 4
+        if (event.isCtrlPressed || "ctrl" in latched) mods = mods or 2
+        if (event.isAltPressed || "alt" in latched) mods = mods or 4
         if (event.isMetaPressed) mods = mods or 8
-        val ch = event.getUnicodeChar(event.metaState and (KeyEvent.META_SHIFT_MASK or KeyEvent.META_ALT_MASK or KeyEvent.META_CAPS_LOCK_ON))
-        val text = if (ch > 0x1F && mods and 2 == 0) String(Character.toChars(ch)) else ""
+        val ch = event.getUnicodeChar(event.metaState and (KeyEvent.META_SHIFT_MASK or KeyEvent.META_CAPS_LOCK_ON))
+        val text = if (ch > 0x1F && mods and (2 or 4) == 0) String(Character.toChars(ch)) else ""
         val unshifted = event.getUnicodeChar(0)
-        if (ctrlLatched) { ctrlLatched = false; onCtrlUsed?.invoke() }
+        if (latched.isNotEmpty() && !KeyEvent.isModifierKey(keyCode)) onModsUsed?.invoke()
         st.androidKey(keyCode, mods, text, unshifted)
         return true
     }
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent) = keyCode != KeyEvent.KEYCODE_BACK || super.onKeyUp(keyCode, event)
+    override fun onKeyUp(keyCode: Int, event: KeyEvent) = keyCode != KeyEvent.KEYCODE_BACK || keyboardBack(keyCode, event) || super.onKeyUp(keyCode, event)
 }

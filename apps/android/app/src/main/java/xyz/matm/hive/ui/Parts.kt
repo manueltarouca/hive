@@ -15,6 +15,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -84,13 +88,14 @@ fun Pill(text: String, primary: Boolean = false, modifier: Modifier = Modifier, 
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { this.selected = selected }
             .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        BasicText(text, style = Type.label.copy(color = if (primary) p.onHoney else if (danger) p.coral else p.text), maxLines = 1)
+        BasicText(text, style = Type.label.copy(color = if (primary) p.onHoney else if (danger) p.coralText else p.text), maxLines = 1)
     }
 }
 
 /** Simple line icons, drawn so they take the palette's colors. */
-enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, Send, Back, Check, Link, Alert, Camera, Gear, Minus, Pin, Search, Bolt }
+enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, KeyboardHide, Send, Back, Check, Link, Alert, Camera, Gear, Minus, Pin, Search, Bolt, More, Sidebar }
 
 @Composable
 fun LineIcon(icon: Icon, color: Color, size: Dp = 18.dp, modifier: Modifier = Modifier, description: String? = null) {
@@ -126,6 +131,20 @@ private fun DrawScope.drawIcon(icon: Icon, color: Color) {
                 androidx.compose.ui.geometry.CornerRadius(.08f * s), style = st)
             for (x in listOf(.27f, .42f, .58f, .73f)) drawCircle(color, .035f * s, Offset(x * s, .42f * s))
             line(.32f, .58f, .68f, .58f)
+        }
+        Icon.KeyboardHide -> {
+            // The keyboard, smaller and higher, over a chevron pointing down: put it away.
+            drawRoundRect(color, Offset(.16f * s, .14f * s), androidx.compose.ui.geometry.Size(.68f * s, .4f * s),
+                androidx.compose.ui.geometry.CornerRadius(.07f * s), style = st)
+            for (x in listOf(.3f, .43f, .57f, .7f)) drawCircle(color, .032f * s, Offset(x * s, .28f * s))
+            line(.36f, .42f, .64f, .42f)
+            line(.38f, .7f, .5f, .82f); line(.5f, .82f, .62f, .7f)
+        }
+        Icon.More -> for (x in listOf(.26f, .5f, .74f)) drawCircle(color, .055f * s, Offset(x * s, .5f * s))
+        Icon.Sidebar -> {
+            drawRoundRect(color, Offset(.14f * s, .22f * s), androidx.compose.ui.geometry.Size(.72f * s, .56f * s),
+                androidx.compose.ui.geometry.CornerRadius(.08f * s), style = st)
+            line(.4f, .22f, .4f, .78f)
         }
         Icon.Send -> { line(.5f, .78f, .5f, .25f); line(.3f, .45f, .5f, .25f); line(.5f, .25f, .7f, .45f) }
         Icon.Link -> rotate(-45f) {
@@ -164,5 +183,18 @@ private fun DrawScope.drawIcon(icon: Icon, color: Color) {
             drawCircle(color, .13f * s, Offset(.5f * s, .55f * s), style = st)
             line(.38f, .3f, .43f, .2f); line(.43f, .2f, .57f, .2f); line(.57f, .2f, .62f, .3f)
         }
+    }
+}
+
+/**
+ * A column of text and controls at a width you can read on a tablet (640 dp), centered; the
+ * whole width on a phone. The background around it stays the screen's.
+ */
+fun Modifier.readingWidth(): Modifier = this.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp).fillMaxWidth()
+
+/** Width classes: one layout that adapts, never a separate tablet screen. */
+enum class Space { Compact, Medium, Expanded;
+    companion object {
+        fun of(widthDp: Float) = when { widthDp < 600 -> Compact; widthDp < 840 -> Medium; else -> Expanded }
     }
 }

@@ -81,11 +81,12 @@ import kotlin.math.roundToInt
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TabStrip(model: AppModel, openSheet: () -> Unit, openMenu: (WindowInfo) -> Unit) {
+fun TabStrip(model: AppModel, openSheet: () -> Unit, openMenu: (WindowInfo) -> Unit, all: Boolean = false) {
     val p = LocalPalette.current
     val tabs = model.tabs()
-    val shown = TabGroups.strip(tabs, model.windowIndex)
-    val all = tabs.size > TabGroups.ALL_IN_STRIP
+    // A wide screen has room for every tab (pins first); a phone keeps pins, what needs you, and where you are.
+    val shown = if (all) TabGroups.shown(tabs.map { it.pinned }) else TabGroups.strip(tabs, model.windowIndex)
+    val folded = tabs.size > TabGroups.ALL_IN_STRIP
     Row(
         Modifier.fillMaxWidth()
             .pointerInput(Unit) {
@@ -95,7 +96,7 @@ fun TabStrip(model: AppModel, openSheet: () -> Unit, openMenu: (WindowInfo) -> U
             .horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (all) {
+        if (folded) {
             // The count wears the states of what's behind it, as a small comb.
             val states = listOf("blocked", "stopped", "done", "working").filter { s -> tabs.any { it.state == s } }
             Row(
@@ -109,7 +110,7 @@ fun TabStrip(model: AppModel, openSheet: () -> Unit, openMenu: (WindowInfo) -> U
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { for (s in states) Hexagon(s, 7.dp) }
                     Spacer(Modifier.width(7.dp))
                 }
-                BasicText("${tabs.size}", style = Type.small.copy(color = p.text, fontWeight = FontWeight(500)))
+                BasicText(if (all) "${tabs.size} tabs" else "${tabs.size}", style = Type.small.copy(color = p.text, fontWeight = FontWeight(500)))
             }
         }
         for (i in shown) {
@@ -153,7 +154,7 @@ fun TabSheet(model: AppModel, close: () -> Unit, openMenu: (WindowInfo) -> Unit)
     val tabs = model.tabs()
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.42f))
         .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = close)) {
-        BoxWithConstraints(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+        BoxWithConstraints(Modifier.align(Alignment.BottomCenter).widthIn(max = 640.dp).fillMaxWidth()) {
             Column(Modifier.fillMaxWidth().heightIn(max = maxHeight * 0.86f).clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                 .background(p.surface).clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
                 .navigationBarsPadding().imePadding().padding(top = 10.dp)) {
@@ -189,7 +190,7 @@ fun TabSheet(model: AppModel, close: () -> Unit, openMenu: (WindowInfo) -> Unit)
                     } else {
                         val g = TabGroups.groups(tabs)
                         Group("Pinned", g.pinned.size, p.muted) { Cards(model, g.pinned, ::go, openMenu) }
-                        Group("Needs you", g.needsYou.size, p.coral) { Cards(model, g.needsYou, ::go, openMenu) }
+                        Group("Needs you", g.needsYou.size, p.coralText) { Cards(model, g.needsYou, ::go, openMenu) }
                         Group("Working", g.working.size, p.muted) { Cards(model, g.working, ::go, openMenu) }
                         Group("Quiet", g.quiet.size, p.muted, count = g.pinned.size + g.needsYou.size + g.working.size > 0) { Quiet(model, g.quiet, ::go, openMenu) }
                     }

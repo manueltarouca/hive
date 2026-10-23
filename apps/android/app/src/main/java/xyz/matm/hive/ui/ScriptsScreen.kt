@@ -87,7 +87,7 @@ fun ScriptsScreen(model: AppModel, h: HostConnection, focus: String?, close: () 
     }
 
     Column(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.readingWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.clip(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = close).semantics { contentDescription = "Back" }.padding(8.dp)) {
                 LineIcon(Icon.Back, p.muted, 20.dp)
             }
@@ -126,13 +126,13 @@ fun ScriptsScreen(model: AppModel, h: HostConnection, focus: String?, close: () 
                     style = Type.small.copy(color = p.muted), modifier = Modifier.widthIn(max = 300.dp),
                 )
             }
-            else -> LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list) {
+            else -> LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, horizontalAlignment = Alignment.CenterHorizontally) {
                 // Read before the host went away: still worth seeing, but the switches can't reach it.
                 if (page.error != null) item(key = "away") {
-                    Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) { Problem(page.error.removeSuffix(" hive keeps trying.") + " This is what hive read last.") }
+                    Box(Modifier.readingWidth().padding(horizontal = 16.dp, vertical = 4.dp)) { Problem(page.error.removeSuffix(" hive keeps trying.") + " This is what hive read last.") }
                 }
                 items(page.list, key = { it.name }) { s ->
-                    ScriptCard(model, h, s, page.activity[s.name], page.problems, page.busy, tick)
+                    Box(Modifier.readingWidth()) { ScriptCard(model, h, s, page.activity[s.name], page.problems, page.busy, tick) }
                 }
                 item(key = "end") { Spacer(Modifier.height(24.dp)) }
             }
@@ -153,8 +153,9 @@ private fun Middle(content: @Composable () -> Unit) {
 private fun StateDot(s: Resident) {
     val p = LocalPalette.current
     when (s.state) {
-        "running" -> Hexagon("done", 9.dp, tint = if (s.watching) p.muted else p.sage)
-        "pending" -> Hexagon("done", 9.dp, tint = p.honey)
+        // The brand's states: honey at work, coral needs you (an OK to give), quiet when watching.
+        "running" -> Hexagon("done", 9.dp, tint = if (s.watching) p.muted else p.honey)
+        "pending" -> Hexagon("blocked", 9.dp)
         "failed", "quarantined" -> Hexagon("blocked", 9.dp)
         else -> Hexagon("idle", 9.dp)
     }
@@ -240,7 +241,7 @@ private fun Problem(text: String) {
     Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Top) {
         LineIcon(Icon.Alert, p.coral, 14.dp, Modifier.padding(top = 2.dp))
         Spacer(Modifier.width(6.dp))
-        BasicText(text, style = Type.small.copy(color = p.coral))
+        BasicText(text, style = Type.small.copy(color = p.coralText))
     }
 }
 
@@ -258,7 +259,7 @@ private fun Allow(model: AppModel, h: HostConnection, s: Resident, busy: Boolean
             Row(verticalAlignment = Alignment.Top) {
                 LineIcon(Icon.Alert, p.coral, 14.dp, Modifier.padding(top = 2.dp))
                 Spacer(Modifier.width(6.dp))
-                BasicText(it, style = Type.small.copy(color = p.coral))
+                BasicText(it, style = Type.small.copy(color = p.coralText))
             }
         }
         Spacer(Modifier.height(10.dp))
