@@ -108,6 +108,15 @@ patch, and this file lists it under "Changed" or "Removed".
   and usage text, so macOS asks for it and you grant it once in System
   Settings; grants to it and to Hive.app now survive rebuilds and updates.
   Hive.app also declares its local network and Apple Events use.
+- On macOS, closing the terminal app that ran the first `hive` command
+  stopped the server and every terminal in it: macOS stops what an app
+  started when it closes. Hive.app now adds the server as its background
+  item (Login Items & Extensions), and `hive` asks macOS to start it, so it
+  keeps running when you close Hive or a terminal app. It starts on demand,
+  not at login, and macOS restarts it after a crash. Terminals started by it
+  get a UTF-8 `LANG` from your macOS language when none is set, and commands
+  find what your login shell's `PATH` finds. Over SSH, `hive` finds the same
+  server as Hive.app.
 
 ### Changed
 

@@ -225,6 +225,13 @@ func baseEnv() []string {
 		env = append(env, kv)
 	}
 	env = append(env, "TERM=xterm-256color", "COLORTERM=truecolor", "TERM_PROGRAM=hive")
+	// A server macOS started (Hive's background item) has no locale; set one,
+	// as Terminal does, or programs fall back to ASCII.
+	if os.Getenv("LANG") == "" && os.Getenv("LC_ALL") == "" && os.Getenv("LC_CTYPE") == "" {
+		if l := defaultLang(); l != "" {
+			env = append(env, "LANG="+l)
+		}
+	}
 	// hive shows OSC 8 hyperlinks and opens them; programs that can't tell
 	// from TERM_PROGRAM ask this (Claude Code then makes its file and URL
 	// links clickable). The user's own setting wins.

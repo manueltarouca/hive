@@ -159,8 +159,20 @@ func connectWith(g globals, extra, env []string) (*client.Client, error) {
 	if g.explicitServer || !strings.HasPrefix(sock, "/") {
 		return nil, &client.UnreachableError{Err: fmt.Errorf("no server on %s", sock)}
 	}
+	exists := false
+	if agentServes(sock, extra, env) {
+		var started bool
+		if started, exists = startAgent(sock); started {
+			return c, nil
+		}
+	}
 	if err := startDaemon(sock, extra, env); err != nil {
 		return nil, &client.UnreachableError{Err: err}
+	}
+	if agentServes(sock, extra, env) && isTerminal(os.Stderr) {
+		if h := agentHint(exists); h != "" {
+			fmt.Fprintln(os.Stderr, h)
+		}
 	}
 	return c, nil
 }
@@ -221,4 +233,9 @@ func short(id string) string {
 		return id
 	}
 	return "…" + id[len(id)-6:]
+}
+
+func isTerminal(f *os.File) bool {
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }

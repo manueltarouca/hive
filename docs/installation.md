@@ -129,6 +129,32 @@ The debug build installs beside a release as **hive dev**.
 Any `hive` command starts a server if none is running. `hive server stop`
 stops it. Your sessions come back the next time it starts.
 
+### On macOS: the server runs in the background
+
+macOS stops what an app started when you close that app, unless the app may
+run in the background. A server started from Terminal or Ghostty would stop,
+with every terminal in it, when you close Terminal or Ghostty. So Hive.app
+adds the server as its background item the first time you open it. You see it
+as **Hive** in System Settings → General → Login Items & Extensions. After
+that, `hive` asks macOS to start the server, and it keeps running when you
+close Hive or your terminal app.
+
+- It doesn't start at login: it starts when you open Hive or run `hive`.
+- If it crashes, macOS starts it again. `hive server stop` stops it until the
+  next `hive` command.
+- Turning Hive off in Login Items stops the server and its terminals.
+- Until you open Hive once, `hive` starts the server itself and says it stops
+  when you close the terminal app. After an update, open Hive once so macOS
+  starts the new server.
+- The background server starts with macOS's environment, not your terminal's.
+  Terminals run your login shell, so `PATH` and what your shell profile sets
+  are there; something you only `export`ed in a terminal before running
+  `hive` is not.
+- A server with options (`hive server start --tailscale ...`) is started by
+  `hive` itself, as before. Tailscale keeps its sign-in, so after the first
+  start you can `hive server stop` and let the next `hive` start the
+  background one.
+
 ## Update
 
 Download the new release and replace the files: `hive` in `~/.local/bin`,
@@ -146,6 +172,9 @@ rm -rf /Applications/Hive.app
 rm -rf ~/.local/state/hive     # your sessions and their scrollback
 rm -rf ~/.config/hive          # settings and saved hosts
 ```
+
+On macOS, first turn **Hive** off in System Settings → General → Login Items
+& Extensions; deleting the app alone leaves the entry there.
 
 If you added the plugin: `claude plugin uninstall hive@hive`.
 

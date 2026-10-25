@@ -366,8 +366,29 @@ func cmdServer(g globals, args []string) error {
 		fresh := fs.Bool("fresh", false, "")
 		sock := fs.String("socket", socketFor(g), "")
 		state := fs.String("state-dir", paths.State(), "")
+		agent := fs.Bool("agent", false, "")
 		rf := addRemoteFlags(fs)
 		if err := parse(fs, args[1:]); err != nil {
+			return err
+		}
+		if *agent {
+			// Hive's background item. Exiting 0 means "don't start me again":
+			// so a server already running, or one that can't start, doesn't
+			// become a restart loop; launchd restarts it only after a crash.
+			if err := prepareAgent(*state); err != nil {
+				return err
+			}
+			if client.New(*sock).Ping() {
+				fmt.Fprintln(os.Stderr, "background server: a server already answers on", *sock)
+				return nil
+			}
+		}
+		// As the background item, an error starting is logged, not a crash.
+		fail := func(err error) error {
+			if *agent && err != nil {
+				fmt.Fprintln(os.Stderr, "background server:", err)
+				return nil
+			}
 			return err
 		}
 		rc, err := rf.config(os.Stdin)
@@ -380,12 +401,15 @@ func cmdServer(g globals, args []string) error {
 		srv, err := server.New(server.Config{Socket: *sock, StateDir: *state, Fresh: *fresh, HivePath: exe, ConfigPath: config.Path(), ScriptsDir: config.Scripts(),
 			Logger: newLogger(), Remote: rc})
 		if err != nil {
-			return err
+			return fail(err)
+		}
+		if *agent {
+			agentServing()
 		}
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 		go func() { <-sig; srv.Shutdown() }()
-		return srv.Serve()
+		return fail(srv.Serve())
 	case "start":
 		fs := flags("server start")
 		rf := addRemoteFlags(fs)

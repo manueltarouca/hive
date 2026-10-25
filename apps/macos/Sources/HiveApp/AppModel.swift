@@ -309,8 +309,11 @@ final class AppModel: ObservableObject {
         let env = ProcessInfo.processInfo.environment
         if let s = env["HIVE_SERVER"], !s.isEmpty { return s }
         if let d = env["XDG_RUNTIME_DIR"], !d.isEmpty { return d + "/hive/server.sock" }
-        // Same as Go's os.TempDir() on macOS: $TMPDIR, the per-user temp dir.
-        let tmp = (env["TMPDIR"] ?? "/tmp/").replacingOccurrences(of: "//", with: "/")
+        // Same as Go's paths.Socket(): $TMPDIR, else the per-user temp dir
+        // (an app opened from an SSH login has no TMPDIR).
+        var buf = [CChar](repeating: 0, count: 1024)
+        let user = confstr(_CS_DARWIN_USER_TEMP_DIR, &buf, buf.count) > 0 ? String(cString: buf) : "/tmp/"
+        let tmp = (env["TMPDIR"].flatMap { $0.isEmpty ? nil : $0 } ?? user).replacingOccurrences(of: "//", with: "/")
         return (tmp as NSString).appendingPathComponent("hive-\(getuid())/server.sock")
     }
 
@@ -406,10 +409,18 @@ final class AppModel: ObservableObject {
     /// Starts the server if nothing answers on the socket. A socket file can
     /// outlive its server, so this connects rather than checking the file.
     private func ensureServer() {
+        // Registered, `hive server start` has launchd start the server as Hive's
+        // background item; otherwise it starts it itself.
+        BackgroundServer.register()
         guard !AppModel.canConnect(socket), let bin = AppModel.hiveBinary() else { return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: bin)
         p.arguments = ["server", "start"]
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["HIVE_AGENT_TEST"] != nil, let label = BackgroundServer.label {
+            p.environment = ProcessInfo.processInfo.environment.merging(["HIVE_AGENT_LABEL": label]) { $1 }
+        }
+        #endif
         try? p.run()
         p.waitUntilExit()
     }

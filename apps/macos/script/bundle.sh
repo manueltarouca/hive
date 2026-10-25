@@ -66,6 +66,28 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
 PLIST
+# The server as Hive's background item (BackgroundServer.swift): a launchd
+# job started on demand, restarted only after a crash. HIVE_AGENT_TEST_DIR
+# gives the test bundle's job its own socket and state, away from yours.
+mkdir -p "$app/Contents/Library/LaunchAgents"
+agent_args=""
+if [ -n "${HIVE_AGENT_TEST_DIR:-}" ]; then
+  for a in --socket "$HIVE_AGENT_TEST_DIR/s.sock" --state-dir "$HIVE_AGENT_TEST_DIR/state"; do agent_args="$agent_args<string>$a</string>"; done
+fi
+cat > "$app/Contents/Library/LaunchAgents/$bundle_id.server.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$bundle_id.server</string>
+  <key>BundleProgram</key><string>Contents/Resources/hive</string>
+  <key>ProgramArguments</key><array><string>hive</string><string>server</string><string>run</string><string>--agent</string>$agent_args</array>
+  <key>AssociatedBundleIdentifiers</key><array><string>$bundle_id</string></array>
+  <key>RunAtLoad</key><false/>
+  <key>KeepAlive</key><dict><key>Crashed</key><true/></dict>
+  <key>ProcessType</key><string>Interactive</string>
+  <key>ExitTimeOut</key><integer>30</integer>
+</dict></plist>
+PLIST
 # Extended attributes (com.apple.provenance, quarantine) would be sealed into
 # the signature and then shipped as ._ files that break it when unzipped.
 xattr -cr "$app"
