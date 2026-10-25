@@ -43,6 +43,9 @@ if [ ! -f "$icns" ] || [ "$here/script/icon.swift" -nt "$icns" ]; then
   iconutil -c icns "$set_dir" -o "$icns"
 fi
 cp "$icns" "$app/Contents/Resources/AppIcon.icns"
+# macOS asks Hive, as the responsible app, for what programs in its panes do:
+# without a usage description, LAN connections fail (EHOSTUNREACH) and Apple
+# Events are refused, with no prompt.
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -58,6 +61,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>HiveVersion</key><string>$version</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSLocalNetworkUsageDescription</key><string>Programs in your terminals reach devices on your local network.</string>
+  <key>NSAppleEventsUsageDescription</key><string>Programs in your terminals control other apps.</string>
   <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
 PLIST

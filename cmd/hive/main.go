@@ -161,6 +161,12 @@ func connectWith(g globals, extra, env []string) (*client.Client, error) {
 	if g.explicitServer || !strings.HasPrefix(sock, "/") {
 		return nil, &client.UnreachableError{Err: fmt.Errorf("no server on %s", sock)}
 	}
+	// Hive.app starts it with HIVE_BY_APP set; anyone else asks the app first.
+	byApp := os.Getenv("HIVE_BY_APP") != ""
+	os.Unsetenv("HIVE_BY_APP") // not for the server's panes
+	if !byApp && extra == nil && env == nil && startViaApp(sock) {
+		return c, nil
+	}
 	if err := startDaemon(sock, extra, env); err != nil {
 		return nil, &client.UnreachableError{Err: err}
 	}

@@ -100,6 +100,12 @@ patch, and this file lists it under "Changed" or "Removed".
 - A method that crashed while called over the attach stream (the apps'
   connection) stopped the whole server. It now fails that one call with
   `internal`, as it already did over `/v1/call`.
+- On macOS, programs in panes could be denied the local network ("No route
+  to host"), screen recording and accessibility, with no prompt, when a
+  `hive` command rather than Hive.app had started the server. A command
+  that finds no server now asks Hive.app to start it (opening it hidden if
+  it isn't running), so the server and its panes count as Hive. Hive.app
+  also declares why it uses the local network and Apple Events.
 
 ### Changed
 
