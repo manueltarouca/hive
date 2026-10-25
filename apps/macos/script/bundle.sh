@@ -69,5 +69,7 @@ PLIST
 # Extended attributes (com.apple.provenance, quarantine) would be sealed into
 # the signature and then shipped as ._ files that break it when unzipped.
 xattr -cr "$app"
-codesign --force --deep --sign - "$app" >/dev/null
+# Required: this bundle ID, not this build's hash, so grants in System
+# Settings still hold after a rebuild.
+codesign --force --deep --sign - -r "=designated => identifier \"$bundle_id\"" "$app" >/dev/null
 echo "$app"

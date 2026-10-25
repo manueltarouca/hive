@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Built into the macOS binary (see the Makefile). macOS asks the server, as
+     the program responsible for its panes, for what their programs do. -->
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>xyz.matm.hive.server</string>
+  <key>CFBundleName</key><string>hive</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Programs in your terminals reach devices on your local network.</string>
+  <key>NSAppleEventsUsageDescription</key><string>Programs in your terminals control other apps.</string>
+</dict></plist>

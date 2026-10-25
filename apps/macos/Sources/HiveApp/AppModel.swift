@@ -4,7 +4,6 @@ import Foundation
 import HiveCore
 import HiveKit
 import UserNotifications
-import notify
 
 /// A window's layout tree, as the server sends it.
 indirect enum Layout: Equatable {
@@ -336,15 +335,6 @@ final class AppModel: ObservableObject {
         // Only at launch: if the server stops later, it was asked to.
         // Reconnecting must not undo `hive server stop`.
         ensureServer()
-        // A hive command found no server on this socket: it asks the app to start it, so the
-        // server is Hive's. One at a time.
-        var token: Int32 = 0
-        let sock = socket
-        let queue = DispatchQueue(label: "xyz.matm.hive.start-server")
-        let status = notify_register_dispatch("xyz.matm.hive.start-server:\(sock)", &token, queue) { _ in
-            AppModel.startServer(socket: sock)
-        }
-        if status != NOTIFY_STATUS_OK { NSLog("hive: can't listen for server starts (notify status %u)", status) }
         for h in hosts { wireHost(h); h.start() }
         watchHosts()
     }
@@ -415,24 +405,16 @@ final class AppModel: ObservableObject {
 
     /// Starts the server if nothing answers on the socket. A socket file can
     /// outlive its server, so this connects rather than checking the file.
-    private func ensureServer() { AppModel.startServer(socket: socket) }
-
-    nonisolated static func startServer(socket: String) {
-        guard !canConnect(socket), let bin = hiveBinary() else { return }
+    private func ensureServer() {
+        guard !AppModel.canConnect(socket), let bin = AppModel.hiveBinary() else { return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: bin)
         p.arguments = ["server", "start"]
-        // Started by the app, the server is Hive's to macOS (local network, screen
-        // recording); without this the CLI would ask the app to start it.
-        var env = ProcessInfo.processInfo.environment
-        env["HIVE_START_HIDDEN"] = nil
-        env["HIVE_BY_APP"] = "1"
-        p.environment = env
         try? p.run()
         p.waitUntilExit()
     }
 
-    nonisolated static func canConnect(_ path: String) -> Bool {
+    static func canConnect(_ path: String) -> Bool {
         let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
         defer { Darwin.close(fd) }

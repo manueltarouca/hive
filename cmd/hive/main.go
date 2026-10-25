@@ -9,10 +9,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/manueltarouca/hive/internal/client"
@@ -161,12 +159,6 @@ func connectWith(g globals, extra, env []string) (*client.Client, error) {
 	if g.explicitServer || !strings.HasPrefix(sock, "/") {
 		return nil, &client.UnreachableError{Err: fmt.Errorf("no server on %s", sock)}
 	}
-	// Hive.app starts it with HIVE_BY_APP set; anyone else asks the app first.
-	byApp := os.Getenv("HIVE_BY_APP") != ""
-	os.Unsetenv("HIVE_BY_APP") // not for the server's panes
-	if !byApp && extra == nil && env == nil && startViaApp(sock) {
-		return c, nil
-	}
 	if err := startDaemon(sock, extra, env); err != nil {
 		return nil, &client.UnreachableError{Err: err}
 	}
@@ -187,15 +179,15 @@ func startDaemon(sock string, extra, env []string) error {
 		return err
 	}
 	defer logf.Close()
-	cmd := exec.Command(exe, append([]string{"server", "run", "--socket", sock}, extra...)...)
-	cmd.Env = append(os.Environ(), env...)
-	cmd.Stdout, cmd.Stderr = logf, logf
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	cmd.Dir = "/"
-	if err := cmd.Start(); err != nil {
+	// Set, not appended: an override must win over the same name already in the environment.
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			os.Setenv(k, v)
+		}
+	}
+	if err := spawnDaemon(exe, append([]string{exe, "server", "run", "--socket", sock}, extra...), os.Environ(), logf); err != nil {
 		return err
 	}
-	_ = cmd.Process.Release()
 	c := client.New(sock)
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {

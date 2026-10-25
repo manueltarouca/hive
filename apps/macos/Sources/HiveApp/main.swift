@@ -179,9 +179,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             return self.model.handleKey(c) ? nil : e
         }
         followSystemAppearance()
-        // Opened by a hive command to start the server: stay hidden, in the menu bar.
-        let hidden = ProcessInfo.processInfo.environment["HIVE_START_HIDDEN"] != nil
-        unsetenv("HIVE_START_HIDDEN")
         window.makeKeyAndOrderFront(nil)
         if ProcessInfo.processInfo.environment["HIVE_DEBUG"] != nil, let b = window.standardWindowButton(.closeButton) {
             let f = b.convert(b.bounds, to: nil)
@@ -189,7 +186,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                   window.frame.height - window.contentLayoutRect.height)
         }
         model.start()
-        if hidden { NSApp.hide(nil) } else { NSApp.activate(ignoringOtherApps: true) }
+        NSApp.activate(ignoringOtherApps: true)
         #if DEBUG
         // For the e2e: SIGUSR1 stands in for "you typed in a pane here" (the
         // size goes to the device in use). Debug builds only.

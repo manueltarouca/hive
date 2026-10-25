@@ -101,11 +101,13 @@ patch, and this file lists it under "Changed" or "Removed".
   connection) stopped the whole server. It now fails that one call with
   `internal`, as it already did over `/v1/call`.
 - On macOS, programs in panes could be denied the local network ("No route
-  to host"), screen recording and accessibility, with no prompt, when a
-  `hive` command rather than Hive.app had started the server. A command
-  that finds no server now asks Hive.app to start it (opening it hidden if
-  it isn't running), so the server and its panes count as Hive. Hive.app
-  also declares why it uses the local network and Apple Events.
+  to host"), screen recording and accessibility, with no prompt. macOS held
+  whatever had started the server responsible for them: a shell, or a
+  Hive.app that had since quit. The server is now responsible for its own
+  panes, whoever starts it, and has its own name (`xyz.matm.hive.server`)
+  and usage text, so macOS asks for it and you grant it once in System
+  Settings; grants to it and to Hive.app now survive rebuilds and updates.
+  Hive.app also declares its local network and Apple Events use.
 
 ### Changed
 

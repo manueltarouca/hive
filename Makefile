@@ -22,6 +22,15 @@ VT_TARGET   := -Dtarget=$(ZIG_TARGET)
 export CC   := $(ZIG) cc -target $(ZIG_TARGET)
 endif
 LDFLAGS     := -s -w -X github.com/manueltarouca/hive/internal/server.Version=$(VERSION)
+# On macOS the server is responsible for its panes' programs, so it carries
+# its own name and usage text: an Info.plist in the binary, and a signing
+# identifier (codesign's default for a Go binary is a.out).
+ifeq ($(shell go env GOOS)$(ZIG_TARGET),darwin)
+# Its designated requirement is that identifier, not this build's hash, so
+# what you grant it in System Settings still holds after a rebuild.
+LDFLAGS     += -extldflags=-Wl,-sectcreate,__TEXT,__info_plist,$(CURDIR)/cmd/hive/Info.plist
+SIGN        := codesign --force --sign - --identifier xyz.matm.hive.server -r '=designated => identifier "xyz.matm.hive.server"' bin/hive
+endif
 export PKG_CONFIG_PATH := $(VT_PREFIX)/share/pkgconfig
 
 .PHONY: all build test vt vt-android clean version
@@ -30,6 +39,7 @@ all: build
 
 build: $(VT_PREFIX)/lib/libghostty-vt.a
 	go build -trimpath -ldflags '$(LDFLAGS)' -o bin/hive ./cmd/hive
+	$(SIGN)
 
 version:
 	@echo $(VERSION)
