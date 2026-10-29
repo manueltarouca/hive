@@ -30,6 +30,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /v1/call", s.handleCall)
 	mux.HandleFunc("GET /v1/events", s.handleEvents)
 	mux.HandleFunc("GET /v1/attach", s.handleAttach)
+	mux.HandleFunc("GET /v1/file", s.handleFile)
 	return remote.Authorize(noBrowsers(mux), s.logDenied)
 }
 

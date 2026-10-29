@@ -49,6 +49,18 @@ request is identified before it reaches a method, and `whoami` says how:
 | `tailscale:tag:ci` | A tagged device, which never counts as its owner |
 | `anonymous` | A caller on a plain TCP listener |
 
+`GET /v1/file?path=P&block_id=B` returns a file the pane `B` printed, as the
+apps' file viewer reads it. A relative path is looked for in the folder of
+the pane's program, then its shell's, then where it started; `~/` and a
+`:line` suffix work. A file comes as it is, with `Range` for a part of it,
+and headers: `X-Hive-Path` (the path resolved), `X-Hive-Kind` (`file` or
+`dir`), `X-Hive-Text: 1` when it reads as text, `X-Hive-Line` when the path
+named a line. A folder comes as JSON, `{path, entries: [{name, dir, size,
+modified}], truncated}`, newest first, at most 500. `HEAD` says the same
+without the body. Only files and folders: never pipes or devices. Anyone a
+server lets in can already read files through a terminal; a read from
+another machine is logged with who asked.
+
 A call answers with `{"result": …}`, or with `{"error": {"status", "code",
 "message"}}` and an HTTP status:
 
