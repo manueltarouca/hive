@@ -70,6 +70,28 @@ use the mouse and opens links.
 Long press to select a word; drag the handles, or keep your finger down and
 drag, to select more. **Copy**, **Select all** and **Paste** show above it.
 
+### Files a pane printed
+
+Tap a path a program printed (`build/shot.png`, `ui/Desk.kt:40`, a folder)
+to see it without leaving hive. The path is read where the pane is, on its
+host, even when it wraps across rows. On a phone the file opens in a sheet
+over the pane, half height: drag it up for more, down to close. On a
+tablet or a wide screen it opens beside the panes, which narrow to make
+room, so you can read the file and answer the agent at once.
+
+- Images show in the app; pinch to zoom.
+- Text shows in the terminal's font with line numbers. `:40` after a path
+  opens at that line. Text over 2 MB offers **Show the last 2 MB**, the end
+  of a log being what you usually want, or **Open in…**.
+- A folder lists its files, newest first; tap one to see it, Back to return.
+- Anything else (a PDF, a video, an archive) opens in an app on the device:
+  **Open in…** fetches it, with progress and **Cancel**, and hands it over
+  read-only. The copy stays a day, then the app deletes it.
+
+A word that only looks like a path (`a/b`) opens nothing when there's no such
+file, so a tap to focus a pane doesn't pop up a viewer. A full path that
+isn't there says so.
+
 ## Size
 
 A pane has one size, set by the device you use. Under the pane the phone

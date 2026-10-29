@@ -95,7 +95,7 @@ fun Pill(text: String, primary: Boolean = false, modifier: Modifier = Modifier, 
 }
 
 /** Simple line icons, drawn so they take the palette's colors. */
-enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, KeyboardHide, Send, Back, Check, Link, Alert, Camera, Gear, Minus, Pin, Search, Bolt, More, Sidebar }
+enum class Icon { Plus, Chevron, Laptop, Globe, Keyboard, KeyboardHide, Send, Back, Check, Link, Alert, Camera, Gear, Minus, Pin, Search, Bolt, More, Sidebar, Share, Image, Doc, Folder, Close, Wifi }
 
 @Composable
 fun LineIcon(icon: Icon, color: Color, size: Dp = 18.dp, modifier: Modifier = Modifier, description: String? = null) {
@@ -177,6 +177,29 @@ private fun DrawScope.drawIcon(icon: Icon, color: Color) {
         }
         Icon.Search -> { drawCircle(color, .24f * s, Offset(.44f * s, .44f * s), style = st); line(.62f, .62f, .82f, .82f) }
         Icon.Alert -> { line(.5f, .2f, .5f, .6f); drawCircle(color, .05f * s, Offset(.5f * s, .78f * s)) }
+        Icon.Share -> { line(.5f, .14f, .5f, .6f); line(.32f, .3f, .5f, .14f); line(.5f, .14f, .68f, .3f)
+            line(.22f, .52f, .22f, .84f); line(.22f, .84f, .78f, .84f); line(.78f, .84f, .78f, .52f) }
+        Icon.Image -> {
+            drawRoundRect(color, Offset(.14f * s, .18f * s), androidx.compose.ui.geometry.Size(.72f * s, .64f * s),
+                androidx.compose.ui.geometry.CornerRadius(.08f * s), style = st)
+            drawCircle(color, .07f * s, Offset(.37f * s, .4f * s), style = st)
+            line(.86f, .64f, .66f, .46f); line(.66f, .46f, .3f, .82f)
+        }
+        Icon.Doc -> { line(.26f, .12f, .58f, .12f); line(.58f, .12f, .74f, .28f); line(.74f, .28f, .74f, .88f)
+            line(.74f, .88f, .26f, .88f); line(.26f, .88f, .26f, .12f); line(.38f, .52f, .62f, .52f); line(.38f, .68f, .62f, .68f) }
+        Icon.Folder -> {
+            val f = androidx.compose.ui.graphics.Path().apply {
+                moveTo(.12f * s, .28f * s); lineTo(.38f * s, .28f * s); lineTo(.46f * s, .36f * s); lineTo(.88f * s, .36f * s)
+                lineTo(.88f * s, .8f * s); lineTo(.12f * s, .8f * s); close()
+            }
+            drawPath(f, color, style = Stroke(width = st.width, join = StrokeJoin.Round))
+        }
+        Icon.Close -> { line(.26f, .26f, .74f, .74f); line(.74f, .26f, .26f, .74f) }
+        Icon.Wifi -> {
+            for ((r, sweep) in listOf(.42f to 90f, .28f to 90f)) drawArc(color, 225f, sweep, false,
+                Offset((.5f - r) * s, (.72f - r) * s), androidx.compose.ui.geometry.Size(2 * r * s, 2 * r * s), style = st)
+            drawCircle(color, .05f * s, Offset(.5f * s, .72f * s))
+        }
         Icon.Camera -> {
             drawRoundRect(color, Offset(.12f * s, .3f * s), androidx.compose.ui.geometry.Size(.76f * s, .5f * s),
                 androidx.compose.ui.geometry.CornerRadius(.08f * s), style = st)

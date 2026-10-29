@@ -62,6 +62,8 @@ class Frame(
     val background: Int,
     val foreground: Int,
     val generation: Long,
+    /** Rows that continue on the next one (soft-wrapped at the edge). */
+    val wraps: BooleanArray = BooleanArray(rows),
 ) {
     fun rowText(y: Int): String {
         val row = cells.getOrNull(y) ?: return ""
@@ -155,10 +157,12 @@ class Mirror private constructor(private var h: Long, theme: TermTheme) {
         val cells: MutableList<Array<Cell>> =
             if (full || prev == null || prev.rows != rows || prev.cols != cols) MutableList(rows) { Array(cols) { Cell.blank } }
             else prev.cells.toMutableList()
+        val wraps = if (full || prev == null || prev.rows != rows || prev.cols != cols) BooleanArray(rows) else prev.wraps.copyOf()
         buf.position(36)
         val scratch = ByteArray(64)
         repeat(dirty) {
-            val y = buf.short.toInt() and 0xFFFF
+            val yw = buf.short.toInt() and 0xFFFF
+            val y = yw and 0x7FFF
             val n = buf.short.toInt() and 0xFFFF
             val row = Array(cols) { Cell.blank }
             for (x in 0 until n) {
@@ -177,11 +181,11 @@ class Mirror private constructor(private var h: Long, theme: TermTheme) {
                 val cbg = if (colors and 2 != 0) rgb(buf) else -1
                 if (x < cols) row[x] = Cell(text, wide, flags, underline, cfg, cbg)
             }
-            if (y < rows) cells[y] = row
+            if (y < rows) { cells[y] = row; wraps[y] = yw and 0x8000 != 0 }
         }
         if (textCache.size > 4096) textCache.clear()
         generation++
-        return Frame(cols, rows, cells, cx, cy, visible, style, bg, fg, generation).also { last = it }
+        return Frame(cols, rows, cells, cx, cy, visible, style, bg, fg, generation, wraps).also { last = it }
     }
 
     private fun rgb(b: ByteBuffer): Int {

@@ -65,6 +65,12 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         private set
     var current by mutableStateOf<HostConnection?>(null)
         private set
+
+    /** A file a pane printed, being looked at (FileView). */
+    val files = FileViewer(context)
+
+    /** Opens a path the pane [block] printed, as that pane sees it on its host. */
+    fun openFile(block: String, path: String) { current?.let { files.open(it, block, path) } }
     var currentSession by mutableStateOf<String?>(null)
         private set
     var sessionLabel by mutableStateOf("")

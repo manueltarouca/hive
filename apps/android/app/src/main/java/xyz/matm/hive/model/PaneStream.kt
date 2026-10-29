@@ -135,8 +135,7 @@ class PaneStream(val client: HiveClient, val blockID: String, theme: TermTheme, 
             if (press != null) {
                 val release = m.mouse(1, x, y, g) ?: ByteArray(0)
                 client.input(blockID, press + release)
-                main.post { link(null) }
-                return@execute
+                return@execute // the program took the tap: no link, no path
             }
             val uri = m.hyperlink(col, row)
             main.post { link(uri) }

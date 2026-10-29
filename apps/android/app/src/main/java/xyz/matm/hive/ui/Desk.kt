@@ -123,6 +123,24 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit, 
     val railRoom = conf.screenWidthDp >= 1200
     val rail = railRoom && railOpen && !imeUp
     androidx.activity.compose.BackHandler(enabled = sheet || menu != null || more) { if (menu != null) menu = null else if (more) more = false else sheet = false }
+    // The file viewer: Back goes up to its folder, then closes it.
+    val viewing = model.files.shown != null
+    // Registered after the sheets' handler, so it runs first: only when none of them is open.
+    androidx.activity.compose.BackHandler(enabled = viewing && !sheet && menu == null && !more) { if (!model.files.goBack()) model.files.close() }
+    // Closed: the path it showed is no longer lit.
+    androidx.compose.runtime.LaunchedEffect(viewing) { if (!viewing) views.values.forEach { it.lit = null } }
+    // A tap on what only looked like a path: that pane goes back to lighting what's shown, if anything.
+    androidx.compose.runtime.LaunchedEffect(model.files.misses) { views.values.forEach { it.unlight() } }
+    // Back online: a file that couldn't come because of it tries again.
+    androidx.compose.runtime.LaunchedEffect(h?.link) { if (h != null && h.link == Link.Connected) model.files.reconnected(h) }
+    // Open in…: the fetched copy goes to an app that opens its type.
+    model.files.handOff?.let { (file, type) ->
+        androidx.compose.runtime.LaunchedEffect(file) {
+            model.files.handOff = null
+            openIn(ctx, file, type)
+        }
+    }
+    val panel = space == Space.Expanded
     Box(Modifier.fillMaxSize()) {
     Row(Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
         AnimatedVisibility(rail, enter = androidx.compose.animation.expandHorizontally(tween(220, easing = Quiet)) + fadeIn(tween(220, easing = Quiet)),
@@ -255,8 +273,16 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit, 
             onMore = { more = !more },
             onPaste = doPaste, mods = mods, modsUsed = modsUsed)
     }
+        // On a wide screen the file opens beside the panes, which narrow to make room.
+        AnimatedVisibility(panel && viewing, enter = androidx.compose.animation.expandHorizontally(tween(220, easing = Quiet)) + fadeIn(tween(220, easing = Quiet)),
+            exit = androidx.compose.animation.shrinkHorizontally(tween(200, easing = Quiet)) + fadeOut(tween(160, easing = Quiet))) {
+            FileView(model.files, panel = true, close = { model.files.close() },
+                openEntry = { e -> model.current?.let { model.files.openEntry(it, e) } }, retry = { model.current?.let(model.files::retry) })
+        }
     }
     if (sheet) TabSheet(model, close = { sheet = false }, openMenu = { menu = it })
+    if (viewing && !panel) FileView(model.files, panel = false, close = { model.files.close() },
+        openEntry = { e -> model.current?.let { model.files.openEntry(it, e) } }, retry = { model.current?.let(model.files::retry) })
     // The tab may have closed meanwhile: its menu goes with it.
     menu?.let { m -> model.windows.firstOrNull { it.id == m.id }?.let { w -> TabMenu(model, w) { menu = null } } ?: run { menu = null } }
     }
@@ -373,6 +399,8 @@ private fun PaneBox(model: AppModel, id: String, focused: Boolean, single: Boole
                             v.show(frame)
                             v.onPhoneSize = { c, r, cw, ch -> model.paneRoom(id, c, r, cw, ch) }
                             v.onLink = openLink
+                            v.onPath = { path -> model.openFile(id, path) }
+                            v.litColor = (if (p.night) 0x38000000 else 0x2E000000) or (if (p.night) 0xF2A93B else 0xD98A12)
                             v.onSwipe = if (single) ({ d -> model.selectPane(model.paneIndex + d) }) else null
                             v.onPinched = { model.sizeLearned() }
                             v.onUsed = { model.focusPane(id); model.used(id) }
@@ -773,5 +801,16 @@ private fun PasteCard(lines: Int, paste: () -> Unit, cancel: () -> Unit) {
             Pill("Paste", primary = true, modifier = Modifier.semantics { contentDescription = "Paste anyway" }, onClick = paste)
             Pill("Cancel", onClick = cancel)
         }
+    }
+}
+
+/** Hands a fetched file to an app that opens its type (read-only, through hive's FileProvider). */
+private fun openIn(ctx: android.content.Context, file: java.io.File, type: String) {
+    val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".files", file)
+    val view = android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, type.ifEmpty { "application/octet-stream" })
+        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    val chooser = android.content.Intent.createChooser(view, "Open ${file.name} in")
+    try { ctx.startActivity(chooser) } catch (_: android.content.ActivityNotFoundException) {
+        android.widget.Toast.makeText(ctx, "No app here opens ${file.name}", android.widget.Toast.LENGTH_SHORT).show()
     }
 }

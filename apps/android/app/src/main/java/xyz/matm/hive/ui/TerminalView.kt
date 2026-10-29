@@ -66,6 +66,18 @@ class TerminalView(context: Context) : View(context) {
     var selectionColor = 0x55F2A93B
     var handleColor = 0xFFF2A93B.toInt()
     var onLink: ((String) -> Unit)? = null
+    /** A tap on a path a program printed (not a link): the path, as shown. */
+    var onPath: ((String) -> Unit)? = null
+    /** The path being viewed, lit in the pane until the viewer closes. */
+    var lit: Selection? = null
+        set(v) { field = v; invalidate() }
+    /** What was lit before the last tap, for [unlight]. */
+    private var litBefore: Selection? = null
+    private var myTap = 0
+
+    /** The last tapped path (in any pane) wasn't a file: if it was this pane's, light what was before. */
+    fun unlight() { if (myTap != 0 && myTap == lastPathTap) { myTap = 0; lit = litBefore } }
+    var litColor = 0x38F2A93B
     var onSwipe: ((Int) -> Unit)? = null
     /** The first pinch: the size hint has been understood. */
     var onPinched: (() -> Unit)? = null
@@ -274,12 +286,26 @@ class TerminalView(context: Context) : View(context) {
             }
         }
         canvas.restore()
+        lit?.let { drawLit(canvas, it) }
         selection?.let { drawSelection(canvas, it) }
         // In the Mac's size, below its last row: the pane ends here.
         val end = f.rows * cellH + pad / 2
         if (!fitted && end < height - 24 * density) {
             canvas.drawLine(0f, end, width.toFloat(), end, edge)
             canvas.drawText("The pane ends here", width / 2f, end + (height - end) / 2, hint)
+        }
+    }
+
+    /** The viewed path: a honey tint and a line under it, no handles. */
+    private fun drawLit(canvas: Canvas, s: Selection) {
+        fill.color = litColor
+        for (r in s.startRow..s.endRow) {
+            val a = if (r == s.startRow) s.startCol else 0
+            val b = if (r == s.endRow) s.endCol else (frame?.cols ?: 1) - 1
+            canvas.drawRect(sx(a), sy(r), sx(b + 1), sy(r + 1), fill)
+            fill.color = handleColor
+            canvas.drawRect(sx(a), sy(r + 1) - density, sx(b + 1), sy(r + 1), fill)
+            fill.color = litColor
         }
     }
 
@@ -374,7 +400,15 @@ class TerminalView(context: Context) : View(context) {
             // A click for a program that tracks the mouse, or the link under the finger. Never the
             // keyboard: a tap to read or aim mustn't cover half the screen.
             val s = stream ?: return true
-            s.tap(col, row, gridX(x), y, geometry()) { link -> if (link != null) onLink?.invoke(link) }
+            s.tap(col, row, gridX(x), y, geometry()) { link ->
+                if (link != null) { onLink?.invoke(link); return@tap }
+                // No link: a path in plain text (what agents print), read across wrapped rows.
+                val hit = frame?.let { PathAt.hit(it, col, row) } ?: return@tap
+                litBefore = lit
+                myTap = ++lastPathTap
+                lit = hit.second
+                onPath?.invoke(hit.first)
+            }
             return true
         }
 
@@ -736,3 +770,6 @@ class TerminalView(context: Context) : View(context) {
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent) = keyCode != KeyEvent.KEYCODE_BACK || keyboardBack(keyCode, event) || super.onKeyUp(keyCode, event)
 }
+
+/** The latest path tapped in any pane: the one a "not a file" answer is about. */
+private var lastPathTap = 0

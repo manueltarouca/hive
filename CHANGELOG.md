@@ -13,6 +13,12 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ### Added
 
+- Tap a path a program printed, on the phone or the tablet, to see the file
+  without leaving hive: images (pinch to zoom), text with line numbers
+  (`:40` opens at that line; the last 2 MB of a long log), folders, and
+  anything else through Open in…. A sheet over the pane on a phone, a panel
+  beside the panes on a wide screen. Paths are read where the pane is, also
+  across wrapped rows. The server serves them at `GET /v1/file`.
 - Seeing what scripts do, and turning them off: every change a script
   makes is listed (`hive script show`, `hive script audit -f`, method
   `audit.list`, event `script_acted`) and shows for a few seconds on the

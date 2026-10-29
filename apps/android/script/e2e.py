@@ -621,6 +621,8 @@ def open_hosts():
         return  # hive reopens where you left it
     if find(root, "Filter or create") is None:
         tap("Switch session")
+    # Under every session: off screen when there are many.
+    scroll_to("Hosts")
     tap("Hosts", exact=True)
     wait("Stay connected")
 
@@ -1065,6 +1067,114 @@ def step_select(srv):
     assert not keyboard_up(), "selecting brought up the keyboard"
 
 
+def pane_tap(srv, name, marker, token, nth=0):
+    """Taps the middle of `token` (the nth time it shows) in session `name`'s pane, found by `marker` in its text."""
+    block = srv.view(name)["windows"][0]["layout"]["block_id"]
+    info = srv.view(name)["blocks"][block]
+    root = dump()
+    term = next(n for n in root.iter("node") if marker in (n.get("content-desc") or ""))
+    a, b, c, d = bounds(term)
+    lines = term.get("content-desc").split("\n")
+    density = int(adb("shell", "wm", "density").split(":")[-1].strip()) / 160
+    pad = round(6 * density)
+    cw = (c - a - 2 * pad) / info["cols"]
+    ch = (d - b - pad) / info["rows"]
+    hits = [(r, m.start()) for r, line in enumerate(lines) for m in re.finditer(re.escape(token), line)]
+    assert len(hits) > nth, f"{token!r} not on screen: {lines[:12]}"
+    r, col = hits[nth]
+    x = int(a + pad + (col + len(token) / 2) * cw)
+    y = int(b + pad / 2 + (r + 0.5) * ch)
+    adb("shell", "input", "tap", str(x), str(y))
+
+
+def close_viewer():
+    tap("Close", exact=True)
+    until("the viewer closed", lambda: find(dump(), "Open in another app", exact=True) is None and find(dump(), "Getting it from", exact=False) is None, timeout=5)
+
+
+def step_files(srv):
+    """Tapping a path a program printed opens it: an image, text at a line, the end of a big log, a
+    folder and a file in it, a PDF through Open in…, a missing one, and a path wrapped across rows."""
+    d = os.path.join(srv.dir, "files-" + "a-rather-long-folder-name-so-paths-wrap")
+    os.makedirs(os.path.join(d, "sub"), exist_ok=True)
+    import shutil
+    shutil.copy(os.path.join(HERE, "..", "build", "e2e", sorted(f for f in os.listdir(os.path.join(HERE, "..", "build", "e2e")) if f.endswith(".png"))[0]), os.path.join(d, "shot.png"))
+    with open(os.path.join(d, "notes.txt"), "w") as f:
+        f.write("first line\nsecond line\nthird line, the one asked for\nfourth\n")
+    with open(os.path.join(d, "big.log"), "w") as f:
+        for i in range(100000):
+            f.write(f"{i:06d} request served in {i % 97} ms\n")
+        f.write("the very last line\n")
+    with open(os.path.join(d, "doc.pdf"), "wb") as f:
+        f.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n")
+    with open(os.path.join(d, "sub", "inner.txt"), "w") as f:
+        f.write("inside the folder\n")
+    script = ("printf 'files ready\\nSaved shot.png\\nSee notes.txt:3\\nLog big.log\\nDoc doc.pdf\\nDir sub/\\nGone missing.txt\\nAlso ~/surely-not-there.txt\\n"
+              + d + "/notes.txt\\n'; exec cat")
+    srv.hive("new", "files", "--cwd", d, "--", "sh", "-c", script)
+    open_switcher()
+    tap("files", exact=True)
+    streaming()
+    time.sleep(1.5)
+
+    pane_tap(srv, "files", "files ready", "shot.png")
+    until("the image", lambda: find(dump(), "PNG image", exact=True) is not None, timeout=15)
+    shot("file-image")
+    close_viewer()
+
+    pane_tap(srv, "files", "files ready", "notes.txt:3")
+    until("the text", lambda: find(dump(), "4 lines", exact=True) is not None, timeout=15)
+    assert find(dump(), "third line, the one asked for", exact=True) is not None, "the line asked for isn't in view"
+    shot("file-text")
+    close_viewer()
+
+    pane_tap(srv, "files", "files ready", "big.log")
+    tap("Show the last 2 MB", timeout=15)
+    until("the end of the log", lambda: find(dump(), "the very last line", exact=True) is not None, timeout=15)
+    assert find(dump(), "the last 2 MB", exact=True) is not None
+    shot("file-tail")
+    close_viewer()
+
+    pane_tap(srv, "files", "files ready", "sub/")
+    tap("inner.txt", timeout=15)
+    until("a file of the folder", lambda: find(dump(), "inside the folder", exact=True) is not None, timeout=15)
+    tap("Back to the folder", exact=True)
+    until("the folder again", lambda: find(dump(), "inner.txt", exact=True) is not None, timeout=5)
+    shot("file-folder")
+    close_viewer()
+
+    # Only looked like a path: nothing opens (a tap to focus or aim lands on such words).
+    pane_tap(srv, "files", "files ready", "missing.txt")
+    time.sleep(3)
+    assert find(dump(), "Close", exact=True) is None, "a viewer opened for a word that isn't a file"
+    # An explicit path that's gone says so.
+    pane_tap(srv, "files", "files ready", "surely-not-there.txt")
+    until("not found", lambda: find(dump(), "Not on ", exact=False) is not None, timeout=15)
+    shot("file-missing")
+    tap("Close", exact=True)
+
+    # The absolute path, longer than the pane is wide: tapped on its second row, still the whole path.
+    pane_tap(srv, "files", "files ready", "notes.txt", nth=1)
+    until("the wrapped path's file", lambda: find(dump(), "4 lines", exact=True) is not None, timeout=15)
+    close_viewer()
+
+    pane_tap(srv, "files", "files ready", "doc.pdf")
+    until("the PDF's card", lambda: find(dump(), "PDF document", exact=False) is not None, timeout=15)
+    shot("file-other")
+    adb("logcat", "-c")
+    tap("Open in…", timeout=15)
+    # The chooser, or (one app for PDFs) that app at once, given hive's file read-only.
+    until("an app asked to view the PDF", lambda: [l for l in adb("logcat", "-d").splitlines()
+        if "act=android.intent.action.CHOOSER" in l or ("act=android.intent.action.VIEW" in l and f"content://{PKG}.files" in l)], timeout=15)
+    time.sleep(2)
+    shot("file-open-in")
+    adb("shell", "am", "start", "-n", f"{PKG}/xyz.matm.hive.MainActivity")
+    time.sleep(1.5)
+    if find(dump(), "Open in another app", exact=True) is not None:
+        close_viewer()
+    assert not keyboard_up(), "tapping paths brought up the keyboard"
+
+
 def step_previews(srv):
     """The tab sheet previews what agents did, not their input box and status bar; their glyphs draw."""
     srv.hive("new", "look", "--cwd", "/tmp", "--", "python3", os.path.join(HERE, "fake-claude-screen.py"), "bypass")
@@ -1323,7 +1433,7 @@ def step_away(srv):
     shot("back")
 
 
-STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_keys, step_select, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
+STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_keys, step_select, step_files, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
 
 
 def main():

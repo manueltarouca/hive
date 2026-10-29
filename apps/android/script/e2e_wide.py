@@ -195,8 +195,32 @@ def step_rotate(srv):
     assert all(c >= 40 for c in after) or len(terminals(dump())) == 1, f"rotated columns {after}"
 
 
+def step_file_panel(srv):
+    """On a wide screen a tapped path opens beside the panes, which narrow; closing gives the room back."""
+    d = os.path.join(srv.dir, "wide-files")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "notes.txt"), "w") as f:
+        f.write("".join(f"line {i}: the panel shows text in the terminal's font\n" for i in range(1, 80)))
+    if "wfiles" not in srv.sessions():
+        srv.hive("new", "wfiles", "--cwd", d, "--", "sh", "-c", "printf 'panel ready\\nSee notes.txt:40\\n'; exec cat")
+    go("wfiles")
+    before = bounds(next(n for n in dump().iter("node") if "panel ready" in (n.get("content-desc") or "")))
+    e2e.pane_tap(srv, "wfiles", "panel ready", "notes.txt:40")
+    until("the panel", lambda: find(dump(), "79 lines", exact=True) is not None, timeout=15)
+    time.sleep(1)
+    root = dump()
+    term = bounds(next(n for n in root.iter("node") if "panel ready" in (n.get("content-desc") or "")))
+    close = bounds(find(root, "Close", exact=True))
+    assert term[2] < close[0], f"the pane {term} isn't beside the panel (close at {close})"
+    assert term[2] < before[2], f"the pane didn't narrow: {before} -> {term}"
+    assert find(root, "line 40: the panel shows text in the terminal's font", exact=True) is not None, "line 40 isn't in view"
+    shot("file-panel")
+    tap("Close", exact=True)
+    until("the pane's room back", lambda: bounds(next(n for n in dump().iter("node") if "panel ready" in (n.get("content-desc") or "")))[2] >= before[2] - 4, timeout=5)
+
+
 STEPS = ([step_side_by_side, step_ask_in_its_pane, step_rail] if LANDSCAPE else [step_one_at_a_time, step_ask_in_its_pane]) + \
-    [step_keyboard_up, step_reading_width, step_rotate]
+    [step_keyboard_up, step_reading_width, step_file_panel, step_rotate]
 
 
 def main():

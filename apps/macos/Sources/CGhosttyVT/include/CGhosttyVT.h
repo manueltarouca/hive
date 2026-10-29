@@ -37,6 +37,8 @@ GhosttyResult hive_frame_meta(GhosttyRenderState rs, HiveFrameMeta *out);
 // Fills up to cap cells of the iterator's current row. Returns the count.
 size_t hive_row_cells(GhosttyRenderStateRowIterator it, GhosttyRenderStateRowCells cells, HiveCell *out, size_t cap);
 bool hive_row_dirty(GhosttyRenderStateRowIterator it);
+/// The row continues on the next one (soft-wrapped at the edge).
+bool hive_row_wrapped(GhosttyRenderStateRowIterator it);
 void hive_row_set_clean(GhosttyRenderStateRowIterator it);
 
 // Encodes a key press for the terminal's current modes into out (cap bytes).

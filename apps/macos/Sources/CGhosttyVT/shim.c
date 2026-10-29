@@ -90,6 +90,14 @@ void hive_row_set_clean(GhosttyRenderStateRowIterator it) {
   ghostty_render_state_row_set(it, GHOSTTY_RENDER_STATE_ROW_OPTION_DIRTY, &d);
 }
 
+bool hive_row_wrapped(GhosttyRenderStateRowIterator it) {
+  GhosttyRow row = 0;
+  bool w = false;
+  if (ghostty_render_state_row_get(it, GHOSTTY_RENDER_STATE_ROW_DATA_RAW, &row) == GHOSTTY_SUCCESS)
+    ghostty_row_get(row, GHOSTTY_ROW_DATA_WRAP, &w);
+  return w;
+}
+
 size_t hive_row_cells(GhosttyRenderStateRowIterator it, GhosttyRenderStateRowCells cells, HiveCell *out, size_t cap) {
   if (ghostty_render_state_row_get(it, GHOSTTY_RENDER_STATE_ROW_DATA_CELLS, &cells) != GHOSTTY_SUCCESS) return 0;
   size_t n = 0;

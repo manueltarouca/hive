@@ -158,11 +158,13 @@ JNIEXPORT jobject JNICALL FN(nFrame)(JNIEnv *env, jclass c, jlong h) {
   ghostty_render_state_get(m->rs, GHOSTTY_RENDER_STATE_DATA_ROW_ITERATOR, &m->it);
   for (size_t y = 0; y < rows && ghostty_render_state_row_iterator_next(m->it); y++) {
     if (!full && !hive_row_dirty(m->it)) continue;
+    bool wrapped = hive_row_wrapped(m->it);
     size_t n = hive_row_cells(m->it, m->cells, m->scratch, cols);
     hive_row_set_clean(m->it);
     // Worst case per cell: 1 + 63 + 4 + 6.
     if (!reserve(m, at + 4 + n * 74 + rows * 4)) { m->framed = false; return NULL; }
-    put16(m->out + at, (uint16_t)y);
+    // The row index, with the top bit set when the row soft-wraps into the next.
+    put16(m->out + at, (uint16_t)(y | (wrapped ? 0x8000 : 0)));
     put16(m->out + at + 2, (uint16_t)n);
     at += 4;
     for (size_t i = 0; i < n; i++) {
