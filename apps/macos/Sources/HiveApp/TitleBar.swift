@@ -44,6 +44,15 @@ struct TitleBar: View {
     }
 }
 
+extension AppModel {
+    /// The animation for tabs, panes and the sidebar (motion), or nil to move
+    /// at once: motion = off, or Reduce Motion in macOS.
+    var motion: Animation? {
+        settings.motion.spring(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+            .map { Animation.spring(response: $0.response, dampingFraction: $0.damping) }
+    }
+}
+
 /// "1 blocked and 2 done in other sessions".
 func attentionHelp(_ a: Attention) -> String {
     attentionCounts(a) + " in other sessions"
@@ -140,8 +149,11 @@ struct Tabs: View {
                     .reorderable(t.window.id, in: reorder, order: { model.shownWindows.map(\.window.id) }, space: "bar-tabs") { id, to in
                         model.moveShown(id, to: to)
                     }
+                    .transition(TabMotion.transition(anchor: .leading))
             }
         }
+        // A new tab grows in, a closed one shrinks away, the others slide over.
+        .animation(model.motion, value: model.shownWindows.map(\.window.id))
         .reorderSpace(reorder, name: "bar-tabs", order: model.shownWindows.map(\.window.id))
         .frame(minWidth: 0, alignment: .leading)
         // Room above and below inside the clip, so a lifted tab's shadow and scale aren't cut off.
@@ -186,8 +198,10 @@ struct TabPill: View {
                     .mask(FadeMask())
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if let status { StatusBadge(state: status == "blocked" || status == "stopped" ? "blocked-dot" : status, style: s) }
+            if let status, !hover { StatusBadge(state: status == "blocked" || status == "stopped" ? "blocked-dot" : status, style: s) }
         }
+        // Under the close button the name fades out, so nothing shifts.
+        .mask(TrailingFade(width: hover && !dragged ? 34 : 0))
         .padding(.leading, 6).padding(.trailing, 10)
         .frame(minWidth: TabPill.minWidth, maxWidth: 210, minHeight: 28, maxHeight: 28, alignment: .leading)
         .background(
@@ -198,19 +212,76 @@ struct TabPill: View {
         .overlay(
             // Dragged: outlined in honey, so it reads as the one moving.
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(dragged ? s.accent.swiftUI.opacity(0.8) : active ? s.border.swiftUI : .clear, lineWidth: dragged ? 1.5 : 1)
+                .strokeBorder(dragged ? s.accent.swiftUI.opacity(0.8) : .clear, lineWidth: 1.5)
         )
+        // Pointing at a tab shows its close button over the end of the name.
+        .overlay(alignment: .trailing) {
+            if hover && !dragged {
+                TabCloseButton(style: s) { model.closeTab(window) }
+                    .padding(.trailing, 5)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: hover)
         .contentShape(Rectangle())
         .onTapGesture { model.selectWindow(index: index) }
         .onHover { hover = $0 }
+        .onReceive(model.$shotHover) { if let i = $0 { hover = model.shownWindows.firstIndex { $0.window.id == window.id } == i } }
         .contextMenu {
             Button(window.pinned ? "Unpin Tab" : "Pin Tab") { model.pinTab(window, !window.pinned) }
             Button("Move Tab Left") { model.moveTab(window.id, by: -1) }
             Button("Move Tab Right") { model.moveTab(window.id, by: 1) }
         }
+        .accessibilityAction(named: "Close Tab") { model.closeTab(window) }
         .accessibilityAction(named: "Move Tab Left") { model.moveTab(window.id, by: -1) }
         .accessibilityAction(named: "Move Tab Right") { model.moveTab(window.id, by: 1) }
         .help("Tab \(index + 1) (⌘\(index + 1))")
+    }
+}
+
+/// How a tab arrives and leaves: it grows in from its edge and shrinks away.
+enum TabMotion {
+    static func transition(anchor: UnitPoint) -> AnyTransition {
+        .asymmetric(insertion: .scale(scale: 0.7, anchor: anchor).combined(with: .opacity),
+                    removal: .scale(scale: 0.7, anchor: anchor).combined(with: .opacity))
+    }
+}
+
+/// Opaque, then clear over the last `width` points: the tab's content fades
+/// out under its close button.
+struct TrailingFade: View, Animatable {
+    var width: CGFloat
+    var animatableData: CGFloat {
+        get { width }
+        set { width = newValue }
+    }
+    var body: some View {
+        GeometryReader { g in
+            let w = max(g.size.width, 1), solid = max(0, (w - width) / w)
+            LinearGradient(stops: [.init(color: .black, location: max(0, solid - 0.12 * (width > 0 ? 1 : 0))),
+                                   .init(color: width > 0 ? .clear : .black, location: solid)],
+                           startPoint: .leading, endPoint: .trailing)
+        }
+    }
+}
+
+/// A tab's close button, shown while the pointer is on the tab.
+struct TabCloseButton: View {
+    let style: Style
+    let action: () -> Void
+    @State private var hover = false
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
+                .foregroundStyle(style.text.swiftUI.opacity(hover ? 0.95 : 0.6))
+                .frame(width: 16, height: 16)
+                .background(Circle().fill(style.text.swiftUI.opacity(hover ? 0.14 : 0.07)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help("Close Tab")
+        .accessibilityLabel("Close Tab")
     }
 }
 

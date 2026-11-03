@@ -211,6 +211,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 if what.hasPrefix("scripts:") { self?.showScripts(nil, String(what.dropFirst("scripts:".count))) }
                 if what == "sharehosts" { self?.showShareHosts() }
                 if what == "menubar" { self?.menuBar.open() }
+                // A tab as if the pointer were on it (hover:N, N from 0), and closing the tab in front.
+                if what.hasPrefix("hover:"), let i = Int(what.dropFirst("hover:".count)) { self?.model.shotHover = i }
+                if what == "closetab" { self?.model.closeTab() }
                 #if DEBUG
                 if what.hasPrefix("menuicons:") { self?.menuBar.writeIcons(to: String(what.dropFirst("menuicons:".count))) }
                 // Closed to the menu bar, then opened again from it.

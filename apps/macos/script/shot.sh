@@ -130,7 +130,7 @@ trap cleanup EXIT
 bg=""; [ "${BACKGROUND:-0}" = 1 ] && bg="-g"
 # In the background the panes still draw (HIVE_DRAW_COVERED), so the shots show them.
 open $bg -n --env HIVE_DRAW_COVERED="${BACKGROUND:-0}" --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_CONFIG="$HIVE_CONFIG" --env HIVE_STYLE="$envstyle" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
-  --stdout "$out/app.log" --stderr "$out/app.log" "$here/build/Hive.app"
+  --stdout "$out/app.log" --stderr "$out/app.log" "${HIVE_APP:-$here/build/Hive.app}"
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   app=$(lsof -t "$out/app.log" 2>/dev/null | head -1)
   [ -n "$app" ] && break

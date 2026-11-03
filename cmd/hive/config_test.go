@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -94,7 +95,12 @@ func TestConfigCommands(t *testing.T) {
 	if code != 0 || json.Unmarshal([]byte(out), &shown) != nil {
 		t.Fatalf("show --json = %q %d", out, code)
 	}
-	if len(shown.Keys) != len(config.Keys) || shown.Keys[0].Name != "theme" || shown.Keys[0].Help == "" || !shown.Keys[7].Server {
+	if len(shown.Keys) != len(config.Keys) || shown.Keys[0].Name != "theme" || shown.Keys[0].Help == "" || !slices.ContainsFunc(shown.Keys, func(k struct {
+		Name, Default, Help string
+		Server              bool
+	}) bool {
+		return k.Name == "scrollback-limit" && k.Server
+	}) {
 		t.Fatalf("keys = %+v", shown.Keys)
 	}
 	if shown.Path != conf || shown.Values["theme"] != "night" || shown.Values["font-size"] != 13.0 || len(shown.Diagnostics) != 2 {

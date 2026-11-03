@@ -11,11 +11,20 @@ public struct Settings: Equatable, Sendable {
     public var bell = "flash"
     public var notify = "background"
     public var confirmPaste = true
+    /// How tabs, panes and the sidebar move.
+    public var motion = Motion.snappy
+    /// When closing a tab, or its last pane, asks first.
+    public var confirmClose = CloseGuard.Policy.running
     /// cursor-style-blink: nil blinks unless a program says otherwise.
     public var cursorStyleBlink: Bool?
     /// Read by the server; shown and set in the Settings window.
     public var scrollbackLimit: UInt64 = 16 << 20
     public var resumeAgents = true
+    /// Listeners the server adds when it starts (tailnet://:4483).
+    public var listen: [String] = []
+    /// Scripts run on the server; others may run them over Tailscale.
+    public var scripts = true
+    public var scriptRemoteRun = false
     public var diagnostics: [Diagnostic] = []
     /// Every setting: its name, default, help, and whether the server reads it.
     public var keys: [Key] = []
@@ -59,10 +68,17 @@ public struct Settings: Equatable, Sendable {
             var cursorStyleBlink: Bool?
             var scrollbackLimit: UInt64
             var resumeAgents: Bool
+            // Newer keys: optional, so a settings file read by an older hive still decodes.
+            var motion: String?
+            var confirmClose: String?
+            var listen: [String]?
+            var scripts: Bool?
+            var scriptRemoteRun: Bool?
             enum CodingKeys: String, CodingKey {
                 case theme, bell, notify
                 case fontFamily = "font-family", fontSize = "font-size", confirmPaste = "confirm-paste", cursorStyleBlink = "cursor-style-blink"
                 case scrollbackLimit = "scrollback-limit", resumeAgents = "resume-agents"
+                case motion, confirmClose = "confirm-close", listen, scripts, scriptRemoteRun = "script-remote-run"
             }
         }
     }
@@ -71,7 +87,11 @@ public struct Settings: Equatable, Sendable {
         let s = try JSONDecoder().decode(Shown.self, from: data)
         return Settings(path: s.path, theme: Appearance(stored: s.values.theme), fontFamily: s.values.fontFamily,
                         fontSize: s.values.fontSize, bell: s.values.bell, notify: s.values.notify,
-                        confirmPaste: s.values.confirmPaste, cursorStyleBlink: s.values.cursorStyleBlink, scrollbackLimit: s.values.scrollbackLimit,
-                        resumeAgents: s.values.resumeAgents, diagnostics: s.diagnostics, keys: s.keys ?? [])
+                        confirmPaste: s.values.confirmPaste,
+                        motion: s.values.motion.flatMap(Motion.init(rawValue:)) ?? .snappy,
+                        confirmClose: s.values.confirmClose.flatMap(CloseGuard.Policy.init(rawValue:)) ?? .running,
+                        cursorStyleBlink: s.values.cursorStyleBlink, scrollbackLimit: s.values.scrollbackLimit,
+                        resumeAgents: s.values.resumeAgents, listen: s.values.listen ?? [],
+                        scripts: s.values.scripts ?? true, scriptRemoteRun: s.values.scriptRemoteRun ?? false, diagnostics: s.diagnostics, keys: s.keys ?? [])
     }
 }

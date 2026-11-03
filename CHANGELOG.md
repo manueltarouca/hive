@@ -13,6 +13,14 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ### Added
 
+- Tabs on the Mac show a close button while the pointer is on them, in the
+  title bar and in the sidebar, and move with a short spring when they open,
+  close or change places. The `motion` setting picks `snappy` (the default),
+  `natural` or `off`; Reduce Motion always moves them at once.
+- Closing a tab, or its last pane, asks first when a program other than the
+  shell runs in it, and names it. The `confirm-close` setting picks
+  `running` (the default), `always` or `never`; "Don't ask again" sets it
+  to never.
 - Tap a path a program printed, on the phone or the tablet, to see the file
   without leaving hive: images (pinch to zoom), text with line numbers
   (`:40` opens at that line; the last 2 MB of a long log), folders, and
@@ -125,6 +133,10 @@ patch, and this file lists it under "Changed" or "Removed".
   server as Hive.app.
 
 ### Changed
+
+- The Mac sidebar is lighter: it shares the window's background with no
+  dividing line, the tab in front has no outline, and titles use lighter
+  weights. A tab's ⌘ number moved to its tooltip.
 
 - `client.perform` needs `control` for app actions that change your layout
   (new tabs, splits, closing, resizing); `ui` still covers showing things.

@@ -48,6 +48,8 @@ comment.
 | `bell` | `flash` | When a program rings the bell: `flash`, `sound`, `flash+sound` or `none`. The Dock bounces once if hive is in the background; `none` turns both off |
 | `notify` | `background` | Agent notifications: `background` (when hive isn't in front), `always` or `never` |
 | `confirm-paste` | `true` | Ask before pasting lines into a program that would run each one |
+| `motion` | `snappy` | How tabs move: `snappy` settles quickly, `natural` springs with a slight overshoot, `off` moves them at once. Reduce Motion in macOS always moves them at once |
+| `confirm-close` | `running` | Ask before closing a tab, or its last pane: `running` (only when a program other than the shell runs in it), `always` or `never` |
 | `cursor-style-blink` | empty | Whether the cursor blinks, with Ghostty's name: empty or `true` blinks (Ghostty's default), `false` keeps it steady. It blinks only in the focused pane, and typing or output shows it again at once. Programs can still choose with `CSI Ps SP q` or DEC mode 12 |
 | `scrollback-limit` | `16m` | History kept per terminal, in bytes (`k`, `m`, `g`), at least `64k`. Read by the server; lowering it drops old lines at once |
 | `resume-agents` | `true` | Resume agents' sessions when the server starts again. Read when the server starts |

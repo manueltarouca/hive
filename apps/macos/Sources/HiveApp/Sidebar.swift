@@ -30,8 +30,11 @@ struct AgentSidebar: View {
                             .reorderable(w.id, in: reorder, order: { model.shownWindows.map(\.window.id) }, space: "sidebar-tabs") { id, to in
                                 model.moveShown(id, to: to)
                             }
+                            .transition(TabMotion.transition(anchor: .top))
                     }
                 }
+                // A new tab grows in, a closed one shrinks away, the others slide over.
+                .animation(model.motion, value: model.shownWindows.map(\.window.id))
                 .reorderSpace(reorder, name: "sidebar-tabs", order: model.shownWindows.map(\.window.id))
                 .padding(.horizontal, 8).padding(.top, 4).padding(.bottom, 12)
             }
@@ -41,9 +44,8 @@ struct AgentSidebar: View {
                 Rectangle()
             })
         }
+        // The window's own surface, with no dividing line: the panes sit beside it as cards.
         .frame(width: AgentSidebar.width)
-        .background(s.sidebar.swiftUI)
-        .overlay(alignment: .trailing) { Rectangle().fill(s.border.swiftUI).frame(width: 1) }
         .contextMenu { HiveContextMenu(model: model) }
     }
 }
@@ -61,12 +63,16 @@ struct AppTile: View {
             .frame(width: 24, height: 24)
         .overlay(alignment: .topTrailing) {
             if let badge {
-                Image(systemName: "hexagon.fill").font(.system(size: 8))
-                    .foregroundStyle(badge == "blocked" ? style.blocked.swiftUI : style.done.swiftUI)
-                    .background(Image(systemName: "hexagon.fill").font(.system(size: 11)).foregroundStyle(style.sidebar.swiftUI))
-                    .offset(x: 4, y: -4)
+                // The ring is cut out of the tile, so it shows whatever is behind the row.
+                ZStack {
+                    Image(systemName: "hexagon.fill").font(.system(size: 11)).blendMode(.destinationOut)
+                    Image(systemName: "hexagon.fill").font(.system(size: 8))
+                        .foregroundStyle(badge == "blocked" ? style.blocked.swiftUI : style.done.swiftUI)
+                }
+                .offset(x: 4, y: -4)
             }
         }
+        .compositingGroup()
     }
 }
 
@@ -92,16 +98,17 @@ struct TabRow: View {
                         Image(systemName: "pin.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(s.accent.swiftUI)
                             .accessibilityLabel("Pinned")
                     }
-                    Text(sum.title).font(.system(size: 12.5, weight: active ? .semibold : .medium))
+                    Text(sum.title).font(.system(size: 12.5, weight: active ? .medium : .regular))
                         .foregroundStyle(s.text.swiftUI.opacity(active ? 1 : 0.86)).lineLimit(1)
                     Spacer(minLength: 4)
-                    if blocked {
+                    // Pointing at a row swaps its state for the close button.
+                    if hover && !dragged {
+                        TabCloseButton(style: s) { model.closeTab(window) }
+                            .transition(.opacity)
+                    } else if blocked {
                         StatusBadge(state: sum.state ?? "blocked", style: s)
                     } else if let st = sum.state {
                         StatusBadge(state: st, style: s)
-                    }
-                    if !blocked, index < 9, hover || active {
-                        Text("⌘\(index + 1)").font(.system(size: 10)).foregroundStyle(s.secondary.swiftUI)
                     }
                 }
                 if let detail = sum.detail {
@@ -118,17 +125,20 @@ struct TabRow: View {
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(dragged ? s.tabActive.swiftUI : active ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear)))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .strokeBorder(dragged ? s.accent.swiftUI.opacity(0.8) : active ? s.border.swiftUI : .clear, lineWidth: dragged ? 1.5 : 1))
+            .strokeBorder(dragged ? s.accent.swiftUI.opacity(0.8) : .clear, lineWidth: 1.5))
+        .animation(.easeOut(duration: 0.12), value: hover)
         .contentShape(Rectangle())
         .onTapGesture { model.selectWindow(index: index) }
         .onHover { hover = $0 }
+        .onReceive(model.$shotHover) { if let i = $0 { hover = model.shownWindows.firstIndex { $0.window.id == window.id } == i } }
         .contextMenu {
             Button(window.pinned ? "Unpin Tab" : "Pin Tab") { model.pinTab(window, !window.pinned) }
             Button("Move Tab Up") { model.moveTab(window.id, by: -1) }
             Button("Move Tab Down") { model.moveTab(window.id, by: 1) }
         }
+        .accessibilityAction(named: "Close Tab") { model.closeTab(window) }
         .accessibilityAction(named: "Move Tab Up") { model.moveTab(window.id, by: -1) }
         .accessibilityAction(named: "Move Tab Down") { model.moveTab(window.id, by: 1) }
-        .help(info?.shortDir ?? "")
+        .help([info?.shortDir, index < 9 ? "⌘\(index + 1)" : nil].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n"))
     }
 }

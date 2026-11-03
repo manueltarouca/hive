@@ -24,6 +24,10 @@ type Config struct {
 	Bell         string  `json:"bell"`
 	Notify       string  `json:"notify"`
 	ConfirmPaste bool    `json:"confirm-paste"`
+	// Motion is how tabs, panes and the sidebar move: snappy, natural or off.
+	Motion string `json:"motion"`
+	// ConfirmClose is when closing a tab or its last pane asks first.
+	ConfirmClose string `json:"confirm-close"`
 	// Nil lets programs decide, blinking by default (Ghostty's blank).
 	CursorStyleBlink *bool  `json:"cursor-style-blink"`
 	ScrollbackLimit  uint64 `json:"scrollback-limit"`
@@ -97,6 +101,10 @@ var Keys = []Key{
 		set: oneOf(func(c *Config, v string) { c.Notify = v }, "background", "always", "never")},
 	{Name: "confirm-paste", Default: "true", Help: "ask before pasting lines into a program that would run each one",
 		set: boolean(func(c *Config, b bool) { c.ConfirmPaste = b })},
+	{Name: "motion", Default: "snappy", Choices: []string{"snappy", "natural", "off"}, Help: "how tabs move: snappy settles quickly, natural springs with a slight overshoot, off moves them at once. Reduce Motion in macOS always moves them at once",
+		set: oneOf(func(c *Config, v string) { c.Motion = v }, "snappy", "natural", "off")},
+	{Name: "confirm-close", Default: "running", Choices: []string{"running", "always", "never"}, Help: "ask before closing a tab, or its last pane: running (only when a program other than the shell runs in it), always or never",
+		set: oneOf(func(c *Config, v string) { c.ConfirmClose = v }, "running", "always", "never")},
 	{Name: "cursor-style-blink", Default: "", Choices: []string{"", "true", "false"}, Help: "whether the cursor blinks: blank or true blinks, as in Ghostty; false keeps it steady. Programs can still change it (DECSCUSR, DEC mode 12)",
 		set: func(c *Config, v string) error {
 			if v == "" {

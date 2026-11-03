@@ -245,6 +245,10 @@ final class AppModel: ObservableObject {
     @Published var style: Style = .light
     /// The settings file (~/.config/hive/config), read through the bundled hive.
     let settingsStore = SettingsStore()
+    /// A close question is on screen.
+    private var askingClose = false
+    /// The screenshot loop's stand-in for a pointer: the shown tab it rests on.
+    @Published var shotHover: Int?
     /// The theme: Hive Day, Hive Night, or follow macOS. From the settings
     /// file; until it exists, the choice remembered before (UserDefaults).
     @Published var appearance = Appearance.system
@@ -1016,7 +1020,48 @@ final class AppModel: ObservableObject {
 
     func closeTab() {
         guard let w = active else { return }
-        call("session.close_window", ["session_id": sid, "window_id": .string(w.id)])
+        closeTab(w)
+    }
+
+    /// Closes a tab, asking first when confirm-close says so.
+    func closeTab(_ w: WindowInfo) {
+        let ids = w.layout?.rects().map(\.0) ?? []
+        confirmClose(ids, what: summary(of: w).title) { [weak self] in
+            guard let self else { return }
+            self.call("session.close_window", ["session_id": self.sid, "window_id": .string(w.id)])
+        }
+    }
+
+    /// Asks before closing these panes when confirm-close says so, then runs
+    /// close. "Don't ask again" sets confirm-close to never.
+    func confirmClose(_ ids: [String], what: String, then close: @escaping () -> Void) {
+        // One question at a time: another close while it's up waits for the answer.
+        guard !askingClose else { return }
+        let panes = ids.map { id in
+            let b = blocks[id]
+            return CloseGuard.Pane(foreground: b?.foreground, exited: b?.exited ?? false, name: b?.program ?? "")
+        }
+        guard let q = CloseGuard.question(closing: panes, what: what, policy: settings.confirmClose) else { close(); return }
+        askingClose = true
+        let alert = NSAlert()
+        alert.messageText = q.title
+        alert.informativeText = q.detail
+        alert.addButton(withTitle: "Close").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Don’t ask again"
+        let answer: (NSApplication.ModalResponse) -> Void = { [weak self] r in
+            self?.askingClose = false
+            guard r == .alertFirstButtonReturn else { return }
+            // Only a close stops the asking: Cancel with the box ticked asks again next time.
+            if alert.suppressionButton?.state == .on { self?.settingsStore.set("confirm-close", "never") }
+            close()
+        }
+        if let window = NSApp.mainWindow ?? NSApp.keyWindow {
+            alert.beginSheetModal(for: window, completionHandler: answer)
+        } else {
+            answer(alert.runModal())
+        }
     }
 
     /// The state a tab shows: working, blocked, or done not yet looked at.
@@ -1166,7 +1211,13 @@ final class AppModel: ObservableObject {
 
     func closePane() {
         guard let b = focusedBlock else { return }
-        call("block.close", ["session_id": sid, "block_id": .string(b)])
+        let close = { [weak self] in
+            guard let self else { return }
+            self.call("block.close", ["session_id": self.sid, "block_id": .string(b)])
+        }
+        // The last pane takes its tab with it: ask as closing the tab would.
+        guard let w = active, (w.layout?.rects().count ?? 1) <= 1 else { close(); return }
+        confirmClose([b], what: summary(of: w).title, then: close)
     }
 
     func focus(_ direction: String) {
