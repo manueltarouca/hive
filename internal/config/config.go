@@ -53,6 +53,9 @@ type Config struct {
 	ResumeAgents     bool   `json:"resume-agents"`
 	// Listeners the server adds when it starts, as --extra-listen takes them.
 	Listen []string `json:"listen"`
+	// Tailscale starts the server as its own Tailscale device (as --tailscale).
+	Tailscale         bool   `json:"tailscale"`
+	TailscaleHostname string `json:"tailscale-hostname"`
 	// ScriptRemoteRun lets callers on other machines run scripts here.
 	ScriptRemoteRun bool `json:"script-remote-run"`
 	// Scripts runs the scripts in the scripts folder.
@@ -188,6 +191,18 @@ var Keys = []Key{
 				}
 			}
 			c.Listen = out
+			return nil
+		}},
+	{Name: "tailscale", Default: "false", Server: true, Help: "join your tailnet as the server's own device, built in, so this Mac needs no Tailscale app (as --tailscale). Read at start; the first time, sign in from Settings, Server, or the link in the server's log",
+		set: boolean(func(c *Config, b bool) { c.Tailscale = b })},
+	{Name: "tailscale-hostname", Default: "", Server: true, Help: "the built-in Tailscale device's name; empty is hive",
+		set: func(c *Config, v string) error {
+			for _, r := range v {
+				if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+					return errors.New("must be lowercase letters, digits and dashes")
+				}
+			}
+			c.TailscaleHostname = v
 			return nil
 		}},
 	{Name: "keybind", Default: "", Server: true, Repeat: true, Help: "change a shortcut, one per line: KEY=ACTION, such as cmd+shift+t=client.new_tab, or KEY=unbind; see the Scripts docs",

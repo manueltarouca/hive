@@ -66,6 +66,8 @@ comment.
 | `scrollback-limit` | `16m` | History kept per terminal, in bytes (`k`, `m`, `g`), at least `64k`. Read by the server; lowering it drops old lines at once |
 | `resume-agents` | `true` | Resume agents' sessions when the server starts again. Read when the server starts |
 | `listen` | empty | Listeners the server adds when it starts, separated by spaces, such as `tailnet://:4483`. Only `tailnet://` and `tailnet-serve://`. One that can't open is tried again every 15 seconds. Listener options to `hive server start` replace it. See [Remote hosts](./remote) |
+| `tailscale` | `false` | Join your tailnet as the server's own device, built in, so this Mac needs no Tailscale app (as `--tailscale`). Read at start; the first time, sign in from Settings, Server, or the link in the server's log |
+| `tailscale-hostname` | empty | The built-in device's name; empty is `hive` |
 | `keybind` | none | Change a shortcut: `KEY=ACTION`, one per line, such as `keybind = cmd+shift+t=client.new_tab`, or `KEY=unbind` to remove one. See [Keys](#keys) |
 | `scripts` | `true` | Run the [scripts](./scripts#scripts-that-keep-running) in the scripts folder (beside this file). Read when the server starts |
 | `script-remote-run` | `false` | Let callers on other machines (over Tailscale) run [scripts](./scripts) on this server |

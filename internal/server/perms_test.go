@@ -41,6 +41,8 @@ func TestPermissionByArguments(t *testing.T) {
 		{"config.set", `{"key":"theme","value":"day"}`, "config"},
 		{"config.set", `{"key":"script-remote-run","value":"true"}`, "server"},
 		{"config.set", `{"key":"listen","value":"tailnet://:1"}`, "server"},
+		{"config.set", `{"key":"tailscale","value":"true"}`, "server"},
+		{"config.set", `{"key":"tailscale-hostname","value":"box"}`, "server"},
 		{"hive.terminal.list_dir", `{"block_id":"b"}`, "screen"},
 		{"hive.terminal.wait", `{"block_id":"b"}`, "read"},
 		{"server.shutdown", `{}`, "server"},

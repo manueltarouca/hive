@@ -40,6 +40,8 @@ public struct Settings: Equatable, Sendable {
     public var resumeAgents = true
     /// Listeners the server adds when it starts (tailnet://:4483).
     public var listen: [String] = []
+    /// The server as its own Tailscale device (read at start).
+    public var tailscale = false
     /// Scripts run on the server; others may run them over Tailscale.
     public var scripts = true
     public var scriptRemoteRun = false
@@ -98,6 +100,7 @@ public struct Settings: Equatable, Sendable {
             var keyHints: Bool?
             var copyOnSelect: Bool?
             var listen: [String]?
+            var tailscale: Bool?
             var scripts: Bool?
             var scriptRemoteRun: Bool?
             enum CodingKeys: String, CodingKey {
@@ -107,6 +110,7 @@ public struct Settings: Equatable, Sendable {
                 case dimPanes = "dim-panes", balanceSplits = "balance-splits", focusFollowsPointer = "focus-follows-pointer"
                 case notifyBlocked = "notify-blocked", notifyDone = "notify-done", notifyStopped = "notify-stopped"
                 case soundBlocked = "sound-blocked", soundDone = "sound-done", soundStopped = "sound-stopped", dockBadge = "dock-badge", keyHints = "key-hints", copyOnSelect = "copy-on-select"
+                case tailscale
                 case motion, confirmClose = "confirm-close", listen, scripts, scriptRemoteRun = "script-remote-run"
             }
         }
@@ -126,7 +130,7 @@ public struct Settings: Equatable, Sendable {
                         soundDone: s.values.soundDone ?? "Glass", soundStopped: s.values.soundStopped ?? "Basso",
                         dockBadge: s.values.dockBadge ?? true, keyHints: s.values.keyHints ?? true, copyOnSelect: s.values.copyOnSelect ?? false,
                         cursorStyleBlink: s.values.cursorStyleBlink, scrollbackLimit: s.values.scrollbackLimit,
-                        resumeAgents: s.values.resumeAgents, listen: s.values.listen ?? [],
+                        resumeAgents: s.values.resumeAgents, listen: s.values.listen ?? [], tailscale: s.values.tailscale ?? false,
                         scripts: s.values.scripts ?? true, scriptRemoteRun: s.values.scriptRemoteRun ?? false, diagnostics: s.diagnostics, keys: s.keys ?? [])
     }
 }

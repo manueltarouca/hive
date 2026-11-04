@@ -54,6 +54,7 @@ public enum SettingsIndex {
 
     public static let entries: [Entry] = [
         e("tailnet", .server, "Reach", "Reachable on your tailnet", "Lets your phone and your other Macs connect over Tailscale. Takes effect when the server starts again.", always: true),
+        e("tailscale", .server, "Reach", "Built-in Tailscale", "Joins your tailnet as the server’s own device, so this Mac needs no Tailscale app. The first time, sign in here.", always: true),
         e("resume-agents", .server, "Sessions", "Resume agents after a restart", "Starts each agent again in its own conversation when the server comes back."),
         e("scrollback-limit", .server, "Sessions", "Scrollback", "History kept for each terminal. Lowering it drops the oldest lines."),
         e("theme", .appearance, "Theme", "Theme", "System follows macOS; Day and Night stay as they are."),

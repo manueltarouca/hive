@@ -56,6 +56,11 @@ With `--tailscale`, the server joins your tailnet as its own device, named
 hive server start --tailscale --tailscale-hostname box
 ```
 
+The setting `tailscale = true` does the same for a server the Mac app
+starts: turn on **Built-in Tailscale** in Settings, Server, and the next time
+the server starts it joins your tailnet. Settings shows **Sign In…** until it
+has, then the device's name.
+
 The first time, the server needs to sign in. The link is in
 `hive server status` and in the server's log,
 `~/.local/state/hive/server.log`. On a machine without a browser, pass a

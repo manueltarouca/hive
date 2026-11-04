@@ -133,7 +133,7 @@ func (s *Server) registerConfigMethods() {
 			}
 			s.reloadConfig()
 			return s.configView(), nil
-		}, api.PermBy("config", "server for listen and settings starting with script", permOfSetting))
+		}, api.PermBy("config", "server for listen and settings starting with script or tailscale", permOfSetting))
 	api.Register(s.reg, "config.reload", "Read the settings file again and apply it.",
 		func(ctx context.Context, _ empty) (configView, error) {
 			s.reloadConfig()

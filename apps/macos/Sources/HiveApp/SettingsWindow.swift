@@ -440,6 +440,8 @@ struct ThemeTile: View {
 struct ServerPage: View {
     let ctx: SettingsContext
     @State private var now = Date()
+    /// Bumped when server.version comes back, so the Tailscale line redraws.
+    @State private var version = 0
 
     var body: some View {
         let st = ctx.style, local = ctx.model.host(id: HostConnection.localID)
@@ -465,7 +467,12 @@ struct ServerPage: View {
                 .font(.system(size: 11.5)).foregroundStyle(st.secondary.swiftUI).padding(.top, 6).padding(.leading, 2)
 
             SettingsSection(title: "Reach", style: st) {
-                SettingsRow(id: "tailnet", style: st, nav: ctx.nav, divider: false) {
+                SettingsRow(id: "tailscale", style: st, nav: ctx.nav, divider: false) {
+                    Toggle("", isOn: Binding(get: { ctx.s.tailscale }, set: { ctx.setServer("tailscale", $0 ? "true" : "false") }))
+                        .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                }
+                TailscaleState(ctx: ctx, version: version)
+                SettingsRow(id: "tailnet", style: st, nav: ctx.nav) {
                     Toggle("", isOn: Binding(get: { ctx.s.listen.contains { $0.hasPrefix("tailnet://") } }, set: { on in
                         var l = ctx.s.listen.filter { !$0.hasPrefix("tailnet://") }
                         if on { l.append("tailnet://:4483") }
@@ -487,6 +494,44 @@ struct ServerPage: View {
             }
         }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { now = $0 }
+        .onAppear { ctx.model.host(id: HostConnection.localID)?.refreshVersion { version += 1 } }
+        // While Built-in Tailscale waits for a sign-in in the browser, the line follows.
+        .onReceive(Timer.publish(every: 3, on: .main, in: .common).autoconnect()) { _ in
+            if ctx.s.tailscale || ctx.model.host(id: HostConnection.localID)?.tailscale != nil {
+                ctx.model.host(id: HostConnection.localID)?.refreshVersion { version += 1 }
+            }
+        }
+    }
+}
+
+/// Built-in Tailscale as the running server has it: waiting for a sign-in,
+/// on the tailnet, or set to start with the server.
+struct TailscaleState: View {
+    let ctx: SettingsContext
+    let version: Int
+
+    var body: some View {
+        let st = ctx.style
+        let t = ctx.model.host(id: HostConnection.localID)?.tailscale
+        // Only a web page: the link comes from the server's control server.
+        let url = t?["auth_url"].string.flatMap(URL.init(string:)).flatMap { $0.scheme == "https" ? $0 : nil }
+        let name = t?["dns_name"].string.map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 }
+        let line: String? = {
+            if let e = t?["error"].string, !e.isEmpty { return "Tailscale: \(e)" }
+            if url != nil { return "Sign in to add this server to your tailnet." }
+            if let name, !name.isEmpty { return ctx.s.tailscale ? "On your tailnet as \(name)." : "On your tailnet as \(name) until the server starts again." }
+            if t != nil { return "Starting." }
+            return ctx.s.tailscale ? "Starts when the server starts again." : nil
+        }()
+        if let line {
+            HStack(spacing: 10) {
+                Text(line).font(.system(size: 11.5)).foregroundStyle(url != nil ? st.accentText.swiftUI : st.secondary.swiftUI)
+                    .textSelection(.enabled)
+                Spacer()
+                if let url { Button("Sign In…") { NSWorkspace.shared.open(url) } }
+            }
+            .padding(.horizontal, 12).padding(.bottom, 8).id(version)
+        }
     }
 }
 

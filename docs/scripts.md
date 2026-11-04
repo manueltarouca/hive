@@ -273,7 +273,7 @@ list sessions, describe blocks, hear events.
 | `spawn` | New panes that run a command. Includes `control`. |
 | `input` | Typing into terminals: `write` and `send_key`, and answering agents |
 | `ui` | Notifications, badges, actions and keys |
-| `config` | Changing settings, except `listen` and those starting with `script` |
+| `config` | Changing settings, except `listen` and those starting with `script` or `tailscale` |
 | `server` | Stopping the server, saving now, and the settings `config` can't change |
 
 `hive api describe METHOD` shows the permission each method needs.

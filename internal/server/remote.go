@@ -19,6 +19,9 @@ type RemoteConfig struct {
 	// Optional: from the settings file. A listener that can't open is
 	// logged and skipped, so the server still starts.
 	Optional bool
+	// NodeOptional: the node is from the settings file (tailscale = true);
+	// one that can't start is logged, and the server starts anyway.
+	NodeOptional bool
 }
 
 type listenerInfo struct {
@@ -65,10 +68,16 @@ func (s *Server) serveRemote() error {
 		}
 		o.Logf = func(f string, a ...any) { s.log.Info("tailscale: " + strings.TrimSpace(fmt.Sprintf(f, a...))) }
 		n, err := remote.StartNode(o, rc.Policy, s.addListener, s.nodeChanged)
-		if err != nil {
+		switch {
+		case err != nil && rc.NodeOptional:
+			// From the settings file: the server still starts, and says why Tailscale didn't.
+			s.log.Error("tailscale: not started", "err", err)
+			s.nodeChanged(remote.NodeStatus{State: "stopped", Error: err.Error()})
+		case err != nil:
 			return fmt.Errorf("tailscale: %w", err)
+		default:
+			s.node = n
 		}
-		s.node = n
 	}
 	return nil
 }

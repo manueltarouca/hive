@@ -33,6 +33,19 @@ final class HostConnection {
     /// The server's version, as hive version prints it, and when it started.
     private(set) var serverVersion: String?
     private(set) var serverStarted: Date?
+    /// Built-in Tailscale's state, as server.version reports it (nil: not running).
+    private(set) var tailscale: JSON?
+
+    /// An object, or nil for anything else (a missing key reads as null).
+    static func object(_ j: JSON) -> JSON? { if case .object = j { return j }; return nil }
+
+    /// Asks for server.version again (Settings shows the newest Tailscale state).
+    func refreshVersion(_ done: @escaping @MainActor () -> Void) {
+        call("server.version") { [weak self] j in
+            self?.tailscale = HostConnection.object(j["tailscale"])
+            done()
+        }
+    }
     /// What the app calls it: This Mac, or the remote server's address
     /// (box.example.ts.net), as the session list and title bar show it.
     var displayName: String {
@@ -258,6 +271,7 @@ final class HostConnection {
                             self.hostname = j["hostname"].string
                             self.home = j["home"].string
                             self.serverVersion = j["hive_version"].string
+                            self.tailscale = HostConnection.object(j["tailscale"])
                             self.serverStarted = j["started_at"].string.flatMap { ISO8601DateFormatter.fractional.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
                             self.link = .connected
                             self.everConnected = true

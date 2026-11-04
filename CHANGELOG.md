@@ -27,6 +27,10 @@ patch, and this file lists it under "Changed" or "Removed".
   (`progress`), so a client that connects later shows it too.
 - On screen, an agent waiting for you says "Needs you" instead of
   "Blocked", on the Mac and the phone. The API keeps `blocked`.
+- The `tailscale` setting (and `tailscale-hostname`) starts the server as
+  its own Tailscale device, as `--tailscale` does, for a server the Mac app
+  starts. Settings, Server has **Built-in Tailscale**, with its state and
+  **Sign In…** while it waits for you.
 - Key sequence hints on the Mac: after a sequence's first key (such as
   ctrl+a in ctrl+a>d), a panel lists the keys that can follow and what each
   does; in a mode, its keys. A click, find or another window drops the

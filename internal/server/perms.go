@@ -50,7 +50,7 @@ func permOfSetting(raw json.RawMessage) (string, error) {
 	if err := json.Unmarshal(raw, &in); err != nil {
 		return "", api.BadRequest("input: %v", err)
 	}
-	if strings.HasPrefix(in.Key, "script") || in.Key == "listen" {
+	if strings.HasPrefix(in.Key, "script") || strings.HasPrefix(in.Key, "tailscale") || in.Key == "listen" {
 		return "server", nil
 	}
 	return "config", nil

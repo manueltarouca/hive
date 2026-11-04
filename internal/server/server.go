@@ -215,18 +215,12 @@ func New(cfg Config) (*Server, error) {
 	// Listeners from the settings file, when none were given as options
 	// (built-in Tailscale alone keeps them): a server the Mac app starts at
 	// login still reaches your phone.
-	if len(s.conf.Listen) > 0 && (s.cfg.Remote == nil || len(s.cfg.Remote.Listen) == 0) {
-		rc := &RemoteConfig{}
-		if s.cfg.Remote != nil {
-			rc = &RemoteConfig{Policy: s.cfg.Remote.Policy, Node: s.cfg.Remote.Node}
-		}
-		rc.Optional = true
-		for _, l := range s.conf.Listen {
-			if sp, err := remote.ParseSpec(l); err == nil {
-				rc.Listen = append(rc.Listen, sp)
-			}
-		}
-		s.cfg.Remote = rc
+	if s.conf.Tailscale && !remote.Built {
+		s.log.Warn("config", "path", cfg.ConfigPath, "problem", "tailscale = true, but this hive was built without Tailscale")
+	}
+	s.cfg.Remote = remoteFromSettings(s.cfg.Remote, s.conf)
+	if !remote.Built && s.cfg.Remote != nil && s.cfg.Remote.NodeOptional {
+		s.cfg.Remote.Node = nil
 	}
 	for _, d := range s.confDiags {
 		s.log.Warn("config", "path", cfg.ConfigPath, "problem", d.String())
@@ -1265,4 +1259,37 @@ func (s *Server) publishAgent(sessionID, blockID string, a *persist.Agent, event
 type progressReport struct {
 	State    string `json:"state"`
 	Progress int    `json:"progress"`
+}
+
+// remoteFromSettings adds the settings file's listeners, when none were
+// given as options (built-in Tailscale alone keeps them), and its built-in
+// Tailscale (tailscale = true), when --tailscale wasn't given: a server the
+// Mac app starts at login still reaches your phone.
+func remoteFromSettings(given *RemoteConfig, conf config.Config) *RemoteConfig {
+	rc := given
+	if len(conf.Listen) > 0 && (given == nil || len(given.Listen) == 0) {
+		rc = &RemoteConfig{}
+		if given != nil {
+			rc = &RemoteConfig{Policy: given.Policy, Node: given.Node}
+		}
+		rc.Optional = true
+		for _, l := range conf.Listen {
+			if sp, err := remote.ParseSpec(l); err == nil {
+				rc.Listen = append(rc.Listen, sp)
+			}
+		}
+	}
+	if conf.Tailscale && (rc == nil || rc.Node == nil) {
+		if rc == nil {
+			rc = &RemoteConfig{}
+		} else {
+			c := *rc
+			rc = &c
+		}
+		// The owner's own devices get in, as with --tailscale: the policy
+		// stays what the options said (none: the owner only).
+		rc.Node = &remote.NodeOptions{Hostname: conf.TailscaleHostname}
+		rc.NodeOptional = true
+	}
+	return rc
 }
