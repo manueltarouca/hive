@@ -113,11 +113,12 @@ See [Agents](./agents) for how agents report their state.
 ## The menu bar
 
 hive's three cells sit in the menu bar. The top cell fills while agents are
-working, and a count says how many need you. The menu lists them, blocked
-first, then finished ones you haven't looked at, then the ones working:
-pick one to open its pane. It also has your hosts, to connect or
-disconnect, **This Mac**, which shows how your phone and other Macs reach
-this one, **New Session**, **Open Hive** and **Settings…**.
+working, and a count says how many need you. The menu starts with the
+server and how long it has run (click it for Settings), lists the agents
+that need you (pick one to open its pane) and how many are working, and
+shows the app's and the server's versions, with a button that copies both
+for a bug report. **Open Hive**, **Settings…** and **Quit Hive** follow.
+Hosts connect and disconnect in Settings, on the Hosts page.
 
 Closing the window keeps hive in the menu bar, and your sessions keep
 running. Open it again from the menu or the Dock; ⌘Q quits.
@@ -141,6 +142,14 @@ field that finds a setting by what it does (⌘F in the window):
 
 Everything there is saved in the settings file, and editing the file updates
 the window. **Open Settings File** on Advanced opens it. See [Settings](./settings).
+
+## Key sequences
+
+A shortcut can be a sequence, such as `ctrl+a>d` (see [Settings](./settings)).
+After its first key, a panel at the bottom lists the keys that can follow and
+what each does; in a mode, it lists the mode's keys. Clicking a pane, opening
+find or switching windows drops a half-typed sequence. Turn the panel off
+with **Show key sequence hints** in Settings, Shortcuts.
 
 ## Find
 

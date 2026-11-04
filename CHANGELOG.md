@@ -17,6 +17,22 @@ patch, and this file lists it under "Changed" or "Removed".
   title bar and in the sidebar, and move with a short spring when they open,
   close or change places. The `motion` setting picks `snappy` (the default),
   `natural` or `off`; Reduce Motion always moves them at once.
+- Notifications by state on the Mac: Needs you, Done and Stopped each turn
+  on or off and play their own macOS sound (`notify-blocked`,
+  `notify-done`, `notify-stopped`, `sound-blocked`, `sound-done`,
+  `sound-stopped`), with a Play button in Settings; `dock-badge` counts
+  the agents that need you on the Dock icon.
+- A program's progress (OSC 9;4) shows as a ring on its tab, in the title
+  bar and the sidebar on the Mac, and in the tab strip and sheet on the phone. The server keeps the last report in the block's view
+  (`progress`), so a client that connects later shows it too.
+- On screen, an agent waiting for you says "Needs you" instead of
+  "Blocked", on the Mac and the phone. The API keeps `blocked`.
+- Key sequence hints on the Mac: after a sequence's first key (such as
+  ctrl+a in ctrl+a>d), a panel lists the keys that can follow and what each
+  does; in a mode, its keys. A click, find or another window drops the
+  half-typed sequence. `key-hints` turns it off.
+- Copy on select on the Mac (`copy-on-select`, off by default): text you
+  select with the mouse goes to the clipboard, and the pane says "Copied".
 - Find in a pane: ⌘F on the Mac (Edit → Find…), and **⋯ → find** on the
   phone and tablet. Matches in the scrollback are counted and marked, the
   latest is current, ⌘G and ⇧⌘G (or the arrows) step through them, and the

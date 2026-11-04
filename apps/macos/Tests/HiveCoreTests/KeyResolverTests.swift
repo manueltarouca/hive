@@ -66,3 +66,31 @@ import HiveKit
         #expect(r.chord(for: "client.shortcuts") == KeyChord(cmd: true, key: "/"))
     }
 }
+
+@Suite struct KeyHintTests {
+    @Test func sequenceAndModeHints() {
+        let km: JSON = ["bindings": [
+            ["key": "ctrl+a>d", "action": "client.split_right", "title": "Split Right"],
+            ["key": "ctrl+a>shift+d", "action": "client.split_down"],
+            ["key": "ctrl+a>r", "action": "client.mode", "args": ["mode": "resize"]],
+            ["key": "h", "action": "client.resize", "mode": "resize", "title": "Narrower"],
+            ["key": "cmd+t", "action": "client.new_tab", "title": "New Tab"],
+            ["key": "ctrl+a>c", "action": "client.new_tab"],
+        ], "modes": [["name": "resize", "exclusive": true]]]
+        var r = KeyResolver(km)
+        #expect(r.hints().isEmpty && r.typed.isEmpty)
+        #expect(r.press(KeyChord(ctrl: true, key: "a")) == .pending)
+        #expect(r.typed == "⌃A")
+        #expect(r.hints() == [KeyResolver.Hint(keys: "D", title: "Split Right"), KeyResolver.Hint(keys: "⇧D", title: "Split down"),
+                              KeyResolver.Hint(keys: "R", title: "Resize mode"), KeyResolver.Hint(keys: "C", title: "New Tab")])
+        #expect(r.press(KeyChord(key: "r")) == .enteredMode("resize"))
+        #expect(r.hints() == [KeyResolver.Hint(keys: "H", title: "Narrower")])
+        #expect(KeyChord(key: "enter").display == "↩" && KeyChord(cmd: true, key: "f5").display == "⌘F5")
+        // A sequence given up (a click) starts over.
+        var q = KeyResolver(km)
+        #expect(q.press(KeyChord(ctrl: true, key: "a")) == .pending)
+        q.cancel()
+        #expect(q.typed.isEmpty && q.hints().isEmpty)
+        #expect(KeyChord(ctrl: true, shift: true, key: "d").spoken == "Control Shift D" && KeyChord(key: "home").display == "↖")
+    }
+}

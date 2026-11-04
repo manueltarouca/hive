@@ -375,3 +375,33 @@ func TestAgentErrorSurvivesTheStopHook(t *testing.T) {
 		h.stop()
 	}
 }
+
+// A program's OSC 9;4 progress shows in the block's view, so a client that
+// attaches late sees it, and a removal or the next prompt clears it.
+func TestProgressInBlockView(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
+		`sleep 0.4; printf '\033]9;4;1;40\033\\'; sleep 1.2; printf '\033]9;4;0;0\033\\'; exec cat`}})
+	bid := strs(created["block_ids"])[0]
+	sid, _ := created["session_id"].(string)
+	progress := func() map[string]any {
+		out := h.call("session.view", map[string]any{"session_id": sid})
+		b, _ := out["blocks"].(map[string]any)[bid].(map[string]any)
+		p, _ := b["progress"].(map[string]any)
+		return p
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for p := progress(); p == nil || p["progress"] != float64(40) || p["state"] != "set"; p = progress() {
+		if time.Now().After(deadline) {
+			t.Fatalf("progress never showed: %v", p)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	for p := progress(); p != nil; p = progress() {
+		if time.Now().After(deadline.Add(3 * time.Second)) {
+			t.Fatalf("progress never went: %v", p)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}

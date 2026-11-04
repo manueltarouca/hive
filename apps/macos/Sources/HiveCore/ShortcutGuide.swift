@@ -12,7 +12,7 @@ public enum ShortcutText {
 
     /// The key's capital, as keycaps show it; ß, whose capital is two
     /// letters, stays as it is.
-    static func capital(_ key: String) -> String {
+    public static func capital(_ key: String) -> String {
         let up = key.uppercased()
         return up.count == key.count ? up : key
     }

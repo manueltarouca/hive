@@ -115,6 +115,9 @@ struct BlockInfo: Equatable {
     var agentState: String?
     var exited = false
     var exitCode = 0
+    /// OSC 9;4: set, error, indeterminate or pause, and a percentage.
+    var progressState: String? = nil
+    var progress = 0
     /// The account's home on the block's machine, for ~ (nil: this Mac's).
     var home: String? = nil
 
@@ -240,6 +243,14 @@ final class AppModel: ObservableObject {
     @Published var keys = KeyResolver()
     /// The current key mode, for the title bar.
     @Published var keyMode: String?
+    /// Key hints on screen: what was typed (or the mode), and what can follow.
+    struct KeyHints: Equatable {
+        var heading: String
+        var hints: [KeyResolver.Hint]
+        /// The heading in words, for VoiceOver.
+        var spokenHeading = ""
+    }
+    @Published var keyHints: KeyHints?
     /// Runs one of the app's own actions (client.*), set by the app delegate.
     var clientAction: ((String, JSON) -> Void)?
     @Published var style: Style = .light
@@ -262,6 +273,7 @@ final class AppModel: ObservableObject {
     /// Opens find on the focused pane, or puts the keyboard back in its field.
     func startFind() {
         guard let b = focusedBlock else { return }
+        cancelKeySequence()
         if finding?.block != b {
             endFind()
             finding = FindState(block: b)
@@ -641,12 +653,24 @@ final class AppModel: ObservableObject {
 
     private func notifyChanges(_ list: [AgentInfo], from h: HostConnection) {
         defer { h.lastAgentStates = Dictionary(uniqueKeysWithValues: list.map { ($0.blockID, $0.state) }) }
+        // The first list after connecting is what was already so, not news: no banners, no sounds.
+        if h.lastAgentStates.isEmpty { return }
+        var played = false
         switch settings.notify {
         case "never": return
         case "always": break
         default: guard !inFront else { return } // background
         }
         for a in list where (a.state == "blocked" || a.state == "done" || a.state == "stopped") && h.lastAgentStates[a.blockID] != a.state {
+            // Each state can be off, and has its own sound (played here, with the notification).
+            let (on, sound) = a.state == "blocked" ? (settings.notifyBlocked, settings.soundBlocked)
+                : a.state == "done" ? (settings.notifyDone, settings.soundDone) : (settings.notifyStopped, settings.soundStopped)
+            guard on else { continue }
+            // One sound for a batch (agents often change together), and only when macOS shows hive's notifications.
+            if sound != "none", !played, notificationsAllowed {
+                NSSound(named: NSSound.Name(sound))?.play()
+                played = true
+            }
             let c = UNMutableNotificationContent()
             c.title = "\(Programs.lookup(a.harness).name) \(a.state == "blocked" ? "needs you" : a.state == "stopped" ? "stopped" : "is done")"
             // Where it is goes in the subtitle (a remote host's agents name
@@ -724,6 +748,7 @@ final class AppModel: ObservableObject {
                                       foreground: foreground, cwd: cwd,
                                       harness: gone ? nil : b["agent"]["harness"].string,
                                       agentState: agentState, exited: b["exited"].bool ?? false, exitCode: b["exit_code"].int ?? 0,
+                                      progressState: b["progress"]["state"].string, progress: b["progress"]["progress"].int ?? 0,
                                       home: h.isLocal ? nil : h.home)
             }
             blocks = info
@@ -823,6 +848,14 @@ final class AppModel: ObservableObject {
                     programCopied(block: inner["payload"]["block_id"].string ?? "", text: inner["payload"]["payload"]["text"].string ?? "")
                 }
                 if name == "title_changed" || name == "size_changed" || name == "process_changed", sid == currentSession { scheduleReload() }
+                // A program reporting progress many times a second: the tab follows twice a second.
+                if name == "progress_report", sid == currentSession, !progressReloadPending {
+                    progressReloadPending = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.progressReloadPending = false
+                        self?.scheduleReload()
+                    }
+                }
                 if name == "status_changed" {
                     h.badges.apply(inner["payload"]["payload"]["badge"])
                     if h === current { paneBadges = h.badges }
@@ -882,6 +915,7 @@ final class AppModel: ObservableObject {
             let mode = self.keys.mode
             self.keys = KeyResolver(j)
             if mode != nil { self.keyMode = nil }
+            self.updateKeyHints()
         }
     }
 
@@ -913,8 +947,30 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// key-hints: after a sequence's first key, or in a mode, what can follow.
+    func updateKeyHints() {
+        let h = keys.hints()
+        let next: KeyHints?
+        if !settings.keyHints || h.isEmpty {
+            next = nil
+        } else if let m = keys.mode, keys.typed.isEmpty {
+            next = KeyHints(heading: "\(m.prefix(1).uppercased() + m.dropFirst()) mode, Esc to leave", hints: h)
+        } else {
+            next = KeyHints(heading: keys.typed, hints: h, spokenHeading: keys.typedSpoken)
+        }
+        if next != keyHints { keyHints = next }
+    }
+
+    /// Drops a half-typed sequence (a click, find, the window losing focus): the next key starts over.
+    func cancelKeySequence() {
+        guard !keys.typed.isEmpty else { return }
+        keys.cancel()
+        updateKeyHints()
+    }
+
     /// A key press, from the app's key monitor: true if hive used it.
     func handleKey(_ c: KeyChord) -> Bool {
+        defer { updateKeyHints() }
         switch keys.press(c) {
         case .pass: return false
         case .pending, .swallowed: return true
@@ -1043,6 +1099,26 @@ final class AppModel: ObservableObject {
             self.agentReloadPending.remove(h.id)
             self.reloadAgents(h)
         }
+    }
+
+    /// Progress reports reload the view at most twice a second.
+    private var progressReloadPending = false
+
+    /// Whether macOS lets hive show notifications; sounds follow it. Kept
+    /// fresh when the app comes to the front (main.swift).
+    var notificationsAllowed = true
+    func refreshNotificationPermission() {
+        UNUserNotificationCenter.current().getNotificationSettings { s in
+            let ok = s.authorizationStatus == .authorized || s.authorizationStatus == .provisional
+            Task { @MainActor [weak self] in self?.notificationsAllowed = ok }
+        }
+    }
+
+    /// The progress a tab shows: its focused pane's, else another pane's.
+    func progress(of w: WindowInfo) -> (state: String, value: Int)? {
+        let ids = [w.focused].compactMap { $0 } + (w.layout?.rects().map(\.0) ?? [])
+        for id in ids { if let b = blocks[id], let s = b.progressState { return (s, b.progress) } }
+        return nil
     }
 
     /// Coalesces bursts of layout events into one reload.
@@ -1240,6 +1316,14 @@ final class AppModel: ObservableObject {
     var attentionElsewhere: Attention { Attention.elsewhere(places, current: currentSession) }
 
     func attention(session: String) -> Attention { Attention.of(places, session: session) }
+
+    /// dock-badge: the agents that need you, in every session, on the Dock icon.
+    func updateDockBadge() {
+        let a = Attention.all(places)
+        let n = a.blocked + a.done
+        let label = settings.dockBadge && n > 0 ? (n > 99 ? "99+" : "\(n)") : nil
+        if NSApp.dockTile.badgeLabel != label { NSApp.dockTile.badgeLabel = label }
+    }
 
     /// Moves a tab to a place in the shown order (pins first), as a drag in the tab bar or the
     /// sidebar lands it: among the pins it's pinned, among the rest unpinned. Shown here at once,
@@ -1493,13 +1577,20 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func copySelection(block: String) {
+    /// confirm: say "Copied" on the pane (copy on select, where nothing else shows it happened).
+    func copySelection(block: String, confirm: Bool = false) {
         let engine = engine
         vt.async {
             guard let text = engine.selectedText(block: block), !text.isEmpty else { return }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
+                guard confirm, let self else { return }
+                self.copiedBlock = block
+                self.copiedReset?.cancel()
+                let reset = DispatchWorkItem { [weak self] in self?.copiedBlock = nil }
+                self.copiedReset = reset
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: reset)
             }
         }
     }

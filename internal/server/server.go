@@ -104,6 +104,9 @@ type rec struct {
 	snapSeq uint64 // output position of the last snapshot
 	owner   string // client with size authority
 	closing bool
+	// progress: the last OSC 9;4 report, so a client that connects late
+	// (the phone, a restart of the app) shows it too; nil when removed.
+	progress *progressReport
 	// resuming: until then, a restored agent's shell in front is the shell
 	// starting it, not the agent gone.
 	resuming time.Time
@@ -504,6 +507,10 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 			if !(p.AtShell() && time.Now().Before(r.resuming)) {
 				r.st.Foreground = &p
 			}
+			// Back at the shell: whatever reported progress is gone.
+			if p.AtShell() {
+				r.progress = nil
+			}
 			// The shell is back in front: the agent exited, maybe killed
 			// before its SessionEnd hook. Its tools never take the terminal
 			// (they run without one), so this means it's gone. A report from
@@ -556,8 +563,20 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 				}
 			}
 		}
+	case "progress_report":
+		st, _ := e.Payload["state"].(string)
+		v, _ := e.Payload["progress"].(int)
+		if st == "remove" || st == "" {
+			r.progress = nil
+		} else {
+			r.progress = &progressReport{State: st, Progress: v}
+		}
 	case "prompt":
 		// A new prompt ends working and blocked records (OSC 7501 lifetime).
+		// It ends a progress report too: the program that sent it is done.
+		if e.Payload["kind"] == "prompt_start" {
+			r.progress = nil
+		}
 		if e.Payload["kind"] == "prompt_start" {
 			for k, v := range r.st.Status {
 				if v.State == "working" || v.State == "blocked" {
@@ -567,6 +586,7 @@ func (s *Server) onBlockEvent(sessionID string, e block.Event) {
 		}
 	case "child_exited":
 		r.st.Exited = true
+		r.progress = nil
 		if c, ok := e.Payload["exit_code"].(int); ok {
 			r.st.ExitCode = c
 		}
@@ -1118,6 +1138,9 @@ func (s *Server) blockInfo(bid string, r *rec) map[string]any {
 	if len(r.st.Status) > 0 {
 		info["program_status"] = sortedStatus(r.st.Status)
 	}
+	if r.progress != nil {
+		info["progress"] = r.progress
+	}
 	if r.owner != "" {
 		info["size_owner"] = r.owner
 	}
@@ -1235,4 +1258,11 @@ func (s *Server) publishAgent(sessionID, blockID string, a *persist.Agent, event
 		"harness": a.Harness, "session_id": a.SessionID, "state": a.State, "message": a.Message, "event": event,
 		"kind": a.Kind, "revision": a.Revision, "updated_at": a.UpdatedAt, "cwd": a.Cwd,
 	})
+}
+
+// progressReport is a program's OSC 9;4 progress: state set, error,
+// indeterminate or pause, and a percentage.
+type progressReport struct {
+	State    string `json:"state"`
+	Progress int    `json:"progress"`
 }

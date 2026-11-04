@@ -26,7 +26,8 @@ func TestParseGrammar(t *testing.T) {
 func TestDefaults(t *testing.T) {
 	c, diags := Parse("")
 	want := Config{Theme: "system", FontFamily: "", FontSize: 13, Bell: "flash", Notify: "background",
-		ConfirmPaste: true, Motion: "snappy", ConfirmClose: "running", DimPanes: "light", BalanceSplits: true, ScrollbackLimit: 16 << 20, ResumeAgents: true, Scripts: true}
+		ConfirmPaste: true, Motion: "snappy", ConfirmClose: "running", DimPanes: "light", BalanceSplits: true,
+		NotifyBlocked: true, NotifyDone: true, NotifyStopped: true, SoundBlocked: "Tink", SoundDone: "Glass", SoundStopped: "Basso", DockBadge: true, KeyHints: true, ScrollbackLimit: 16 << 20, ResumeAgents: true, Scripts: true}
 	if !reflect.DeepEqual(c, want) || len(diags) != 0 {
 		t.Fatalf("defaults = %+v, %v", c, diags)
 	}

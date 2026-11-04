@@ -884,11 +884,11 @@ def step_script_page(srv):
     shot("scripts-options")
     # The one that asks to read and type, still pending, says so plainly.
     for _ in range(6):
-        if find(dump(), "It can read your terminals and type into them") is not None:
+        if find(dump(), "Can read your terminals and type into them") is not None:
             break
         adb("shell", "input", "swipe", "540", "1900", "540", "700", "300")
         time.sleep(0.6)
-    wait("It can read your terminals and type into them")
+    wait("Can read your terminals and type into them")
     adb("shell", "input", "swipe", "540", "1500", "540", "900", "300")  # the whole card in view
     time.sleep(0.6)
     shot("scripts-typist")
@@ -1090,6 +1090,20 @@ def pane_tap(srv, name, marker, token, nth=0):
 def close_viewer():
     tap("Close", exact=True)
     until("the viewer closed", lambda: find(dump(), "Open in another app", exact=True) is None and find(dump(), "Getting it from", exact=False) is None, timeout=5)
+
+
+def step_progress(srv):
+    """A program's progress (OSC 9;4) shows as a ring on its tab, and goes when the program says it's done."""
+    srv.hive("new", "prog", "--cwd", "/tmp")
+    sid = srv.view("prog")["session_id"]
+    srv.call("session.new_window", {"session_id": sid, "layout": {"cwd": "/tmp", "command": ["sh", "-c",
+        "printf '\\033]9;4;1;50\\033\\\\'; echo building; sleep 8; printf '\\033]9;4;0;0\\033\\\\'; exec cat"]}})
+    open_switcher()
+    tap("prog", exact=True)
+    streaming()
+    wait("50 percent", timeout=10)
+    shot("progress-ring")
+    wait("50 percent", gone=True, timeout=15)
 
 
 def step_find(srv):

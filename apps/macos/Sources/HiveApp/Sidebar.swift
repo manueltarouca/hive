@@ -105,6 +105,8 @@ struct TabRow: View {
                     if hover && !dragged {
                         TabCloseButton(style: s) { model.closeTab(window) }
                             .transition(.opacity)
+                    } else if let p = model.progress(of: window), !blocked {
+                        ProgressRing(state: p.state, value: p.value, style: s)
                     } else if blocked {
                         StatusBadge(state: sum.state ?? "blocked", style: s)
                     } else if let st = sum.state {

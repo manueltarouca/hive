@@ -53,6 +53,15 @@ comment.
 | `dim-panes` | `light` | How much the panes you're not typing in step back: `light`, `more` or `off` |
 | `balance-splits` | `true` | Give every pane in a tab the same room when the app opens or closes one. This replaces sizes set by dragging or `--ratio` |
 | `focus-follows-pointer` | `false` | Focus a pane when the pointer moves over it, without a click |
+| `notify-blocked` | `true` | Notify when an agent needs you (when `notify` allows) |
+| `notify-done` | `true` | Notify when an agent is done (when `notify` allows) |
+| `notify-stopped` | `true` | Notify when an agent stopped and won't go on by itself, such as at a usage limit (when `notify` allows) |
+| `sound-blocked` | `Tink` | The sound when an agent needs you: a macOS sound (Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink), or `none` |
+| `sound-done` | `Glass` | The sound when an agent is done |
+| `sound-stopped` | `Basso` | The sound when an agent stopped |
+| `dock-badge` | `true` | Count the agents that need you on hive's Dock icon |
+| `key-hints` | `true` | Show the keys that can follow while a key sequence is half typed, and a mode's keys |
+| `copy-on-select` | `false` | Copy text as soon as you select it with the mouse; ⌘C still works |
 | `cursor-style-blink` | empty | Whether the cursor blinks, with Ghostty's name: empty or `true` blinks (Ghostty's default), `false` keeps it steady. It blinks only in the focused pane, and typing or output shows it again at once. Programs can still choose with `CSI Ps SP q` or DEC mode 12 |
 | `scrollback-limit` | `16m` | History kept per terminal, in bytes (`k`, `m`, `g`), at least `64k`. Read by the server; lowering it drops old lines at once |
 | `resume-agents` | `true` | Resume agents' sessions when the server starts again. Read when the server starts |

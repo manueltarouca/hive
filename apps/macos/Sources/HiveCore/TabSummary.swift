@@ -76,6 +76,9 @@ public struct Attention: Equatable, Sendable {
         count(agents.filter { $0.session == session })
     }
 
+    /// In every session: what the Dock badge counts.
+    public static func all(_ agents: [AgentPlace]) -> Attention { count(agents) }
+
     /// In every session but the current one.
     public static func elsewhere(_ agents: [AgentPlace], current: String?) -> Attention {
         count(agents.filter { $0.session != current })

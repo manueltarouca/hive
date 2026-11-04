@@ -196,6 +196,7 @@ final class PaneView: MTKView, NSTextInputClient {
     // MARK: mouse
 
     override func mouseDown(with event: NSEvent) {
+        model.cancelKeySequence()
         window?.makeFirstResponder(self)
         model.focus(block: blockID)
         // ⌘-click on a link is the link's, not the program's or a
@@ -223,6 +224,8 @@ final class PaneView: MTKView, NSTextInputClient {
             return
         }
         pointer(.release, .left, event)
+        // copy-on-select: what the drag selected goes to the clipboard (after the release, on the same queue).
+        if model.settings.copyOnSelect { model.copySelection(block: blockID, confirm: true) }
     }
 
     // MARK: links
@@ -549,7 +552,7 @@ struct StatusBadge: View {
         case "blocked", "stopped":
             HStack(spacing: 4) {
                 Image(systemName: "hexagon.fill").font(.system(size: 8)).foregroundStyle(style.blocked.swiftUI)
-                Text(state == "stopped" ? "Stopped" : "Blocked").font(.system(size: 10, weight: .semibold)).foregroundStyle(style.blockedText.swiftUI)
+                Text(state == "stopped" ? "Stopped" : "Needs you").font(.system(size: 10, weight: .semibold)).foregroundStyle(style.blockedText.swiftUI)
             }
             .padding(.horizontal, 6).padding(.vertical, 1)
             .background(Capsule().fill(style.blocked.swiftUI.opacity(0.14)))
@@ -980,5 +983,39 @@ struct FindBar: View {
         .foregroundStyle(model.style.secondary.swiftUI)
         .help(help)
         .accessibilityLabel(help)
+    }
+}
+
+/// A program's progress (OSC 9;4) as a small ring: honey as it fills, coral
+/// for an error, muted while paused, and a turning arc when it can't tell.
+struct ProgressRing: View {
+    let state: String
+    let value: Int
+    let style: Style
+    var size: CGFloat = 12
+    @State private var turn = false
+
+    var body: some View {
+        let tint = state == "error" ? style.blocked : state == "pause" ? style.secondary : style.accent
+        ZStack {
+            Circle().stroke(style.text.swiftUI.opacity(0.14), lineWidth: 2)
+            if state == "indeterminate" && NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                // Without motion a turning arc would read as 30% done: the whole ring, faint.
+                Circle().stroke(tint.swiftUI.opacity(0.6), style: StrokeStyle(lineWidth: 2, dash: [2, 2]))
+            } else if state == "indeterminate" {
+                Circle().trim(from: 0, to: 0.3).stroke(tint.swiftUI, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(turn ? 360 : 0))
+                    .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .linear(duration: 1).repeatForever(autoreverses: false), value: turn)
+                    .onAppear { turn = true }
+            } else {
+                Circle().trim(from: 0, to: CGFloat(max(0, min(100, value))) / 100)
+                    .stroke(tint.swiftUI, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.3), value: value)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityElement()
+        .accessibilityLabel(state == "indeterminate" ? "In progress" : state == "error" ? "Failed at \(value) percent" : "\(value) percent")
     }
 }

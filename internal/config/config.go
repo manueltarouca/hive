@@ -34,6 +34,19 @@ type Config struct {
 	BalanceSplits bool `json:"balance-splits"`
 	// FocusFollowsPointer focuses a pane when the pointer moves over it.
 	FocusFollowsPointer bool `json:"focus-follows-pointer"`
+	// Per agent state: whether it notifies, and the sound it plays.
+	NotifyBlocked bool   `json:"notify-blocked"`
+	NotifyDone    bool   `json:"notify-done"`
+	NotifyStopped bool   `json:"notify-stopped"`
+	SoundBlocked  string `json:"sound-blocked"`
+	SoundDone     string `json:"sound-done"`
+	SoundStopped  string `json:"sound-stopped"`
+	// DockBadge counts the agents that need you on the Dock icon.
+	DockBadge bool `json:"dock-badge"`
+	// KeyHints shows the keys that can follow a sequence's first key, and a mode's keys.
+	KeyHints bool `json:"key-hints"`
+	// CopyOnSelect copies text as soon as it's selected.
+	CopyOnSelect bool `json:"copy-on-select"`
 	// Nil lets programs decide, blinking by default (Ghostty's blank).
 	CursorStyleBlink *bool  `json:"cursor-style-blink"`
 	ScrollbackLimit  uint64 `json:"scrollback-limit"`
@@ -86,6 +99,9 @@ const minScrollback = 64 << 10
 // big no longer convert to an integer exactly.
 const maxSize = 1 << 40
 
+// sounds are the macOS sounds an agent state can play, or none.
+var sounds = []string{"none", "Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink"}
+
 // Keys lists every setting, in the order the template shows them.
 var Keys = []Key{
 	{Name: "theme", Default: "system", Help: "system, day or night", Choices: []string{"system", "day", "night"},
@@ -117,6 +133,24 @@ var Keys = []Key{
 		set: boolean(func(c *Config, b bool) { c.BalanceSplits = b })},
 	{Name: "focus-follows-pointer", Default: "false", Help: "focus a pane when the pointer moves over it, without a click",
 		set: boolean(func(c *Config, b bool) { c.FocusFollowsPointer = b })},
+	{Name: "notify-blocked", Default: "true", Help: "notify when an agent needs you (when notify allows)",
+		set: boolean(func(c *Config, b bool) { c.NotifyBlocked = b })},
+	{Name: "notify-done", Default: "true", Help: "notify when an agent is done (when notify allows)",
+		set: boolean(func(c *Config, b bool) { c.NotifyDone = b })},
+	{Name: "notify-stopped", Default: "true", Help: "notify when an agent stopped and won't go on by itself, such as at a usage limit (when notify allows)",
+		set: boolean(func(c *Config, b bool) { c.NotifyStopped = b })},
+	{Name: "sound-blocked", Default: "Tink", Choices: sounds, Help: "the sound when an agent needs you: a macOS sound, or none",
+		set: oneOf(func(c *Config, v string) { c.SoundBlocked = v }, sounds...)},
+	{Name: "sound-done", Default: "Glass", Choices: sounds, Help: "the sound when an agent is done: a macOS sound, or none",
+		set: oneOf(func(c *Config, v string) { c.SoundDone = v }, sounds...)},
+	{Name: "sound-stopped", Default: "Basso", Choices: sounds, Help: "the sound when an agent stopped: a macOS sound, or none",
+		set: oneOf(func(c *Config, v string) { c.SoundStopped = v }, sounds...)},
+	{Name: "dock-badge", Default: "true", Help: "count the agents that need you on hive's Dock icon",
+		set: boolean(func(c *Config, b bool) { c.DockBadge = b })},
+	{Name: "copy-on-select", Default: "false", Help: "copy text as soon as you select it with the mouse; cmd+C still works",
+		set: boolean(func(c *Config, b bool) { c.CopyOnSelect = b })},
+	{Name: "key-hints", Default: "true", Help: "show the keys that can follow while a key sequence is half typed, and a mode's keys",
+		set: boolean(func(c *Config, b bool) { c.KeyHints = b })},
 	{Name: "cursor-style-blink", Default: "", Choices: []string{"", "true", "false"}, Help: "whether the cursor blinks: blank or true blinks, as in Ghostty; false keeps it steady. Programs can still change it (DECSCUSR, DEC mode 12)",
 		set: func(c *Config, v string) error {
 			if v == "" {

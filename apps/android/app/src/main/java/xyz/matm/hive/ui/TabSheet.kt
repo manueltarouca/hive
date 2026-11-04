@@ -134,7 +134,9 @@ fun TabStrip(model: AppModel, openSheet: () -> Unit, openMenu: (WindowInfo) -> U
                 FadeText(label, Type.small, if (sel) p.text else p.muted, Modifier.widthIn(max = 140.dp))
                 // A script just acted in this tab.
                 if (w.blocks.any { model.chipFor(it) != null }) { Spacer(Modifier.width(5.dp)); LineIcon(Icon.Bolt, p.honey, 13.dp, description = "A script acted here") }
-                if (state != null) { Spacer(Modifier.width(7.dp)); Hexagon(state, 8.dp) }
+                val prog = model.tabProgress(w)
+                if (prog != null && state != "blocked" && state != "stopped") { Spacer(Modifier.width(7.dp)); ProgressRing(prog.first, prog.second, 12.dp) }
+                else if (state != null) { Spacer(Modifier.width(7.dp)); Hexagon(state, 8.dp) }
             }
         }
     }
@@ -275,7 +277,10 @@ private fun Card(model: AppModel, w: WindowInfo, i: Int, go: (Int) -> Unit, open
                 ProgramTile(model.program(w), 16.dp, model.otherPrograms(w))
                 Spacer(Modifier.width(6.dp))
                 FadeText(label, Type.small.copy(fontWeight = FontWeight(500)), p.text, Modifier.weight(1f, fill = false))
-                model.tabState(w)?.let { Spacer(Modifier.weight(0.001f)); Spacer(Modifier.width(6.dp)); Hexagon(it, 8.dp) }
+                val st = model.tabState(w)
+                val prog = model.tabProgress(w)
+                if (prog != null && st != "blocked" && st != "stopped") { Spacer(Modifier.weight(0.001f)); Spacer(Modifier.width(6.dp)); ProgressRing(prog.first, prog.second, 12.dp) }
+                else st?.let { Spacer(Modifier.weight(0.001f)); Spacer(Modifier.width(6.dp)); Hexagon(it, 8.dp) }
             }
             Spacer(Modifier.height(6.dp))
             val lines = model.previews[w.id] ?: listOf(model.titleParts(w).second.ifEmpty { " " })

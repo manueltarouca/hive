@@ -235,7 +235,7 @@ final class MenuBar: NSObject, NSMenuDelegate {
         let where_ = model.hostRows.first { $0.id == a.host }
         let session = a.sessionLabel.isEmpty ? "a session" : a.sessionLabel
         let place = where_.map { $0.local ? session : "\(session) on \($0.name)" } ?? session
-        let word = a.state == "blocked" ? "Blocked" : a.state == "stopped" ? "Stopped" : a.state == "done" ? "Done" : "Working"
+        let word = a.state == "blocked" ? "Needs you" : a.state == "stopped" ? "Stopped" : a.state == "done" ? "Done" : "Working"
         let said = a.message.isEmpty ? word : "\(word): \(a.message)"
         i.attributedTitle = twoLines(MenuBarStatus.clip(a.task, max: 44), MenuBarStatus.clip("\(place), \(said)", max: 58))
         i.setAccessibilityLabel("\(a.task), \(word), in \(place)")

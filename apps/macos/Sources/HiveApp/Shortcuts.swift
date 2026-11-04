@@ -153,3 +153,54 @@ struct ShortcutsView: View {
         .accessibilityLabel("Keyboard Shortcuts")
     }
 }
+
+/// Over the window: the keys that can follow a sequence's first key, or a
+/// mode's keys, at the bottom. Clicks pass through to the panes.
+final class KeyHintsHost: NSHostingView<KeyHintsView> {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    // VoiceOver's pointer lands on the pane below, not this layer.
+    override func accessibilityHitTest(_ point: NSPoint) -> Any? { nil }
+}
+
+struct KeyHintsView: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        let s = model.style
+        VStack {
+            Spacer()
+            if let k = model.keyHints {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(k.heading).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(s.accentText.swiftUI)
+                    let cols = k.hints.count > 6 ? 2 : 1
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 150), alignment: .leading), count: cols), alignment: .leading, spacing: 5) {
+                        ForEach(Array(k.hints.prefix(k.hints.count > 18 ? 16 : 18).enumerated()), id: \.offset) { _, h in
+                            HStack(spacing: 8) {
+                                Text(h.keys).font(.system(size: 11.5, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(s.text.swiftUI)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .frame(minWidth: 34)
+                                    .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(s.text.swiftUI.opacity(0.08)))
+                                Text(h.title).font(.system(size: 12)).foregroundStyle(s.secondary.swiftUI).lineLimit(1)
+                            }
+                        }
+                    }
+                    if k.hints.count > 18 {
+                        Text("and \(k.hints.count - 16) more, in Settings, Shortcuts").font(.system(size: 11.5)).foregroundStyle(s.secondary.swiftUI)
+                    }
+                }
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .frame(maxWidth: 460, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(s.card.swiftUI)
+                    .shadow(color: .black.opacity(s.dark ? 0.35 : 0.12), radius: 12, y: 4))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(s.border.swiftUI, lineWidth: 1))
+                .padding(.bottom, 22)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Keys after \(k.spokenHeading.isEmpty ? k.heading : k.spokenHeading): " + k.hints.map { "\($0.spoken.isEmpty ? $0.keys : $0.spoken), \($0.title)" }.joined(separator: "; "))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(model.motion == nil ? nil : .easeOut(duration: 0.15), value: model.keyHints)
+    }
+}

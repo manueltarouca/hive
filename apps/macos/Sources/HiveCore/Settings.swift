@@ -21,6 +21,18 @@ public struct Settings: Equatable, Sendable {
     public var balanceSplits = true
     /// Focus a pane when the pointer moves over it.
     public var focusFollowsPointer = false
+    /// Per agent state: whether it notifies and its sound ("none": silent).
+    public var notifyBlocked = true, notifyDone = true, notifyStopped = true
+    public var soundBlocked = "Tink", soundDone = "Glass", soundStopped = "Basso"
+    /// Count the agents that need you on the Dock icon.
+    public var dockBadge = true
+    /// Show the keys that can follow a sequence's first key, and a mode's keys.
+    public var keyHints = true
+    /// Copy text as soon as it's selected.
+    public var copyOnSelect = false
+
+    /// The macOS sounds a state can play.
+    public static let sounds = ["Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink"]
     /// cursor-style-blink: nil blinks unless a program says otherwise.
     public var cursorStyleBlink: Bool?
     /// Read by the server; shown and set in the Settings window.
@@ -80,6 +92,11 @@ public struct Settings: Equatable, Sendable {
             var dimPanes: String?
             var balanceSplits: Bool?
             var focusFollowsPointer: Bool?
+            var notifyBlocked: Bool?, notifyDone: Bool?, notifyStopped: Bool?
+            var soundBlocked: String?, soundDone: String?, soundStopped: String?
+            var dockBadge: Bool?
+            var keyHints: Bool?
+            var copyOnSelect: Bool?
             var listen: [String]?
             var scripts: Bool?
             var scriptRemoteRun: Bool?
@@ -88,6 +105,8 @@ public struct Settings: Equatable, Sendable {
                 case fontFamily = "font-family", fontSize = "font-size", confirmPaste = "confirm-paste", cursorStyleBlink = "cursor-style-blink"
                 case scrollbackLimit = "scrollback-limit", resumeAgents = "resume-agents"
                 case dimPanes = "dim-panes", balanceSplits = "balance-splits", focusFollowsPointer = "focus-follows-pointer"
+                case notifyBlocked = "notify-blocked", notifyDone = "notify-done", notifyStopped = "notify-stopped"
+                case soundBlocked = "sound-blocked", soundDone = "sound-done", soundStopped = "sound-stopped", dockBadge = "dock-badge", keyHints = "key-hints", copyOnSelect = "copy-on-select"
                 case motion, confirmClose = "confirm-close", listen, scripts, scriptRemoteRun = "script-remote-run"
             }
         }
@@ -102,6 +121,10 @@ public struct Settings: Equatable, Sendable {
                         confirmClose: s.values.confirmClose.flatMap(CloseGuard.Policy.init(rawValue:)) ?? .running,
                         dimPanes: s.values.dimPanes ?? "light", balanceSplits: s.values.balanceSplits ?? true,
                         focusFollowsPointer: s.values.focusFollowsPointer ?? false,
+                        notifyBlocked: s.values.notifyBlocked ?? true, notifyDone: s.values.notifyDone ?? true,
+                        notifyStopped: s.values.notifyStopped ?? true, soundBlocked: s.values.soundBlocked ?? "Tink",
+                        soundDone: s.values.soundDone ?? "Glass", soundStopped: s.values.soundStopped ?? "Basso",
+                        dockBadge: s.values.dockBadge ?? true, keyHints: s.values.keyHints ?? true, copyOnSelect: s.values.copyOnSelect ?? false,
                         cursorStyleBlink: s.values.cursorStyleBlink, scrollbackLimit: s.values.scrollbackLimit,
                         resumeAgents: s.values.resumeAgents, listen: s.values.listen ?? [],
                         scripts: s.values.scripts ?? true, scriptRemoteRun: s.values.scriptRemoteRun ?? false, diagnostics: s.diagnostics, keys: s.keys ?? [])

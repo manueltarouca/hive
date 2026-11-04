@@ -154,7 +154,13 @@ Session events include `window_created`, `window_closed`, `window_pinned`,
 `block_closed`, `session_view_changed` and `active_window_changed`. Terminal
 events include `child_exited`, `title_changed`, `pwd_changed`, `bell`,
 `process_changed`, `size_changed`, `desktop_notification`,
-`program_status_changed` and `agent_changed`.
+`progress_report`, `program_status_changed` and `agent_changed`.
+
+`progress_report` is a program's progress (OSC 9;4): `state` (`set`,
+`error`, `indeterminate`, `pause` or `remove`) and `progress`, a
+percentage. The block's view keeps the last one as `progress`
+(`{"state", "progress"}`) until it's removed, the program exits or the
+shell is back in front, so a client that connects later shows it too.
 
 `agent_changed` carries `harness`, `session_id` (the agent's own), `state`,
 `message`, `kind` (for a blocked agent: `permission_prompt` or

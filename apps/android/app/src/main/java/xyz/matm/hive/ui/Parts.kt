@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -219,5 +221,29 @@ fun Modifier.readingWidth(): Modifier = this.fillMaxWidth().wrapContentWidth(Ali
 enum class Space { Compact, Medium, Expanded;
     companion object {
         fun of(widthDp: Float) = when { widthDp < 600 -> Compact; widthDp < 840 -> Medium; else -> Expanded }
+    }
+}
+
+/** A program's progress (OSC 9;4) as a small ring, as on the Mac: honey as it fills, coral on an error, muted while paused, a turning arc when it can't tell. */
+@androidx.compose.runtime.Composable
+fun ProgressRing(state: String, value: Int, size: androidx.compose.ui.unit.Dp) {
+    val p = LocalPalette.current
+    val tint = when (state) { "error" -> p.coral; "pause" -> p.muted; else -> p.honey }
+    val spin = if (state == "indeterminate") {
+        val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "progress")
+        val v by t.animateFloat(0f, 360f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween<Float>(1000, easing = androidx.compose.animation.core.LinearEasing)), label = "spin")
+        v
+    } else 0f
+    androidx.compose.foundation.Canvas(androidx.compose.ui.Modifier.size(size).semantics {
+        contentDescription = when (state) { "indeterminate" -> "In progress"; "error" -> "Failed at $value percent"; else -> "$value percent" }
+    }) {
+        val w = 2.dp.toPx()
+        val inset = w / 2
+        val box = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w)
+        val at = androidx.compose.ui.geometry.Offset(inset, inset)
+        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(w, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        drawArc(p.muted.copy(alpha = 0.3f), 0f, 360f, false, at, box, style = stroke)
+        if (state == "indeterminate") drawArc(tint, spin - 90f, 108f, false, at, box, style = stroke)
+        else drawArc(tint, -90f, 360f * value.coerceIn(0, 100) / 100f, false, at, box, style = stroke)
     }
 }

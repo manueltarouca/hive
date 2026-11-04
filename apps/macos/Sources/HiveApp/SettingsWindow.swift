@@ -568,6 +568,10 @@ struct TerminalPage: View {
                     Toggle("", isOn: Binding(get: { ctx.s.confirmPaste }, set: { ctx.set("confirm-paste", $0 ? "true" : "false") }))
                         .toggleStyle(.switch).labelsHidden().controlSize(.small)
                 }
+                SettingsRow(id: "copy-on-select", style: st, nav: ctx.nav) {
+                    Toggle("", isOn: Binding(get: { ctx.s.copyOnSelect }, set: { ctx.set("copy-on-select", $0 ? "true" : "false") }))
+                        .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                }
             }
         }
     }
@@ -629,7 +633,64 @@ struct NotificationsPage: View {
                     .labelsHidden().fixedSize()
                 }
             }
+            SettingsSection(title: "By state", note: "Each state notifies with its own sound. The tab is marked either way.", style: st) {
+                StateRow(ctx: ctx, id: "notify-blocked", color: st.blocked, on: ctx.s.notifyBlocked, sound: ctx.s.soundBlocked,
+                         soundKey: "sound-blocked", divider: false)
+                StateRow(ctx: ctx, id: "notify-done", color: st.done, on: ctx.s.notifyDone, sound: ctx.s.soundDone, soundKey: "sound-done")
+                StateRow(ctx: ctx, id: "notify-stopped", color: st.blocked, on: ctx.s.notifyStopped, sound: ctx.s.soundStopped,
+                         soundKey: "sound-stopped")
+            }
+            SettingsSection(title: "Dock", style: st) {
+                SettingsRow(id: "dock-badge", style: st, nav: ctx.nav, divider: false) {
+                    Toggle("", isOn: Binding(get: { ctx.s.dockBadge }, set: { ctx.set("dock-badge", $0 ? "true" : "false") }))
+                        .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                }
+            }
         }
+    }
+}
+
+/// One agent state: its hexagon, whether it notifies, its sound and a Play button.
+struct StateRow: View {
+    let ctx: SettingsContext
+    let id: String
+    let color: NSColor
+    let on: Bool
+    let sound: String
+    let soundKey: String
+    var divider = true
+
+    var body: some View {
+        let st = ctx.style
+        let e = SettingsIndex.entry(id)
+        VStack(spacing: 0) {
+            if divider { Rectangle().fill(st.border.swiftUI.opacity(0.6)).frame(height: 1).padding(.leading, 12) }
+            HStack(spacing: 10) {
+                Image(systemName: "hexagon.fill").font(.system(size: 15)).foregroundStyle(color.swiftUI.opacity(on ? 1 : 0.35))
+                Text(e.label).font(.system(size: 12.5)).foregroundStyle(st.text.swiftUI)
+                Spacer(minLength: 8)
+                Picker("", selection: Binding(get: { sound }, set: { ctx.set(soundKey, $0) })) {
+                    Text("No sound").tag("none")
+                    ForEach(HiveCore.Settings.sounds, id: \.self) { Text($0).tag($0) }
+                }
+                .labelsHidden().fixedSize().disabled(!on)
+                .accessibilityLabel("\(e.label) sound")
+                Button { NSSound(named: NSSound.Name(sound))?.play() } label: {
+                    Image(systemName: "play.fill").font(.system(size: 9)).frame(width: 22, height: 22)
+                        .background(Circle().fill(st.text.swiftUI.opacity(0.07)))
+                }
+                .buttonStyle(.plain).foregroundStyle(st.secondary.swiftUI)
+                .disabled(!on || sound == "none")
+                .help("Play")
+                .accessibilityLabel("Play the \(e.label) sound")
+                Toggle("", isOn: Binding(get: { on }, set: { ctx.set(id, $0 ? "true" : "false") }))
+                    .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                    .accessibilityLabel("Notify: \(e.label)")
+            }
+            .padding(.horizontal, 12).frame(minHeight: 40)
+        }
+        .id(id)
+        .help(e.help)
     }
 }
 
@@ -765,6 +826,12 @@ struct ShortcutsPage: View {
             SettingsSection(title: "Shortcuts", style: st) {
                 SettingsRow(id: "shortcuts", style: st, nav: ctx.nav, divider: false) {
                     Button("Show Shortcuts") { ctx.actions.shortcuts() }
+                }
+            }
+            SettingsSection(title: "Keyboard", style: st) {
+                SettingsRow(id: "key-hints", style: st, nav: ctx.nav, divider: false) {
+                    Toggle("", isOn: Binding(get: { ctx.s.keyHints }, set: { ctx.set("key-hints", $0 ? "true" : "false") }))
+                        .toggleStyle(.switch).labelsHidden().controlSize(.small)
                 }
             }
             Text("Change a shortcut with a keybind line in the settings file, such as keybind = cmd+shift+t=client.new_tab.")

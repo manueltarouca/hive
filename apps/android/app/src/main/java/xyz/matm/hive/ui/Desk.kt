@@ -426,7 +426,7 @@ private fun PaneBox(model: AppModel, id: String, focused: Boolean, single: Boole
     }
 }
 
-/** The Mac's StatusBadge: "Blocked" or "Stopped" in words, else the state's hexagon. */
+/** The Mac's StatusBadge: "Needs you" or "Stopped" in words, else the state's hexagon. */
 @Composable
 fun StateBadge(state: String) {
     val p = LocalPalette.current
@@ -435,7 +435,7 @@ fun StateBadge(state: String) {
             verticalAlignment = Alignment.CenterVertically) {
             Hexagon(state, 7.dp)
             Spacer(Modifier.width(4.dp))
-            BasicText(if (state == "blocked") "Blocked" else "Stopped", style = Type.tiny.copy(color = p.coralText, fontWeight = androidx.compose.ui.text.font.FontWeight(600)))
+            BasicText(if (state == "blocked") "Needs you" else "Stopped", style = Type.tiny.copy(color = p.coralText, fontWeight = androidx.compose.ui.text.font.FontWeight(600)))
         }
     } else Hexagon(state, 8.dp)
 }

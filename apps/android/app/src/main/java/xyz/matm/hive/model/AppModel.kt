@@ -31,6 +31,9 @@ data class BlockInfo(
     val label: String = "",
     /** The client holding its size (server's size_owner); "" for nobody. */
     val sizeOwner: String = "",
+    /** A program's progress (OSC 9;4): set, error, indeterminate or pause, or null; and a percentage. */
+    val progressState: String? = null,
+    val progress: Int = 0,
 ) {
     /** The agent if one reports from here, else the program in front (Programs.shown, as on the Mac). */
     val program: xyz.matm.hive.agents.Program get() = xyz.matm.hive.agents.Programs.shown(harness, foreground.ifEmpty { null })
@@ -489,6 +492,12 @@ class AppModel(private val context: Context) : HostConnection.Listener {
     }
 
     private var reloadPending = false
+    private var progressReloadPending = false
+
+    /** A tab's progress: its focused pane's, else another pane's. */
+    fun tabProgress(w: WindowInfo): Pair<String, Int>? =
+        (listOfNotNull(w.focused) + w.blocks).firstNotNullOfOrNull { id -> blocks[id]?.let { b -> b.progressState?.let { it to b.progress } } }
+
     private fun scheduleReload() {
         if (reloadPending) return
         reloadPending = true
@@ -534,7 +543,8 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                     val live = agentsByBlock[id]
                     val harness = live?.harness ?: agent?.optString("harness")?.takeIf { it.isNotEmpty() && st != "ended" }
                     newBlocks[id] = BlockInfo(id, b.optString("title"), cwd, fg.optString("program").ifEmpty { fg.optString("name") },
-                        harness, live?.shown ?: st.takeIf { it.isNotEmpty() && it != "ended" }, b.optString("label"), b.optString("size_owner"))
+                        harness, live?.shown ?: st.takeIf { it.isNotEmpty() && it != "ended" }, b.optString("label"), b.optString("size_owner"),
+                        b.optJSONObject("progress")?.optString("state")?.ifEmpty { null }, b.optJSONObject("progress")?.optInt("progress") ?: 0)
                 }
                 val keepWindow = windows.getOrNull(windowIndex)?.id
                 val keepBlock = visibleBlock
@@ -904,6 +914,11 @@ class AppModel(private val context: Context) : HostConnection.Listener {
                     }
                     if (name == "program_status_changed") { scheduleAgentReload(h); if (sid == currentSession) scheduleReload() }
                     if (name in setOf("title_changed", "size_changed", "process_changed", "child_exited", "pwd_changed") && sid == currentSession) scheduleReload()
+                    // Progress many times a second: the tab follows twice a second.
+                    if (name == "progress_report" && sid == currentSession && !progressReloadPending) {
+                        progressReloadPending = true
+                        main.postDelayed({ progressReloadPending = false; scheduleReload() }, 500)
+                    }
                 } else if (sid == currentSession) scheduleReload()
                 if (type == "block_closed" || type == "block_created" || type == "session_view_changed") reloadSessions(h)
             }

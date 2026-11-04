@@ -34,6 +34,8 @@ final class RootView: NSView {
             } else if v is TitleBarHost<AgentSidebar> {
                 v.isHidden = side == 0
                 v.frame = NSRect(x: 0, y: 0, width: AgentSidebar.width, height: bounds.height)
+            } else if v is KeyHintsHost {
+                v.frame = NSRect(x: side, y: TitleBar.height, width: bounds.width - side, height: bounds.height - TitleBar.height)
             } else if v is PanesView || v is HostAwayHost {
                 // Cards start just under the bar, clear of the tabs.
                 let top = TitleBar.height + 4
@@ -107,6 +109,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         model.$trouble.removeDuplicates().sink { [weak away] t in away?.isHidden = !t }.store(in: &bag)
         root.addSubview(bar)
         root.addSubview(sidebar)
+        // Key hints float over everything, and never take a click.
+        root.addSubview(KeyHintsHost(rootView: KeyHintsView(model: model)))
         window.contentView = root
 
         // Screenshot runs use their own defaults suite: they mustn't take or
@@ -137,6 +141,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             .dropFirst()
             .debounce(for: .milliseconds(250), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.applyFont() }
+            .store(in: &bag)
+        // The Dock badge follows the agents, what you've seen, and the setting.
+        Publishers.CombineLatest4(model.$agents, model.$seenDone, model.$blocks, model.settingsStore.$settings.map(\.dockBadge).removeDuplicates())
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in self?.model.updateDockBadge() }
+            .store(in: &bag)
+        model.settingsStore.$settings
+            .map(\.keyHints)
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in self?.model.updateKeyHints() }
             .store(in: &bag)
         model.settingsStore.$settings
             .map(\.dimPanes)
@@ -235,6 +250,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 // A tab as if the pointer were on it (hover:N, N from 0), and closing the tab in front.
                 if what.hasPrefix("hover:"), let i = Int(what.dropFirst("hover:".count)) { self?.model.shotHover = i }
                 if what == "closetab" { self?.model.closeTab() }
+                // A key pressed through the keymap (press:ctrl+a), for key hints.
+                if what.hasPrefix("press:"), let c = KeyChord.parse(String(what.dropFirst("press:".count)))?.first { _ = self?.model.handleKey(c) }
                 // Find open with a query typed (find:FAIL).
                 if what.hasPrefix("find:"), let self {
                     self.model.startFind()
@@ -373,7 +390,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         panes.sync()
     }
 
-    func windowDidResignKey(_ notification: Notification) { panes.sync() }
+    func windowDidResignKey(_ notification: Notification) { panes.sync(); model.cancelKeySequence() }
 
     /// hive stays in the menu bar with the window closed; ⌘Q quits.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -430,7 +447,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
     }
 
-    func applicationDidBecomeActive(_ notification: Notification) { model.markSeen() }
+    func applicationDidBecomeActive(_ notification: Notification) { model.markSeen(); model.refreshNotificationPermission() }
 
     // MARK: palette and picker
 
@@ -739,6 +756,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         case "client.mode":
             m.keys.enter(args["mode"].string)
             m.keyMode = args["mode"].string
+            m.updateKeyHints()
         default: NSLog("hive: no client action %@", action)
         }
     }

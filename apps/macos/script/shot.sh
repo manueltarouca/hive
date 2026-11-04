@@ -95,6 +95,10 @@ if [ "${SCRIPTS:-0}" = 1 ]; then
     printf "  ⎿  You'"'"'ve hit your session limit · resets 3am (Europe/Lisbon)\r\n"; exec cat' sh "$H" "$root" "$msg" >/dev/null
 fi
 
+# PROGRESS=1 adds a tab whose program reports 60% (OSC 9;4), for the ring on its tab.
+if [ "${PROGRESS:-0}" = 1 ]; then
+  $H -s hive-demo run --label build --focus=false --cwd "$root" -- sh -c 'printf "\033]9;4;1;60\033\\"; echo building; exec cat' >/dev/null
+fi
 # EXTRA_TABS=n adds plain tabs, to check the title bar with many tabs.
 i=1; while [ "$i" -le "${EXTRA_TABS:-0}" ]; do  # not seq: on macOS, seq 1 0 counts down
   $H -s hive-demo run --label "extra-tab-$i" --focus=false >/dev/null; i=$((i + 1))

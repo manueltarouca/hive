@@ -198,6 +198,8 @@ struct TabPill: View {
                     .mask(FadeMask())
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // A tab that needs you shows that, not its progress (as in the sidebar).
+            if let p = model.progress(of: window), !hover, status != "blocked", status != "stopped" { ProgressRing(state: p.state, value: p.value, style: s) }
             if let status, !hover { StatusBadge(state: status == "blocked" || status == "stopped" ? "blocked-dot" : status, style: s) }
         }
         // Under the close button the name fades out, so nothing shifts.
