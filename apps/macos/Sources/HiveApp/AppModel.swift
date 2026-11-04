@@ -1366,9 +1366,16 @@ final class AppModel: ObservableObject {
         var p: [String: JSON] = ["session_id": sid, "block_id": .string(b), "direction": horizontal ? "horizontal" : "vertical",
                                  "layout": AppModel.layout(cwd: currentCwd())]
         if let cols, let rows { p["cols"] = .number(Double(cols)); p["rows"] = .number(Double(rows)) }
+        guard settings.balanceSplits else { call("session.new_split", .object(p)); return }
         // The server balances in the same change, so the new pane doesn't land at half and then jump.
-        if settings.balanceSplits { p["balance"] = true }
-        call("session.new_split", .object(p))
+        // A server from before balance refuses the argument: split, then balance (it has no
+        // session.balance_window either, which just fails quietly).
+        var withBalance = p
+        withBalance["balance"] = true
+        let h = current
+        h.call("session.new_split", .object(withBalance)) { r in
+            if case .failure = r { h.call("session.new_split", .object(p)) }
+        }
     }
 
     /// balance-splits: evens out a tab's panes after the app opened or closed one.
