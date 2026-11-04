@@ -30,6 +30,9 @@ final class HostConnection {
     /// connected. Home shortens paths to ~ as that machine's shell does.
     private(set) var hostname: String?
     private(set) var home: String?
+    /// The server's version, as hive version prints it, and when it started.
+    private(set) var serverVersion: String?
+    private(set) var serverStarted: Date?
     /// What the app calls it: This Mac, or the remote server's address
     /// (box.example.ts.net), as the session list and title bar show it.
     var displayName: String {
@@ -166,7 +169,7 @@ final class HostConnection {
         // still delivers (its close, a late reply, events) is ignored.
         self.client = HiveClient(endpoint: endpoint, queue: vt)
         engine = Engine(client: self.client)
-        connected = false
+        connected = false; serverVersion = nil; serverStarted = nil
         link = .idle
         status = ""
         sessions = []
@@ -254,6 +257,8 @@ final class HostConnection {
                             guard let self, self.engine === engine else { return }
                             self.hostname = j["hostname"].string
                             self.home = j["home"].string
+                            self.serverVersion = j["hive_version"].string
+                            self.serverStarted = j["started_at"].string.flatMap { ISO8601DateFormatter.fractional.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
                             self.link = .connected
                             self.everConnected = true
                             self.connected = true
@@ -286,7 +291,7 @@ final class HostConnection {
         // keeps its reason (refused, nothing answers).
         let wasUp = connected
         if wasUp { link = .reconnecting; status = problem ?? "" }
-        connected = false
+        connected = false; serverVersion = nil; serverStarted = nil
         onDisconnected?(self)
         guard !closing else { return }
         // A lost connection backs off; a failed attempt already chose.
@@ -330,4 +335,13 @@ final class HostConnection {
             }
         }
     }
+}
+
+extension ISO8601DateFormatter {
+    /// Go's time.Time in JSON: RFC 3339 with fractional seconds.
+    static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 }

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import HiveCore
 
@@ -79,5 +80,13 @@ import Testing
         #expect(MenuBarStatus.clip("Refactor the attach protocol now", max: 20) == "Refactor the attach…")
         // Whitespace and newlines from an agent's message become one line.
         #expect(MenuBarStatus.clip("May I\n  run   Bash?", max: 40) == "May I run Bash?")
+    }
+
+    @Test func runningFor() {
+        let t = Date(timeIntervalSince1970: 1_000_000)
+        #expect(HiveCore.runningFor(since: t, now: t.addingTimeInterval(20)) == "Running")
+        #expect(HiveCore.runningFor(since: t, now: t.addingTimeInterval(18 * 60)) == "Running for 18m")
+        #expect(HiveCore.runningFor(since: t, now: t.addingTimeInterval(5 * 3600)) == "Running for 5h")
+        #expect(HiveCore.runningFor(since: t, now: t.addingTimeInterval(3 * 86400)) == "Running for 3 days")
     }
 }

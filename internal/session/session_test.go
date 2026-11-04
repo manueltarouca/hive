@@ -2,6 +2,7 @@ package session
 
 import (
 	"errors"
+	"math"
 	"testing"
 )
 
@@ -152,5 +153,43 @@ func TestMoveWithBadSideKeepsBlock(t *testing.T) {
 	}
 	if !w.Has("block:b") {
 		t.Fatal("block:b was orphaned")
+	}
+}
+
+func TestBalance(t *testing.T) {
+	leaf := func(id string) *Node { return &Node{Type: "block", BlockID: id} }
+	// a | (b over (c | d)): two columns; the right one holds b above c|d.
+	w := &Window{Root: &Node{Type: "split", Direction: "horizontal", Ratio: 0.8, A: leaf("a"),
+		B: &Node{Type: "split", Direction: "vertical", Ratio: 0.3, A: leaf("b"),
+			B: &Node{Type: "split", Direction: "horizontal", Ratio: 0.9, A: leaf("c"), B: leaf("d")}}}}
+	if !w.Balance() {
+		t.Fatal("nothing changed")
+	}
+	r := w.Rects()
+	// Three columns at the widest: a gets a third, c and d a third each.
+	near := func(x, y float64) bool { return math.Abs(x-y) < 1e-9 }
+	if !near(r["a"].W, 1.0/3) || !near(r["c"].W, 1.0/3) || !near(r["d"].W, 1.0/3) {
+		t.Fatalf("widths a=%v c=%v d=%v", r["a"].W, r["c"].W, r["d"].W)
+	}
+	if !near(r["b"].H, 0.5) || !near(r["c"].H, 0.5) {
+		t.Fatalf("heights b=%v c=%v", r["b"].H, r["c"].H)
+	}
+	if w.Balance() {
+		t.Fatal("balancing twice changed something")
+	}
+	// Splitting the same way again and again: thirds, not a half and two quarters.
+	row := &Window{Root: &Node{Type: "split", Direction: "horizontal", Ratio: 0.5, A: leaf("a"),
+		B: &Node{Type: "split", Direction: "horizontal", Ratio: 0.5, A: leaf("b"), B: leaf("c")}}}
+	row.Balance()
+	rr := row.Rects()
+	if !near(rr["a"].W, 1.0/3) || !near(rr["b"].W, 1.0/3) || !near(rr["c"].W, 1.0/3) {
+		t.Fatalf("row widths %v %v %v", rr["a"].W, rr["b"].W, rr["c"].W)
+	}
+	if (&Window{}).Balance() {
+		t.Fatal("an empty window changed")
+	}
+	one := &Window{Root: leaf("x")}
+	if one.Balance() {
+		t.Fatal("a single block changed")
 	}
 }

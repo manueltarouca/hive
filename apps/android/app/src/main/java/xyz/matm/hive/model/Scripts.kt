@@ -78,12 +78,12 @@ data class Resident(
     /** Its state in plain words. */
     val stateLine: String
         get() = when (state) {
-            "running" -> if (watching) "Running, watch only" else "Running"
-            "pending" -> "Waiting for your OK"
+            "running" -> if (watching) "Watching only" else "Running"
+            "pending" -> "Needs your OK"
             "disabled" -> "Turned off"
-            "stopped" -> "Stopped by itself"
+            "stopped" -> "Ended on its own"
             "failed" -> "Failed" + (error.lineSequence().firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.let { ": $it" } ?: "")
-            "quarantined" -> "Paused: it ran too long too often"
+            "quarantined" -> "Paused after running too long, too often"
             else -> state.replaceFirstChar { it.uppercase() }
         }
 
@@ -170,14 +170,14 @@ object ScriptWords {
 
     /** The plain warning when a script asks to both read and type. */
     fun warning(asks: List<String>): String? =
-        if ("screen" in asks && "input" in asks) "It can read your terminals and type into them, agents included." else null
+        if ("screen" in asks && "input" in asks) "Can read your terminals and type into them, agents included." else null
 
     /** A result as people read it: nothing for ok. */
     fun result(r: String): String? = when (r) {
         "", "ok" -> null
-        "watching" -> "refused: watch only"
-        "conflict" -> "not sent: it had moved on"
-        "permission_denied" -> "refused: not allowed"
+        "watching" -> "refused: the script can only watch"
+        "conflict" -> "not sent: the pane had changed"
+        "permission_denied" -> "refused: the script isn’t allowed to"
         else -> "failed: " + r.replace('_', ' ')
     }
 
@@ -196,11 +196,11 @@ object ScriptWords {
 
     /** What a person did to a script, in words: "set to watch only", "set “Remind me after” to 30". */
     private fun personal(e: ActivityEntry, options: List<ScriptOption>): String = when (e.method) {
-        "script.set_mode" -> if (e.summary.endsWith("watch")) "set to watch only" else "let act"
+        "script.set_mode" -> if (e.summary.endsWith("watch")) "set to watch only" else "let act again"
         "script.enable" -> "turned on"
         "script.disable" -> "turned off"
         "script.grant" -> "allowed"
-        "script.revoke" -> "permissions taken away"
+        "script.revoke" -> "permissions taken back"
         "script.set_option" -> e.summary.split(" = ", limit = 2).let { kv ->
             if (kv.size != 2) return@let e.summary
             val label = options.firstOrNull { it.key == kv[0] }?.title?.ifEmpty { null } ?: kv[0]

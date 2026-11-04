@@ -56,6 +56,38 @@ func pixels(_ img: CGImage) -> [UInt8] {
         }
     }
 
+    /// Find matches draw behind their cells: soft yellow, the current one
+    /// in the cursor's honey, both with dark text.
+    @Test func findMatchesAreDrawn() throws {
+        let r = try Renderer(fonts: FontSet(pointSize: 13, scale: 2))
+        let m = try Mirror(cols: 20, rows: 3)
+        m.apply(theme: .ghostty)
+        m.feed(Data("ab PASS cd PASS".utf8))
+        let hits = m.find("pass")
+        m.setFindMarks(hits, current: 1)
+        let d = PaneDraw(frame: m.frame(), origin: .zero, size: SIMD2(400, 120), focused: false)
+        let inst = r.instances(for: [d], viewport: SIMD2(400, 120))
+        let yellow = SIMD4<Float>(0xF0 / 255, 0xC6 / 255, 0x74 / 255, 1)
+        let honey = SIMD4<Float>(0xE8 / 255, 0x8A / 255, 0x1E / 255, 1)
+        // "PASS" at columns 3 to 6 is a match, at 11 to 14 the current one, in its own amber.
+        let cw = Int(r.fonts.cellWidth)
+        let yellowAt = Set(inst.filter { $0.kind == 0 && $0.color == yellow }.map { Int($0.pos.x) / cw })
+        let honeyAt = Set(inst.filter { $0.kind == 0 && $0.color == honey }.map { Int($0.pos.x) / cw })
+        #expect(yellowAt == [3, 4, 5, 6])
+        #expect(honeyAt == [11, 12, 13, 14])
+        // For a look at it: /tmp/hive-render-find.png.
+        let lines = "$ go test ./...\r\nok   internal/server  2.1s\r\nFAIL internal/vt  0.4s\r\n--- FAIL: TestWrap\r\nok   internal/block  0.9s\r\n$ "
+        let big = try Mirror(cols: 30, rows: 6)
+        big.apply(theme: .ghostty)
+        big.feed(Data(lines.utf8))
+        let found = big.find("fail")
+        big.setFindMarks(found, current: 1)
+        let w = r.fonts.cellWidth * 30 + 24, h = r.fonts.cellHeight * 6 + 24
+        if let img = r.image([PaneDraw(frame: big.frame(), origin: SIMD2(12, 12), size: SIMD2(Float(w - 24), Float(h - 24)), focused: true)], width: w, height: h) {
+            png(img, to: URL(fileURLWithPath: "/tmp/hive-render-find.png"))
+        }
+    }
+
     /// A link under the pointer with ⌘ held is underlined across its
     /// columns, on its row, and nothing else changes.
     @Test func hoveredLinkIsUnderlined() throws {

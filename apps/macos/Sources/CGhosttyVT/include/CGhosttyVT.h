@@ -55,6 +55,10 @@ bool hive_mode(GhosttyTerminal t, uint16_t number, bool ansi);
 void hive_set_render_hold(GhosttyTerminal t, GhosttyTerminalRenderHoldFn fn, void *userdata);
 void hive_scroll_delta(GhosttyTerminal t, intptr_t rows);
 void hive_scroll_bottom(GhosttyTerminal t);
+/// The scrollable area: total rows, the viewport's first row in it, and the viewport's rows.
+bool hive_scrollbar(GhosttyTerminal t, uint64_t *total, uint64_t *offset, uint64_t *len);
+/// Scrolls so the viewport starts at this row of the scrollable area.
+void hive_scroll_to_row(GhosttyTerminal t, size_t row);
 
 // Sets default colors and the first 16 palette entries (the rest keep
 // libghostty's 256-color defaults).

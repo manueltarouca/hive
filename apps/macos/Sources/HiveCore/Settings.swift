@@ -15,6 +15,12 @@ public struct Settings: Equatable, Sendable {
     public var motion = Motion.snappy
     /// When closing a tab, or its last pane, asks first.
     public var confirmClose = CloseGuard.Policy.running
+    /// How much the panes you're not typing in step back: light, more, off.
+    public var dimPanes = "light"
+    /// Even out a tab's panes when the app opens or closes one.
+    public var balanceSplits = true
+    /// Focus a pane when the pointer moves over it.
+    public var focusFollowsPointer = false
     /// cursor-style-blink: nil blinks unless a program says otherwise.
     public var cursorStyleBlink: Bool?
     /// Read by the server; shown and set in the Settings window.
@@ -71,6 +77,9 @@ public struct Settings: Equatable, Sendable {
             // Newer keys: optional, so a settings file read by an older hive still decodes.
             var motion: String?
             var confirmClose: String?
+            var dimPanes: String?
+            var balanceSplits: Bool?
+            var focusFollowsPointer: Bool?
             var listen: [String]?
             var scripts: Bool?
             var scriptRemoteRun: Bool?
@@ -78,6 +87,7 @@ public struct Settings: Equatable, Sendable {
                 case theme, bell, notify
                 case fontFamily = "font-family", fontSize = "font-size", confirmPaste = "confirm-paste", cursorStyleBlink = "cursor-style-blink"
                 case scrollbackLimit = "scrollback-limit", resumeAgents = "resume-agents"
+                case dimPanes = "dim-panes", balanceSplits = "balance-splits", focusFollowsPointer = "focus-follows-pointer"
                 case motion, confirmClose = "confirm-close", listen, scripts, scriptRemoteRun = "script-remote-run"
             }
         }
@@ -90,6 +100,8 @@ public struct Settings: Equatable, Sendable {
                         confirmPaste: s.values.confirmPaste,
                         motion: s.values.motion.flatMap(Motion.init(rawValue:)) ?? .snappy,
                         confirmClose: s.values.confirmClose.flatMap(CloseGuard.Policy.init(rawValue:)) ?? .running,
+                        dimPanes: s.values.dimPanes ?? "light", balanceSplits: s.values.balanceSplits ?? true,
+                        focusFollowsPointer: s.values.focusFollowsPointer ?? false,
                         cursorStyleBlink: s.values.cursorStyleBlink, scrollbackLimit: s.values.scrollbackLimit,
                         resumeAgents: s.values.resumeAgents, listen: s.values.listen ?? [],
                         scripts: s.values.scripts ?? true, scriptRemoteRun: s.values.scriptRemoteRun ?? false, diagnostics: s.diagnostics, keys: s.keys ?? [])

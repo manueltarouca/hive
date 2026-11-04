@@ -19,10 +19,10 @@ struct ScriptsPageTests {
         """))
         #expect(list.map(\.name) == ["broken", "digest", "limit-resume", "needs-you"])
         let pending = list[2], running = list[3], off = list[1], failed = list[0]
-        #expect(pending.stateText == "Waiting for your OK" && pending.needsYou)
+        #expect(pending.stateText == "Needs your OK" && pending.needsYou)
         #expect(pending.mayDo == ["Type into terminals, agents included", "Read what terminals show", "Notify you, mark panes and bring hive to the front"])
         #expect(pending.shownPermissions == ["input", "screen", "ui"])
-        #expect(pending.warning == "It can read your terminals and type into them, agents included.")
+        #expect(pending.warning == "Can read your terminals and type into them, agents included.")
         #expect(running.warning == nil && running.on && !running.watching)
         #expect(running.options[0].label == "Remind me after" && running.options[0].max == 240)
         #expect(running.options[1].label == "Include Done" && running.options[1].value == .bool(false))
@@ -39,8 +39,8 @@ struct ScriptsPageTests {
         ]}
         """))
         #expect(e[0].text() == "Typed 7 characters \u{201C}resume⏎\u{201D}" && e[0].problem == nil && e[0].time != nil)
-        #expect(e[1].problem == "Refused: watch only")
-        #expect(e[2].byPerson && e[2].text() == "You set it to watch only")
+        #expect(e[1].problem == "Refused: the script can only watch")
+        #expect(e[2].byPerson && e[2].text() == "You set the script to watch only")
         let set = ActivityEntry(json(#"{"principal":"tailscale:me via tailnet (notification button)","method":"script.set_option","summary":"auto = false","result":"ok"}"#))
         let opts = [ScriptOption(json(#"{"key":"auto","title":"Type it by itself","type":"bool","value":false}"#))]
         #expect(set.text(options: opts) == "You set \u{201C}Type it by itself\u{201D} to off from a notification")

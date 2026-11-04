@@ -185,6 +185,21 @@ void hive_scroll_bottom(GhosttyTerminal t) {
   ghostty_terminal_scroll_viewport(t, s);
 }
 
+bool hive_scrollbar(GhosttyTerminal t, uint64_t *total, uint64_t *offset, uint64_t *len) {
+  GhosttyTerminalScrollbar sb;
+  memset(&sb, 0, sizeof(sb));
+  if (ghostty_terminal_get(t, GHOSTTY_TERMINAL_DATA_SCROLLBAR, &sb) != GHOSTTY_SUCCESS) return false;
+  *total = sb.total;
+  *offset = sb.offset;
+  *len = sb.len;
+  return true;
+}
+
+void hive_scroll_to_row(GhosttyTerminal t, size_t row) {
+  GhosttyTerminalScrollViewport s = {.tag = GHOSTTY_SCROLL_VIEWPORT_ROW, .value = {.row = row}};
+  ghostty_terminal_scroll_viewport(t, s);
+}
+
 void hive_set_theme(GhosttyTerminal t, GhosttyColorRgb fg, GhosttyColorRgb bg, GhosttyColorRgb cursor,
                     const GhosttyColorRgb *palette16) {
   ghostty_terminal_set(t, GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND, &fg);

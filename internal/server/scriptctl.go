@@ -63,6 +63,7 @@ func (s *Server) ownerCaller(ctx context.Context) bool {
 var uiClientActions = map[string]bool{
 	"client.palette": true, "client.shortcuts": true, "client.reveal": true, "client.sidebar": true,
 	"client.session_picker": true, "client.settings": true, "client.mode": true, "client.focus": true,
+	"client.find": true, "client.find_next": true, "client.find_previous": true,
 }
 
 func permOfClientAction(raw json.RawMessage) (string, error) {

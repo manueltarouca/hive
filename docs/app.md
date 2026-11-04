@@ -124,16 +124,30 @@ running. Open it again from the menu or the Dock; ⌘Q quits.
 
 ## Settings
 
-**Hive → Settings…** (⌘,) has the app's settings:
+**Hive → Settings…** (⌘,) has a page for each part of the app, and a search
+field that finds a setting by what it does (⌘F in the window):
 
-| Section | Settings |
+| Page | Settings |
 | --- | --- |
-| Appearance | Theme, font, font size |
-| Terminal | Bell, blinking cursor, ask before pasting several lines, scrollback |
-| Agents | Notifications (when hive is in the background, always, or never), resume agents when the server restarts |
+| Server | How long it has run, reachable on your tailnet, resume agents after a restart, scrollback |
+| Appearance | Theme, font, font size, animation |
+| Terminal | Blinking cursor, bell, ask before pasting several lines |
+| Panes | Dim other panes, focus follows the pointer, balance splits, ask before closing |
+| Notifications | When an agent needs you or is done |
+| Agents and Scripts | Connect Claude Code's hooks, run scripts, let other machines run them |
+| Hosts | Each host and its state, Connect or Disconnect, share hosts with your phone, add a host |
+| Shortcuts | Every shortcut |
+| Advanced | The settings file |
 
 Everything there is saved in the settings file, and editing the file updates
-the window. **Open Config File** opens it. See [Settings](./settings).
+the window. **Open Settings File** on Advanced opens it. See [Settings](./settings).
+
+## Find
+
+**Edit → Find…** (⌘F) opens a find bar on the focused pane. Typing searches
+what the pane printed, scrollback included; the latest match is current.
+↩ or ⌘G goes to the next match, ⇧↩ or ⇧⌘G to the previous one, and Esc
+closes the bar. The bar follows new output while it's open.
 
 ## Theme
 

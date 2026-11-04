@@ -94,10 +94,42 @@ class AppModel(private val context: Context) : HostConnection.Listener {
         private set
     /** The panes on screen, by block: the focused one on a phone, a split's all side by side on a wide screen. */
     var panes by mutableStateOf<Map<String, Pane>>(emptyMap())
+
         private set
     /** Side by side: the UI says whether the window on screen fits all its panes (a wide screen, panes not too small). */
     var sideBySide by mutableStateOf(false)
         private set
+
+    /** Find in a pane: what's typed, how many matches, which is current (-1: none). */
+    class FindUi(val block: String) {
+        var query by mutableStateOf("")
+        var count by mutableStateOf(0)
+        var current by mutableStateOf(-1)
+    }
+    var finding by mutableStateOf<FindUi?>(null)
+
+    fun startFind(block: String) {
+        endFind()
+        val f = FindUi(block)
+        finding = f
+        panes[block]?.stream?.onFind = { n, c -> if (finding === f) { f.count = n; f.current = c } }
+    }
+
+    fun updateFind(q: String) {
+        val f = finding ?: return
+        f.query = q
+        panes[f.block]?.stream?.find(q) { n, c -> if (finding === f && f.query == q) { f.count = n; f.current = c } }
+    }
+
+    fun stepFind(by: Int) {
+        val f = finding ?: return
+        panes[f.block]?.stream?.stepFind(by) { c -> if (finding === f) f.current = c }
+    }
+
+    fun endFind() {
+        finding?.let { panes[it.block]?.stream?.endFind() }
+        finding = null
+    }
     /** A wide screen (tablet): panes fit on first use, as the Mac takes its own back. */
     var wide = false
 

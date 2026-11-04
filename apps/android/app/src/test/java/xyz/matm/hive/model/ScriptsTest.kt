@@ -33,7 +33,7 @@ class ScriptsTest {
         val n = list[2]
         assertTrue(n.watching)
         assertTrue(n.on)
-        assertEquals("Running, watch only", n.stateLine)
+        assertEquals("Watching only", n.stateLine)
         assertEquals(listOf("notify you, mark panes and bring hive to the front"), n.may)
         assertEquals(3, n.options.size)
         val num = n.options[0]
@@ -50,14 +50,14 @@ class ScriptsTest {
 
     @Test fun stateLines() {
         val list = Resident.list(JSONObject(listJson)).associateBy { it.name }
-        assertEquals("Waiting for your OK", list["digest"]!!.stateLine)
+        assertEquals("Needs your OK", list["digest"]!!.stateLine)
         assertEquals("Failed: SyntaxError: unexpected token", list["Broken"]!!.stateLine)
         val r = list["digest"]!!
         assertEquals("Turned off", r.copy(state = "disabled").stateLine)
         assertFalse(r.copy(state = "disabled").on)
-        assertEquals("Paused: it ran too long too often", r.copy(state = "quarantined").stateLine)
+        assertEquals("Paused after running too long, too often", r.copy(state = "quarantined").stateLine)
         assertFalse(r.copy(state = "quarantined").on)
-        assertEquals("Stopped by itself", r.copy(state = "stopped").stateLine)
+        assertEquals("Ended on its own", r.copy(state = "stopped").stateLine)
         assertEquals("Running", r.copy(state = "running").stateLine)
     }
 
@@ -80,7 +80,7 @@ class ScriptsTest {
         assertEquals("It may notify you, mark panes and bring hive to the front.", ScriptWords.sentence(listOf("read", "ui")))
         assertEquals("It asks to read terminals, type into terminals and notify you, mark panes and bring hive to the front.", ScriptWords.sentence(listOf("ui", "input", "screen"), "It asks to"))
         assertNull(ScriptWords.sentence(listOf("read")))
-        assertEquals("It can read your terminals and type into them, agents included.", ScriptWords.warning(listOf("screen", "input")))
+        assertEquals("Can read your terminals and type into them, agents included.", ScriptWords.warning(listOf("screen", "input")))
         assertNull(ScriptWords.warning(listOf("input")))
     }
 
@@ -101,13 +101,13 @@ class ScriptsTest {
         val auto = ScriptOption("auto", "Type it by itself", "bool", null, null, null, null)
         assertEquals("set “Type it by itself” to off by you from a notification", ScriptWords.entry(list[1], listOf(auto)))
         assertEquals("set to watch only by you", ScriptWords.entry(list[2]))
-        assertEquals("typed 3 characters, refused: watch only", ScriptWords.entry(list[3]))
+        assertEquals("typed 3 characters, refused: the script can only watch", ScriptWords.entry(list[3]))
         assertEquals("typed 7 characters “go on”", ScriptWords.entry(list[4]))
         assertTrue(list[4].byScript)
         fun person(method: String, summary: String) = ScriptWords.entry(ActivityEntry.of(entry("peer:501", summary, method = method)))
         assertEquals("turned off by you", person("script.disable", "turned off"))
         assertEquals("allowed by you", person("script.grant", "granted"))
-        assertEquals("let act by you", person("script.set_mode", "mode act"))
+        assertEquals("let act again by you", person("script.set_mode", "mode act"))
         assertFalse(list[1].byScript)
     }
 

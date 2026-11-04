@@ -103,6 +103,8 @@ done
 suite=xyz.matm.hive.shots
 defaults delete "$suite" >/dev/null 2>&1 || true
 [ "${SIDEBAR:-0}" = 1 ] && defaults write "$suite" sidebar -bool true
+# CONFIG="key=value ..." sets fixture settings, such as CONFIG="dim-panes=more".
+for kv in ${CONFIG:-}; do $H config set "${kv%%=*}" "${kv#*=}" >/dev/null; done
 # APPEARANCE=system|day|night sets the theme in the fixture's settings file.
 # Use the style "system" to test it: then HIVE_STYLE isn't set and the
 # setting decides.
@@ -129,7 +131,9 @@ trap cleanup EXIT
 # behind other windows don't draw, panels and menus do.
 bg=""; [ "${BACKGROUND:-0}" = 1 ] && bg="-g"
 # In the background the panes still draw (HIVE_DRAW_COVERED), so the shots show them.
-open $bg -n --env HIVE_DRAW_COVERED="${BACKGROUND:-0}" --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_CONFIG="$HIVE_CONFIG" --env HIVE_STYLE="$envstyle" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
+# CLAUDE_CONFIG_DIR: Settings checks Claude Code's hooks; never the real ~/.claude.
+mkdir -p "$D/claude"
+open $bg -n --env CLAUDE_CONFIG_DIR="$D/claude" --env HIVE_DRAW_COVERED="${BACKGROUND:-0}" --env HIVE_SERVER="$HIVE_SERVER" --env HIVE_CONFIG="$HIVE_CONFIG" --env HIVE_STYLE="$envstyle" --env HIVE_OPEN="$overlay" --env HIVE_DEFAULTS_SUITE="$suite" \
   --stdout "$out/app.log" --stderr "$out/app.log" "${HIVE_APP:-$here/build/Hive.app}"
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   app=$(lsof -t "$out/app.log" 2>/dev/null | head -1)
@@ -146,6 +150,8 @@ if [ "${SCRIPTS:-0}" = 1 ]; then
   $H script run --allow input "$D/release-notes.ts" >/dev/null 2>&1 || true
   sleep 1.5
 fi
+# SETTLE=seconds: more time for an overlay opened late (HIVE_OPEN=find:…).
+sleep "${SETTLE:-0}"
 W=$($tools/winid "$app")
 # Only Hive's own windows are captured (by window ID), never a screen
 # region, so nothing else on the screen can end up in a shot.

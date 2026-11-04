@@ -219,6 +219,8 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit, 
             val chip = if (block == null) model.chipElsewhere()?.let { it.copy(text = "${it.text} in ${it.place}") } else null
             var lastChip by remember { mutableStateOf(chip) }
             if (chip != null) lastChip = chip
+            // Over the pane's header, on the desk's own colour: nothing of the pane peeks around it.
+            model.finding?.let { f -> Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(p.bg).padding(top = 6.dp, bottom = 6.dp, start = 10.dp, end = 10.dp)) { FindBar(model, f) } }
             Box(Modifier.align(Alignment.TopCenter).padding(top = 12.dp, start = 12.dp, end = 12.dp)) {
                 androidx.compose.animation.AnimatedVisibility(visible = chip != null, enter = fadeIn(tween(180, easing = Quiet)), exit = fadeOut(tween(300, easing = Quiet))) {
                     lastChip?.let { c -> ActedChipView(c.text, c.refused) { model.hosts.firstOrNull { it.id == c.host }?.let { openScript(it, c.script) } } }
@@ -263,7 +265,7 @@ fun Desk(model: AppModel, openSwitcher: () -> Unit, openLink: (String) -> Unit, 
         }
         AnimatedVisibility(more, enter = androidx.compose.animation.expandVertically(tween(200, easing = Quiet)) + fadeIn(tween(200, easing = Quiet)),
             exit = androidx.compose.animation.shrinkVertically(tween(180, easing = Quiet)) + fadeOut(tween(140, easing = Quiet))) {
-            MoreKeys(model, mods, modsUsed)
+            MoreKeys(model, mods, modsUsed, find = { more = false; model.visibleBlock?.let(model::startFind) })
         }
         KeyBar(model, ask, space, ctrl, alt, imeUp, more,
             onCtrl = { ctrl = latch(ctrl, ctrlTap); ctrlTap = System.currentTimeMillis() },
@@ -743,7 +745,7 @@ private fun BarKey(label: String, describe: String, enabled: Boolean, modifier: 
  * row. Control first (Claude Code's own shortcuts among them), then symbols, moving, function keys.
  */
 @Composable
-private fun MoreKeys(model: AppModel, mods: () -> String, modsUsed: () -> Unit) {
+private fun MoreKeys(model: AppModel, mods: () -> String, modsUsed: () -> Unit, find: () -> Unit) {
     val p = LocalPalette.current
     fun c(l: Char, what: String) = K("^$l", "Control $l, $what", "ctrl+${l.lowercaseChar()}")
     val groups = listOf(
@@ -762,6 +764,11 @@ private fun MoreKeys(model: AppModel, mods: () -> String, modsUsed: () -> Unit) 
                 .padding(horizontal = 8.dp).padding(top = 10.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            // The pane itself first: find in what it printed.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                BarKey("find", "Find in this pane", model.stream != null, Modifier.weight(2f).height(42.dp), onTap = find)
+                repeat(cols - 2) { Spacer(Modifier.weight(1f)) }
+            }
             for ((title, keys) in groups) {
                 BasicText(title, style = Type.tiny.copy(color = p.muted, fontWeight = androidx.compose.ui.text.font.FontWeight(500)),
                     modifier = Modifier.padding(start = 4.dp, top = 4.dp))

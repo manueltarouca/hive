@@ -302,6 +302,21 @@ JNIEXPORT jboolean JNICALL FN(nPasteSafe)(JNIEnv *env, jclass c, jlong h, jbyteA
 JNIEXPORT void JNICALL FN(nScroll)(JNIEnv *env, jclass c, jlong h, jint rows) { hive_scroll_delta(T->t, rows); }
 JNIEXPORT void JNICALL FN(nScrollBottom)(JNIEnv *env, jclass c, jlong h) { hive_scroll_bottom(T->t); }
 
+// The scrollable area as {total rows, the viewport's first row, the viewport's rows}, or null.
+JNIEXPORT jlongArray JNICALL FN(nScrollbar)(JNIEnv *env, jclass c, jlong h) {
+  uint64_t total = 0, offset = 0, len = 0;
+  if (!hive_scrollbar(T->t, &total, &offset, &len)) return NULL;
+  jlongArray out = (*env)->NewLongArray(env, 3);
+  if (!out) return NULL;
+  jlong v[3] = {(jlong)total, (jlong)offset, (jlong)len};
+  (*env)->SetLongArrayRegion(env, out, 0, 3, v);
+  return out;
+}
+
+JNIEXPORT void JNICALL FN(nScrollToRow)(JNIEnv *env, jclass c, jlong h, jlong row) {
+  hive_scroll_to_row(T->t, (size_t)(row > 0 ? row : 0));
+}
+
 static HivePointerGeometry geometry(jint sw, jint sh, jint cw, jint ch) {
   return (HivePointerGeometry){(uint32_t)(sw > 0 ? sw : 1), (uint32_t)(sh > 0 ? sh : 1), (uint32_t)(cw > 0 ? cw : 1),
                                (uint32_t)(ch > 0 ? ch : 1)};

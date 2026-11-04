@@ -387,6 +387,46 @@ func (w *Window) ResizePane(blockID, dir string, delta float64) error {
 	return nil
 }
 
+// Balance gives every block the same share of its row and column: each
+// split's ratio follows how many blocks lie side by side along its
+// direction on each of its sides, replacing ratios set by hand. It reports
+// whether a ratio changed.
+func (w *Window) Balance() bool {
+	// span is how many blocks sit next to each other along dir inside n.
+	var span func(n *Node, dir string) int
+	span = func(n *Node, dir string) int {
+		if n == nil {
+			return 0
+		}
+		if n.Type == "block" {
+			return 1
+		}
+		a, b := span(n.A, dir), span(n.B, dir)
+		if n.Direction == dir {
+			return a + b
+		}
+		return max(a, b)
+	}
+	changed := false
+	var walk func(n *Node)
+	walk = func(n *Node) {
+		if n == nil || n.Type == "block" {
+			return
+		}
+		a, b := span(n.A, n.Direction), span(n.B, n.Direction)
+		if a+b > 0 {
+			r := float64(a) / float64(a+b)
+			if math.Abs(r-n.Ratio) > 1e-9 {
+				n.Ratio, changed = r, true
+			}
+		}
+		walk(n.A)
+		walk(n.B)
+	}
+	walk(w.Root)
+	return changed
+}
+
 // Item is something a target can name.
 type Item struct {
 	ID    string

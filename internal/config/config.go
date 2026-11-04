@@ -28,6 +28,12 @@ type Config struct {
 	Motion string `json:"motion"`
 	// ConfirmClose is when closing a tab or its last pane asks first.
 	ConfirmClose string `json:"confirm-close"`
+	// DimPanes is how much the panes you're not typing in step back.
+	DimPanes string `json:"dim-panes"`
+	// BalanceSplits evens out a tab's panes when the app opens or closes one.
+	BalanceSplits bool `json:"balance-splits"`
+	// FocusFollowsPointer focuses a pane when the pointer moves over it.
+	FocusFollowsPointer bool `json:"focus-follows-pointer"`
 	// Nil lets programs decide, blinking by default (Ghostty's blank).
 	CursorStyleBlink *bool  `json:"cursor-style-blink"`
 	ScrollbackLimit  uint64 `json:"scrollback-limit"`
@@ -105,6 +111,12 @@ var Keys = []Key{
 		set: oneOf(func(c *Config, v string) { c.Motion = v }, "snappy", "natural", "off")},
 	{Name: "confirm-close", Default: "running", Choices: []string{"running", "always", "never"}, Help: "ask before closing a tab, or its last pane: running (only when a program other than the shell runs in it), always or never",
 		set: oneOf(func(c *Config, v string) { c.ConfirmClose = v }, "running", "always", "never")},
+	{Name: "dim-panes", Default: "light", Choices: []string{"light", "more", "off"}, Help: "how much the panes you're not typing in step back: light, more or off",
+		set: oneOf(func(c *Config, v string) { c.DimPanes = v }, "light", "more", "off")},
+	{Name: "balance-splits", Default: "true", Help: "give every pane in a tab the same room when the app opens or closes one; this replaces sizes set by dragging or --ratio",
+		set: boolean(func(c *Config, b bool) { c.BalanceSplits = b })},
+	{Name: "focus-follows-pointer", Default: "false", Help: "focus a pane when the pointer moves over it, without a click",
+		set: boolean(func(c *Config, b bool) { c.FocusFollowsPointer = b })},
 	{Name: "cursor-style-blink", Default: "", Choices: []string{"", "true", "false"}, Help: "whether the cursor blinks: blank or true blinks, as in Ghostty; false keeps it steady. Programs can still change it (DECSCUSR, DEC mode 12)",
 		set: func(c *Config, v string) error {
 			if v == "" {

@@ -204,4 +204,42 @@ private func bytes(_ s: String) -> Data { Data(s.utf8) }
         let emDash = KeyInput(key: .mac(0x2C), mods: [.alt, .shift], text: "—", unshifted: "-", consumed: [.alt, .shift])
         #expect(m.encodeKey(emDash) == Data("—".utf8))
     }
+
+    /// Find counts rows as the scrollbar does, even across soft-wrapped
+    /// lines, and revealing a match scrolls it onto the screen with its
+    /// cells marked.
+    @Test func findRevealsAndMarksMatches() throws {
+        let m = try Mirror(cols: 20, rows: 5)
+        var out = ""
+        for i in 0..<40 { out += "line \(i)\r\n" }
+        out += String(repeating: "w", count: 30) + " needle\r\n"  // wraps onto a second row
+        out += "after\r\n"
+        m.feed(bytes(out))
+        let hits = m.find("LINE 7")
+        #expect(hits == [FindMatch(row: 7, col: 0, cols: 6)])
+        let wrapped = m.find("needle")
+        #expect(wrapped.count == 1)
+        // Rows after a wrapped line still count as the scrollbar does: 40 lines, 2 wrapped rows, then "after".
+        #expect(m.find("after").first?.row == 42)
+        m.setFindMarks(hits, current: 0)
+        m.reveal(hits[0])
+        let f = m.frame()
+        let row = try #require(f.cells.firstIndex { r in r.map(\.text).joined().hasPrefix("line 7") && r.first?.found == 2 })
+        #expect(f.cells[row][5].found == 2 && f.cells[row][6].found == 0)
+        // Cleared: no cell keeps a mark.
+        m.setFindMarks([], current: nil)
+        #expect(m.frame().cells.allSatisfy { $0.allSatisfy { $0.found == 0 } })
+        #expect(m.find("").isEmpty && m.find("absent").isEmpty)
+        #expect(Mirror.columns("你x") == 3)
+    }
+
+    @Test func findRowsWithBlankLinesFirst() throws {
+        let m = try Mirror(cols: 20, rows: 6)
+        m.feed(bytes("\r\n\r\n\r\nPASS here\r\n"))
+        let hits = m.find("pass")
+        #expect(hits.first?.row == 3)
+        m.setFindMarks(hits, current: 0)
+        let f = m.frame()
+        #expect(f.cells[3][0].found == 2)
+    }
 }

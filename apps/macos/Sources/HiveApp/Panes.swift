@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import HiveCore
 import HiveRender
 import MetalKit
@@ -313,6 +314,8 @@ final class PaneView: MTKView, NSTextInputClient {
     override func otherMouseDown(with event: NSEvent) { pointer(.press, .middle, event) }
     override func otherMouseUp(with event: NSEvent) { pointer(.release, .middle, event) }
     override func mouseMoved(with event: NSEvent) {
+        // focus-follows-pointer: the pane under a moving pointer takes focus (never mid-drag).
+        if model.settings.focusFollowsPointer, !focused, NSEvent.pressedMouseButtons == 0 { model.focus(block: blockID) }
         if event.modifierFlags.contains(.command) || overLink { updateLinkCursor(event.modifierFlags) }
         pointer(.motion, nil, event)
     }
@@ -651,6 +654,10 @@ final class CardView: NSView {
     let pane: PaneView
     let header: NSHostingView<PaneHeader>
     let contentInset: CGFloat = 10
+    private unowned let model: AppModel
+    /// The find bar, while find is open on this pane.
+    private var findBar: NSHostingView<FindBar>?
+    private var findWatch: AnyCancellable?
 
     /// A brief honey flash over the pane: its program rang the bell.
     func flash() {
@@ -673,8 +680,12 @@ final class CardView: NSView {
 
     init(pane: PaneView, model: AppModel) {
         self.pane = pane
+        self.model = model
         header = NSHostingView(rootView: PaneHeader(model: model, blockID: pane.blockID))
         super.init(frame: .zero)
+        findWatch = model.$finding.map { $0?.block }.removeDuplicates().sink { [weak self] b in
+            DispatchQueue.main.async { self?.showFind(b == self?.pane.blockID) }
+        }
         wantsLayer = true
         layer?.cornerRadius = 10
         layer?.cornerCurve = .continuous
@@ -687,15 +698,36 @@ final class CardView: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    /// Shows or hides the find bar; closed, the keyboard goes back to the pane.
+    private func showFind(_ on: Bool) {
+        if on, findBar == nil {
+            let bar = NSHostingView(rootView: FindBar(model: model, blockID: pane.blockID))
+            bar.safeAreaRegions = []
+            addSubview(bar)
+            findBar = bar
+            needsLayout = true
+        } else if !on, let bar = findBar {
+            let hadKeyboard = window?.firstResponder is NSText && (window?.firstResponder as? NSView)?.isDescendant(of: bar) == true
+            bar.removeFromSuperview()
+            findBar = nil
+            if hadKeyboard || model.focusedBlock == pane.blockID { window?.makeFirstResponder(pane) }
+        }
+    }
+
     func apply(style: Style, focused: Bool) {
         layer?.backgroundColor = (focused ? style.focusedPane : style.unfocusedPane).cgColor
-        layer?.borderColor = (focused ? style.accent.withAlphaComponent(0.55) : style.border.withAlphaComponent(0.7)).cgColor
+        // The honey edge is PanesView's ring, which glides from pane to pane: the focused card has none of its own.
+        layer?.borderColor = focused ? NSColor.clear.cgColor : style.border.withAlphaComponent(0.7).cgColor
         pane.focused = focused
     }
 
     override func layout() {
         super.layout()
         header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: 30)
+        if let bar = findBar {
+            let w = max(0, min(320, bounds.width - 20))
+            bar.frame = NSRect(x: bounds.maxX - w - 10, y: 36, width: w, height: 36)
+        }
         // Whole cells only: the rest is card padding.
         let avail = NSRect(x: contentInset, y: 32, width: bounds.width - contentInset * 2, height: bounds.height - 32 - contentInset)
         let cw = pane.cellSize.width, ch = pane.cellSize.height
@@ -711,11 +743,22 @@ final class PanesView: NSView {
     let renderer: Renderer
     private var cards: [String: CardView] = [:]
     let gap: CGFloat = 8
+    /// The honey edge around the focused pane: one ring that glides from
+    /// pane to pane with the motion setting.
+    private let ring = CALayer()
+    private var ringFor: String?
+    private var ringWindow: String?
 
     init(model: AppModel, renderer: Renderer) {
         self.model = model
         self.renderer = renderer
         super.init(frame: .zero)
+        wantsLayer = true
+        ring.borderWidth = 1
+        ring.cornerRadius = 10
+        ring.cornerCurve = .continuous
+        ring.zPosition = 1000
+        ring.isHidden = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -743,6 +786,7 @@ final class PanesView: NSView {
             c.apply(style: model.style, focused: id == focused)
             c.pane.needsDisplay = true
         }
+        placeRing(model.style)
         if let f = focused, let c = cards[f], window?.firstResponder !== c.pane {
             window?.makeFirstResponder(c.pane)
         }
@@ -755,6 +799,48 @@ final class PanesView: NSView {
         for (id, c) in cards {
             c.apply(style: s, focused: id == focused)
             c.pane.needsDisplay = true
+        }
+        placeRing(s)
+    }
+
+    /// Puts the ring on the focused card. Focus moving to another pane of the
+    /// same tab glides it there; anything else (a resize, another tab) moves
+    /// it at once.
+    private func placeRing(_ style: Style) {
+        guard let layer else { return }
+        if ring.superlayer !== layer { layer.addSublayer(ring) }
+        ring.borderColor = style.accent.withAlphaComponent(0.55).cgColor
+        guard let f = model.focusedBlock, let c = cards[f] else {
+            ring.isHidden = true
+            ringFor = nil
+            return
+        }
+        let target = c.frame
+        // Only focus moving within one tab glides; another tab, a resize or a zoom moves it at once.
+        let gliding = ringFor != nil && ringFor != f && ringWindow == model.active?.id && !ring.isHidden
+        let from = ring.presentation()?.frame ?? ring.frame
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        ring.isHidden = false
+        ring.frame = target
+        CATransaction.commit()
+        ringFor = f
+        ringWindow = model.active?.id
+        guard gliding, from != target,
+              let sp = model.settings.motion.spring(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) else {
+            ring.removeAllAnimations()
+            return
+        }
+        let moves: [(String, NSValue, NSValue)] = [
+            ("position", NSValue(point: CGPoint(x: from.midX, y: from.midY)), NSValue(point: CGPoint(x: target.midX, y: target.midY))),
+            ("bounds.size", NSValue(size: from.size), NSValue(size: target.size)),
+        ]
+        for (key, a, b) in moves {
+            let anim = CASpringAnimation(perceptualDuration: sp.response, bounce: max(0, min(0.4, 1 - sp.damping)))
+            anim.keyPath = key
+            anim.fromValue = a
+            anim.toValue = b
+            ring.add(anim, forKey: key)
         }
     }
 
@@ -772,6 +858,7 @@ final class PanesView: NSView {
             if f.maxY < 0.9999 { r.size.height -= gap / 2 }
             c.frame = r.integral
         }
+        placeRing(model.style)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -835,5 +922,63 @@ final class PreeditView: NSView {
         text.draw(at: NSPoint(x: 0, y: baseline - (font?.ascender ?? 0)))
         (text.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor ?? .white).setFill()
         NSRect(x: 0, y: baseline + 2, width: bounds.width, height: 1).fill()
+    }
+}
+
+/// Find in a pane: a capsule over its top right. Typing searches the
+/// scrollback; ↩ and ⇧↩ step through matches, Esc closes.
+struct FindBar: View {
+    @ObservedObject var model: AppModel
+    let blockID: String
+    @State private var text = ""
+    @FocusState private var typing: Bool
+
+    var body: some View {
+        let s = model.style
+        let f = model.finding
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(s.secondary.swiftUI)
+            TextField("Find", text: $text)
+                .textFieldStyle(.plain).font(.system(size: 12.5))
+                .focused($typing)
+                .onSubmit { model.stepFind(NSEvent.modifierFlags.contains(.shift) ? -1 : 1); typing = true }
+                .onChange(of: text) { _, q in model.updateFind(q) }
+                .accessibilityLabel("Find in this pane")
+                .accessibilityValue(count(f))
+            Text(count(f)).font(.system(size: 11.5)).monospacedDigit().foregroundStyle(s.secondary.swiftUI)
+                .fixedSize()
+            Rectangle().fill(s.border.swiftUI).frame(width: 1, height: 14)
+            HStack(spacing: 2) {
+                button("chevron.up", "Previous Match") { model.stepFind(-1) }
+                button("chevron.down", "Next Match") { model.stepFind(1) }
+                button("xmark", "Close Find") { model.endFind() }
+            }
+        }
+        .padding(.leading, 12).padding(.trailing, 6).frame(height: 32)
+        .background(Capsule().fill(s.card.swiftUI).shadow(color: .black.opacity(s.dark ? 0.35 : 0.12), radius: 8, y: 2))
+        .overlay(Capsule().strokeBorder(s.border.swiftUI, lineWidth: 1))
+        .padding(2)
+        .onExitCommand { model.endFind() }
+        .onAppear { text = model.finding?.query ?? ""; typing = true }
+        .onChange(of: model.findFocus) { _, _ in typing = true }
+        // A search started elsewhere (a script, the screenshot loop) shows its words here.
+        .onChange(of: model.finding?.query) { _, q in if let q, q != text { text = q } }
+    }
+
+    private func count(_ f: AppModel.FindState?) -> String {
+        guard let f, !f.query.isEmpty else { return "" }
+        guard f.count > 0, let c = f.current else { return "No matches" }
+        return "\(c + 1) of \(f.count)"
+    }
+
+    private func button(_ symbol: String, _ help: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 10.5, weight: .semibold))
+                .frame(width: 22, height: 22).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(model.style.secondary.swiftUI)
+        .help(help)
+        .accessibilityLabel(help)
     }
 }

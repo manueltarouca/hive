@@ -110,7 +110,7 @@ public final class FontSet {
         return nil
     }()
 
-    func face(bold b: Bool, italic i: Bool) -> CTFont {
+    public func face(bold b: Bool, italic i: Bool) -> CTFont {
         switch (b, i) {
         case (true, true): return boldItalic
         case (true, false): return bold

@@ -118,6 +118,12 @@ public final class Renderer {
                     var fgc = cell.fg ?? defaultFG, bgc = cell.bg
                     if cell.inverse { (fgc, bgc) = (bgc ?? defaultBG, fgc) }
                     if cell.selected { bgc = theme.selection }
+                    // Find: matches in a soft yellow, the current one in a deeper amber (not the cursor's
+                    // honey), with dark text on both.
+                    if cell.found != 0 {
+                        bgc = cell.found == 2 ? RGB(0xE8, 0x8A, 0x1E) : RGB(0xF0, 0xC6, 0x74)
+                        fgc = RGB(0x1D, 0x1F, 0x21)
+                    }
                     let isCursor = p.focused && p.cursorShown && f.cursor.visible && f.cursor.style == .block && f.cursor.x == x && f.cursor.y == y
                     if isCursor { bgc = theme.cursor; fgc = defaultBG }
                     if let bgc { bg.append(QuadInstance(pos: pos, size: SIMD2(cw * width, ch), uv: .zero, color: color(bgc), kind: 0)) }

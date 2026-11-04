@@ -339,6 +339,17 @@ func (s *Server) registerMethods() {
 			}
 			return empty{}, nil
 		}, api.Perm("control"))
+	api.Register(r, "session.balance_window", "Give every block in a window the same share of its row and column.",
+		func(ctx context.Context, in windowRef) (revisionOut, error) {
+			return s.withSession(in.SessionID, func(ss *session.Session) error {
+				w := ss.Window(in.WindowID)
+				if w == nil {
+					return api.NotFound("no window %s", in.WindowID)
+				}
+				w.Balance()
+				return nil
+			})
+		}, api.Perm("control"))
 	api.Register(r, "session.focus_window", "Make a window the active one.",
 		func(ctx context.Context, in windowRef) (revisionOut, error) {
 			return s.withSession(in.SessionID, func(ss *session.Session) error {
@@ -442,6 +453,7 @@ func (s *Server) registerMethods() {
 		Ratio     float64     `json:"ratio,omitempty" desc:"The new part's share, 0 to 1. Default 0.5."`
 		Focus     *bool       `json:"focus,omitempty" desc:"Focus the new block. Default true."`
 		Layout    *LayoutSpec `json:"layout,omitempty" desc:"The blocks to create. Default: one shell."`
+		Balance   bool        `json:"balance,omitempty" desc:"Then give every block in the window the same share of its row and column, replacing ratio."`
 		sizeIn
 	}
 	api.Register(r, "session.new_split", "Create a split beside an existing block.",
@@ -486,6 +498,9 @@ func (s *Server) registerMethods() {
 				return newOut{}, api.BadRequest("%v", err)
 			}
 			_ = anchor.b.Resize(ac, ar)
+			if in.Balance {
+				w.Balance() // the clients' sizes follow when they lay it out
+			}
 			if in.Focus == nil || *in.Focus {
 				w.Focus = firstOf(blocks)
 			}

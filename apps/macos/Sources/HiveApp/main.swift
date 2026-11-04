@@ -139,6 +139,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             .sink { [weak self] _ in self?.applyFont() }
             .store(in: &bag)
         model.settingsStore.$settings
+            .map(\.dimPanes)
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in DispatchQueue.main.async { self?.updateAppearance() } }
+            .store(in: &bag)
+        model.settingsStore.$settings
             .map(\.cursorStyleBlink)
             .removeDuplicates()
             .sink { [weak self] b in
@@ -170,6 +176,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         // sequences and modes. Until the keymap arrives, the menu's own keys.
         model.clientAction = { [weak self] action, args in self?.runClientAction(action, args) }
         model.showScripts = { [weak self] h, name in self?.showScripts(h, name) }
+        settingsWindow.actions = SettingsActions(
+            shareHosts: { [weak self] in self?.showShareHosts() },
+            addHost: { [weak self] in self?.showAddHost() },
+            scripts: { [weak self] in self?.showScripts() },
+            shortcuts: { [weak self] in self?.showMainWindow(); self?.toggleShortcuts() })
         model.$keys.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.buildMenu() } }.store(in: &bag)
         // Another keyboard layout: the menu shows the keys it can type.
         DistributedNotificationCenter.default().publisher(for: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String))
@@ -207,6 +218,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 if what == "hostlist:remove" { self?.showHostList(.remove) }
                 if what == "shortcuts" { self?.toggleShortcuts() }
                 if what == "settings" { self?.showSettings() }
+                // A page (settings:panes), or a search (settings:?dim).
+                if what.hasPrefix("settings:"), let self {
+                    let arg = String(what.dropFirst("settings:".count))
+                    if arg.hasPrefix("?") {
+                        self.showSettings()
+                        self.settingsWindow.nav.query = String(arg.dropFirst())
+                    } else if let p = SettingsIndex.Page(rawValue: arg) {
+                        self.settingsWindow.show(model: self.model, page: p)
+                    }
+                }
                 if what == "scripts" { self?.showScripts() }
                 if what.hasPrefix("scripts:") { self?.showScripts(nil, String(what.dropFirst("scripts:".count))) }
                 if what == "sharehosts" { self?.showShareHosts() }
@@ -214,6 +235,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 // A tab as if the pointer were on it (hover:N, N from 0), and closing the tab in front.
                 if what.hasPrefix("hover:"), let i = Int(what.dropFirst("hover:".count)) { self?.model.shotHover = i }
                 if what == "closetab" { self?.model.closeTab() }
+                // Find open with a query typed (find:FAIL).
+                if what.hasPrefix("find:"), let self {
+                    self.model.startFind()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.model.updateFind(String(what.dropFirst("find:".count))) }
+                }
                 #if DEBUG
                 if what.hasPrefix("menuicons:") { self?.menuBar.writeIcons(to: String(what.dropFirst("menuicons:".count))) }
                 // Closed to the menu bar, then opened again from it.
@@ -324,7 +350,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             let want = NSAppearance(named: night ? .darkAqua : .aqua)
             if NSApp.appearance?.name != want?.name { NSApp.appearance = want }
         }
-        let s: Style = night ? .dark : .light
+        var s: Style = night ? .dark : .light
+        s.dim = Style.dim(model.settings.dimPanes)
         if model.style != s { model.style = s }
         for (a, item) in appearanceItems { item.state = a == model.appearance ? .on : .off }
     }
@@ -532,6 +559,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             PaletteItem(title: "Zoom Pane", detail: k("Zoom Pane"), symbol: "arrow.up.left.and.arrow.down.right") { m.toggleZoom() },
             PaletteItem(title: "Close Pane", detail: k("Close Pane"), symbol: "xmark") { m.closePane() },
             PaletteItem(title: "Close Tab", detail: k("Close Tab"), symbol: "xmark.square") { m.closeTab() },
+            PaletteItem(title: "Find…", detail: k("Find…"), symbol: "magnifyingglass") { m.startFind() },
             PaletteItem(title: "Next Tab", detail: k("Next Tab"), symbol: "arrow.right") { m.selectWindow(offset: 1) },
             PaletteItem(title: "Previous Tab", detail: k("Previous Tab"), symbol: "arrow.left") { m.selectWindow(offset: -1) },
             PaletteItem(title: "Move Tab Left", detail: "", symbol: "arrow.left.to.line") { if let w = m.active { m.moveTab(w.id, by: -1) } },
@@ -698,6 +726,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         case "client.close_pane": m.closePane()
         case "client.close_tab": m.closeTab()
         case "client.sidebar": m.sidebar.toggle()
+        case "client.find": m.startFind()
+        case "client.find_next": m.stepFind(1)
+        case "client.find_previous": m.stepFind(-1)
         case "client.zoom": m.toggleZoom()
         case "client.next_tab": m.selectWindow(offset: 1)
         case "client.previous_tab": m.selectWindow(offset: -1)
@@ -778,6 +809,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         menu("Edit", [
             NSMenuItem(title: "Copy", action: #selector(PaneView.copy(_:)), keyEquivalent: "c"),
             NSMenuItem(title: "Paste", action: #selector(PaneView.paste(_:)), keyEquivalent: "v"),
+            .separator(),
+            bound("Find…", "client.find", .null, "f") { m.startFind() },
+            bound("Find Next", "client.find_next", .null, "g") { m.stepFind(1) },
+            bound("Find Previous", "client.find_previous", .null, "g", [.command, .shift]) { m.stepFind(-1) },
         ])
         appearanceItems = Appearance.allCases.map { a in (a, item(a.title, "") { m.setAppearance(a) }) }
         menu("View", [bound("Toggle Agents Sidebar", "client.sidebar", .null, "s", [.command, .shift]) { m.sidebar.toggle() }, .separator()]

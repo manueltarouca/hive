@@ -822,7 +822,7 @@ def step_script_page(srv):
     shot("settings-scripts")
     tap(f"Scripts on {LABEL}")
     wait("digest", exact=True)
-    wait("Waiting for your OK")
+    wait("Needs your OK")
     wait("It asks to notify you, mark panes and bring hive to the front.")
     shot("scripts-pending")
     # Allow digest.
@@ -839,7 +839,7 @@ def step_script_page(srv):
     # Watch only.
     tap_on_screen("Watch only, needs-you")
     until("needs-you watches", lambda: scripts_state(srv)["needs-you"]["mode"] == "watch")
-    wait("Running, watch only")
+    wait("Watching only")
     scroll_to("set to watch only by you")
     # A long number label keeps one line, on its own: the − and + sit below it.
     scroll_to("Remind me after this many minutes")
@@ -1090,6 +1090,34 @@ def pane_tap(srv, name, marker, token, nth=0):
 def close_viewer():
     tap("Close", exact=True)
     until("the viewer closed", lambda: find(dump(), "Open in another app", exact=True) is None and find(dump(), "Getting it from", exact=False) is None, timeout=5)
+
+
+def step_find(srv):
+    """Find in a pane from the key bar's more keys: matches counted across the scrollback, the latest current,
+    stepping wraps, Done clears the marks."""
+    lines = "\\n".join([f"line {i:03d}" + (" FAIL early" if i == 3 else "") for i in range(80)]) + "\\nFAIL late one\\nFAIL late two\\n"
+    srv.hive("new", "finds", "--cwd", "/tmp", "--", "sh", "-c", f"printf '{lines}'; exec cat")
+    open_switcher()
+    tap("finds", exact=True)
+    streaming()
+    time.sleep(1.5)
+    tap("More keys")
+    tap("Find in this pane")
+    wait("Find in this pane")
+    type_text("fail")
+    wait("3 of 3", timeout=10)
+    shot("find-latest")
+    tap("Previous match")
+    wait("2 of 3")
+    tap("Previous match")
+    wait("1 of 3")
+    shot("find-early")  # the first match is in the scrollback: the pane scrolled up to it
+    tap("Next match")
+    wait("2 of 3")
+    hide_keyboard()
+    tap("Done")
+    wait("Find in this pane", gone=True)
+    shot("find-done")
 
 
 def step_files(srv):
@@ -1433,7 +1461,7 @@ def step_away(srv):
     shot("back")
 
 
-STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_keys, step_select, step_files, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
+STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_keys, step_select, step_files, step_find, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
 
 
 def main():

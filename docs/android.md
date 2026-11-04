@@ -70,6 +70,12 @@ use the mouse and opens links.
 Long press to select a word; drag the handles, or keep your finger down and
 drag, to select more. **Copy**, **Select all** and **Paste** show above it.
 
+### Find in a pane
+
+**⋯** on the key bar, then **find**, searches what the pane printed,
+scrollback included. The latest match is current; the arrows step through
+the others, scrolling to each, and **Done** or Back closes the search.
+
 ### Files a pane printed
 
 Tap a path a program printed (`build/shot.png`, `ui/Desk.kt:40`, a folder)

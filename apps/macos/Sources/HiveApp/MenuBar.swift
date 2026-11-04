@@ -164,70 +164,51 @@ final class MenuBar: NSObject, NSMenuDelegate {
         let s = current
         menu.removeAllItems()
 
+        // The server and how it is; clicking it opens Settings.
         let header = NSMenuItem()
-        let view = NSHostingView(rootView: MenuHeader(subtitle: s.subtitle, problem: s.icon == .away))
-        view.frame = NSRect(x: 0, y: 0, width: 280, height: 46)
+        // This Mac's server up and every host fine: how long it has run.
+        let local = model.host(id: HostConnection.localID)
+        let subtitle = s.icon != .away && (local?.connected ?? false) ? (local?.serverStarted.map { runningFor(since: $0) } ?? s.subtitle) : s.subtitle
+        let view = NSHostingView(rootView: MenuHeader(subtitle: subtitle, problem: s.icon == .away) { [weak self, weak menu] in
+            menu?.cancelTracking()
+            // After the menu's tracking loop ends.
+            DispatchQueue.main.async { self?.showSettings() }
+        })
+        view.frame = NSRect(x: 0, y: 0, width: 280, height: 58)
+        view.autoresizingMask = [.width]  // as wide as the menu
         header.view = view
         menu.addItem(header)
         menu.addItem(.separator())
 
-        // Hosts: this Mac, then each remote one with what you can do.
-        let hosts = model.hostRows
-        if let local = hosts.first(where: \.local) {
-            // As Tailscale's "This Device": picked, it shows how your other
-            // devices reach this Mac (the phone's QR).
-            let mac = ClosureMenuItem(title: "This Mac: \(AppModel.macName)\(local.connected ? "" : ", not connected")", key: "") { [weak self] in
-                self?.showShareHosts()
-            }
-            mac.toolTip = "How your phone and other Macs reach this one"
-            menu.addItem(mac)
-        }
-        let remote = hosts.filter { !$0.local }
-        let hostsItem = NSMenuItem(title: "Hosts", action: nil, keyEquivalent: "")
-        let sub = NSMenu()
-        sub.autoenablesItems = false
-        for h in remote {
-            let up = h.connected
-            let state = up ? "Connected" : h.idle ? "Not connected" : (h.problem ?? "Away")
-            let row = NSMenuItem(title: h.name, action: nil, keyEquivalent: "")
-            row.attributedTitle = twoLines(h.name, state)
-            let actions = NSMenu()
-            if up || !h.idle {
-                actions.addItem(ClosureMenuItem(title: "Disconnect", key: "") { [weak self] in self?.model.disconnect(host: h.id) })
-            } else {
-                actions.addItem(ClosureMenuItem(title: "Connect", key: "") { [weak self] in self?.model.connect(host: h.id) })
-            }
-            row.submenu = actions
-            sub.addItem(row)
-        }
-        if !remote.isEmpty { sub.addItem(.separator()) }
-        sub.addItem(ClosureMenuItem(title: "Share Hosts with Phone…", key: "") { [weak self] in self?.showShareHosts() })
-        hostsItem.submenu = sub
-        menu.addItem(hostsItem)
-        menu.addItem(.separator())
-
-        // The agents: what needs you, then what's working.
+        // What needs you, by name; what's working, as a count.
         // Block ids are per server: keyed by host too.
         let byID = Dictionary(model.agents.map { ("\($0.host)/\($0.blockID)", $0) }, uniquingKeysWith: { a, _ in a })
-        if s.needsYou.isEmpty && s.working.isEmpty {
-            menu.addItem(disabled(s.quiet > 0 ? "No agent needs you" : "No agents running"))
-        }
         if !s.needsYou.isEmpty {
             menu.addItem(.sectionHeader(title: "Needs you"))
             for a in s.needsYou { if let info = byID["\(a.host)/\(a.id)"] { menu.addItem(row(info)) } }
         }
-        if !s.working.isEmpty {
-            menu.addItem(.sectionHeader(title: "Working"))
-            for a in s.working { if let info = byID["\(a.host)/\(a.id)"] { menu.addItem(row(info)) } }
-        }
-        if s.quiet > 0 {
-            menu.addItem(disabled(s.quiet == 1 ? "1 idle agent" : "\(s.quiet) idle agents"))
-        }
+        let working = s.working.count
+        menu.addItem(disabled(working > 0 ? (working == 1 ? "1 agent working" : "\(working) agents working")
+                              : s.needsYou.isEmpty ? (s.quiet > 0 ? "No agent needs you" : "No agents running") : "No other agents working"))
         menu.addItem(.separator())
 
-        let new = ClosureMenuItem(title: "New Session", key: "n") { [weak self] in self?.showWindow(); self?.model.newSession() }
-        new.keyEquivalentModifierMask = [.command, .shift]
-        menu.addItem(new)
+        // The versions, to copy into a bug report.
+        let versions = NSMenuItem()
+        let app = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        let server = model.host(id: HostConnection.localID)?.serverVersion ?? "not connected"
+        let appLine = build.map { $0 == app ? app : "\(app) (\($0))" } ?? app
+        let vview = NSHostingView(rootView: MenuVersions(app: appLine, server: server) { [weak menu] in
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("Hive \(appLine)\nhive server \(server)", forType: .string)
+            menu?.cancelTracking()
+        })
+        vview.frame = NSRect(x: 0, y: 0, width: 280, height: 44)
+        vview.autoresizingMask = [.width]
+        versions.view = vview
+        menu.addItem(versions)
+        menu.addItem(.separator())
+
         menu.addItem(ClosureMenuItem(title: "Open Hive", key: "") { [weak self] in self?.showWindow() })
         menu.addItem(ClosureMenuItem(title: "Settings…", key: ",") { [weak self] in self?.showSettings() })
         menu.addItem(.separator())
@@ -275,19 +256,58 @@ final class MenuBar: NSObject, NSMenuDelegate {
     }
 }
 
-/// "hive" and how it is, at the top of the menu.
+/// The server and how it is, at the top of the menu: the app's icon, its
+/// name, a dot for its state. Clicking it opens Settings.
 private struct MenuHeader: View {
     let subtitle: String
     let problem: Bool
+    let open: () -> Void
+    @State private var hover = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text("hive").font(.system(size: 13, weight: .semibold))
-            Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("hive server").font(.system(size: 13, weight: .semibold))
+                HStack(spacing: 5) {
+                    Circle().fill(problem ? Color.orange : Color.green).frame(width: 7, height: 7)
+                    Text(subtitle).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 4)
+            Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        // In line with the items' text below it.
-        .padding(.leading, 16.5).padding(.vertical, 6)
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.primary.opacity(hover ? 0.08 : 0)))
+        .padding(.horizontal, 6)
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
+        .onTapGesture(perform: open)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens Settings")
+    }
+}
+
+/// The app's and the server's versions, with a button that copies both.
+private struct MenuVersions: View {
+    let app: String
+    let server: String
+    let copy: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 2) {
+                GridRow { Text("Hive").foregroundStyle(.secondary); Text(app) }
+                GridRow { Text("hive server").foregroundStyle(.secondary); Text(server).lineLimit(1).truncationMode(.middle) }
+            }
+            .font(.system(size: 11.5))
+            Spacer(minLength: 4)
+            Button(action: copy) { Image(systemName: "doc.on.doc").font(.system(size: 12)) }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .help("Copy both versions")
+                .accessibilityLabel("Copy versions")
+        }
+        .padding(.horizontal, 14.5).padding(.vertical, 5)
     }
 }

@@ -1,3 +1,4 @@
+import Foundation
 /// The menu bar's quick status: what the icon shows, the line under "hive",
 /// and the agents, those that need you first. Agents of a host that can't
 /// be reached aren't shown: what was last known of them is out of date.
@@ -85,5 +86,16 @@ public struct MenuBarStatus: Equatable, Sendable {
             cut = String(cut[..<space])
         }
         return cut.trimmingCharacters(in: .whitespaces) + "…"
+    }
+}
+
+/// How long the server has run, as the menu bar says it: "Running for 18m".
+public func runningFor(since start: Date, now: Date = Date()) -> String {
+    let m = Int(now.timeIntervalSince(start) / 60)
+    switch m {
+    case ..<1: return "Running"
+    case ..<60: return "Running for \(m)m"
+    case ..<(48 * 60): return "Running for \(m / 60)h"
+    default: return "Running for \(m / (24 * 60)) days"
     }
 }

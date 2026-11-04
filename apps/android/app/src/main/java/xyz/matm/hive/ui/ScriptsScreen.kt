@@ -201,7 +201,7 @@ private fun ScriptCard(model: AppModel, h: HostConnection, s: Resident, activity
         }
 
         Rule()
-        ToggleRow("Watch only", "It may look, mark panes and notify. Every change it tries is refused and listed below.",
+        ToggleRow("Watch only", "The script can read terminals, mark panes and notify you. Anything else it tries is refused and listed below.",
             s.watching, "Watch only, ${s.name}") { on -> model.changeScript(h, s.name, "script.set_mode", JSONObject().put("mode", if (on) "watch" else "act")) }
 
         for (o in s.options) {

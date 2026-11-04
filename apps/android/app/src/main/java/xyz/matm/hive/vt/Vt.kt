@@ -19,6 +19,8 @@ internal object Vt {
     @JvmStatic external fun nPasteSafe(h: Long, utf8: ByteArray): Boolean
     @JvmStatic external fun nScroll(h: Long, rows: Int)
     @JvmStatic external fun nScrollBottom(h: Long)
+    @JvmStatic external fun nScrollbar(h: Long): LongArray?
+    @JvmStatic external fun nScrollToRow(h: Long, row: Long)
     @JvmStatic external fun nWheel(h: Long, rows: Int, x: Float, y: Float, sw: Int, sh: Int, cw: Int, ch: Int): ByteArray?
     @JvmStatic external fun nMouse(h: Long, action: Int, x: Float, y: Float, sw: Int, sh: Int, cw: Int, ch: Int): ByteArray?
     @JvmStatic external fun nHyperlink(h: Long, col: Int, row: Int): String?
@@ -64,6 +66,8 @@ class Frame(
     val generation: Long,
     /** Rows that continue on the next one (soft-wrapped at the edge). */
     val wraps: BooleanArray = BooleanArray(rows),
+    /** Find matches on screen: (row, col, cols, current 1 or 0) each. */
+    val found: List<IntArray> = emptyList(),
 ) {
     fun rowText(y: Int): String {
         val row = cells.getOrNull(y) ?: return ""
@@ -120,6 +124,61 @@ class Mirror private constructor(private var h: Long, theme: TermTheme) {
     fun scroll(rows: Int) { if (h != 0L) Vt.nScroll(h, rows) }
     fun scrollToBottom() { if (h != 0L) Vt.nScrollBottom(h) }
     fun plainText(): String = if (h == 0L) "" else Vt.nPlainText(h)
+
+    /** A find match: its row in the scrollable area (scrollback, then screen), first column, columns. */
+    data class FindMatch(val row: Int, val col: Int, val cols: Int)
+    private var marks: List<FindMatch> = emptyList()
+    private var current = -1
+
+    /** Every match of [query], top first, ignoring case; rows count as the scrollbar does. */
+    fun find(query: String): List<FindMatch> {
+        if (query.isEmpty() || h == 0L) return emptyList()
+        val out = ArrayList<FindMatch>()
+        plainText().split('\n').forEachIndexed { row, line ->
+            var from = 0
+            while (true) {
+                val at = line.indexOf(query, from, ignoreCase = true)
+                if (at < 0) break
+                out += FindMatch(row, columns(line, 0, at), maxOf(1, columns(line, at, at + query.length)))
+                from = at + query.length
+            }
+        }
+        return out
+    }
+
+    /** Marks matches on the next frames; [cur] is drawn stronger. */
+    fun setFindMarks(m: List<FindMatch>, cur: Int) { marks = m; current = cur }
+
+    /** Scrolls so the match is on screen, near the middle when it wasn't. */
+    fun reveal(m: FindMatch) {
+        if (h == 0L) return
+        val sb = Vt.nScrollbar(h) ?: return
+        val offset = sb[1]
+        val len = sb[2]
+        if (m.row >= offset && m.row < offset + len) return
+        Vt.nScrollToRow(h, maxOf(0L, m.row - len / 2))
+    }
+
+    /** The marks on screen now, as Frame.found has them. */
+    private fun found(rows: Int): List<IntArray> {
+        if (marks.isEmpty() || h == 0L) return emptyList()
+        val offset = Vt.nScrollbar(h)?.get(1) ?: 0L
+        return marks.withIndex().filter { (_, m) -> m.row >= offset && m.row < offset + rows }
+            .map { (i, m) -> intArrayOf((m.row - offset).toInt(), m.col, m.cols, if (i == current) 1 else 0) }
+    }
+
+    private fun columns(s: String, from: Int, to: Int): Int {
+        var n = 0
+        var i = from
+        while (i < to) {
+            val cp = s.codePointAt(i)
+            val wide = cp in 0x1100..0x115F || cp in 0x2E80..0xA4CF || cp in 0xAC00..0xD7A3 || cp in 0xF900..0xFAFF ||
+                cp in 0xFE30..0xFE4F || cp in 0xFF00..0xFF60 || cp in 0xFFE0..0xFFE6 || cp in 0x1F300..0x1FAFF || cp in 0x20000..0x3FFFD
+            n += if (wide) 2 else 1
+            i += Character.charCount(cp)
+        }
+        return n
+    }
     fun hyperlink(col: Int, row: Int): String? = if (h == 0L) null else Vt.nHyperlink(h, col, row)
     fun mode(n: Int, ansi: Boolean = false) = h != 0L && Vt.nMode(h, n, ansi)
 
@@ -142,7 +201,14 @@ class Mirror private constructor(private var h: Long, theme: TermTheme) {
     fun frame(): Frame {
         val buf = if (h == 0L) null else Vt.nFrame(h)
         val prev = last
-        if (buf == null) return prev ?: Frame(0, 0, emptyList(), 0, 0, false, 1, TermTheme.night.background, TermTheme.night.foreground, 0)
+        if (buf == null) {
+            val p = prev ?: return Frame(0, 0, emptyList(), 0, 0, false, 1, TermTheme.night.background, TermTheme.night.foreground, 0)
+            // Nothing new on screen, but the find marks may have moved.
+            val found = found(p.rows)
+            val same = found.size == p.found.size && found.indices.all { found[it].contentEquals(p.found[it]) }
+            return if (same) p else Frame(p.cols, p.rows, p.cells, p.cursorX, p.cursorY, p.cursorVisible, p.cursorStyle,
+                p.background, p.foreground, p.generation, p.wraps, found).also { last = it }
+        }
         buf.order(ByteOrder.LITTLE_ENDIAN)
         val cols = buf.getInt(0)
         val rows = buf.getInt(4)
@@ -185,7 +251,7 @@ class Mirror private constructor(private var h: Long, theme: TermTheme) {
         }
         if (textCache.size > 4096) textCache.clear()
         generation++
-        return Frame(cols, rows, cells, cx, cy, visible, style, bg, fg, generation, wraps).also { last = it }
+        return Frame(cols, rows, cells, cx, cy, visible, style, bg, fg, generation, wraps, found(rows)).also { last = it }
     }
 
     private fun rgb(b: ByteBuffer): Int {

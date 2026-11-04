@@ -19,6 +19,15 @@ public struct Cell: Equatable, Sendable {
     public var invisible = false, strikethrough = false, blink = false
     public var underline: UInt8 = 0
     public var selected = false
+    /// Find: 1 a match, 2 the current match.
+    public var found: UInt8 = 0
+}
+
+/// A find match: its row in the scrollable area (scrollback, then screen),
+/// its first column, and how many columns it covers.
+public struct FindMatch: Equatable, Sendable {
+    public var row: Int, col: Int, cols: Int
+    public init(row: Int, col: Int, cols: Int) { self.row = row; self.col = col; self.cols = cols }
 }
 
 public struct Cursor: Equatable, Sendable {
@@ -406,6 +415,63 @@ public final class Mirror {
         return String(decoding: UnsafeBufferPointer(start: ptr, count: len), as: UTF8.self)
     }
 
+    // MARK: find
+
+    /// The matches marked on frames, and which one is current.
+    public private(set) var findMarks: [FindMatch] = []
+    public private(set) var findCurrent: Int?
+    private var marksChanged = false
+    private var markedOffset: UInt64?
+
+    /// Every match of query in the scrollback and on screen, top first,
+    /// ignoring case. Rows count as the scrollbar does.
+    public func find(_ query: String) -> [FindMatch] {
+        guard !query.isEmpty else { return [] }
+        var out: [FindMatch] = []
+        for (row, line) in plainText().split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            var from = line.startIndex
+            // A cap keeps a one-letter query on a huge scrollback quick.
+            while out.count < Mirror.findLimit, from < line.endIndex,
+                  let r = line.range(of: query, options: [.caseInsensitive], range: from..<line.endIndex) {
+                out.append(FindMatch(row: row, col: Mirror.columns(line[line.startIndex..<r.lowerBound]), cols: max(1, Mirror.columns(line[r]))))
+                from = r.upperBound
+            }
+        }
+        return out
+    }
+
+    /// The most matches find reports.
+    public static let findLimit = 10_000
+
+    /// Marks matches on the next frames; current is drawn stronger.
+    public func setFindMarks(_ marks: [FindMatch], current: Int?) {
+        findMarks = marks
+        findCurrent = current
+        marksChanged = true
+    }
+
+    /// Scrolls so the match is on screen, near the middle when it wasn't.
+    public func reveal(_ m: FindMatch) {
+        var total: UInt64 = 0, offset: UInt64 = 0, len: UInt64 = 0
+        guard hive_scrollbar(term, &total, &offset, &len) else { return }
+        let row = UInt64(max(0, m.row))
+        if row >= offset && row < offset + len { return }
+        linkGeneration &+= 1
+        hive_scroll_to_row(term, Int(row > len / 2 ? row - len / 2 : 0))
+    }
+
+    /// Columns a run of text takes: wide characters take two.
+    static func columns<S: StringProtocol>(_ s: S) -> Int {
+        s.reduce(0) { n, ch in
+            guard let v = ch.unicodeScalars.first?.value else { return n + 1 }
+            let wide = (0x1100...0x115F).contains(v) || (0x2E80...0xA4CF).contains(v) || (0xAC00...0xD7A3).contains(v)
+                || (0xF900...0xFAFF).contains(v) || (0xFE30...0xFE4F).contains(v) || (0xFF00...0xFF60).contains(v)
+                || (0xFFE0...0xFFE6).contains(v) || (0x1F1E6...0x1F1FF).contains(v) || (0x1F300...0x1FAFF).contains(v)
+                || (0x20000...0x3FFFD).contains(v)
+            return n + (wide ? 2 : 1)
+        }
+    }
+
     /// Builds the current frame. While output is held (mode 2026) it returns
     /// the last complete frame.
     public func frame() -> PaneFrame {
@@ -417,8 +483,15 @@ public final class Mirror {
         hive_frame_meta(renderState, &meta)
         let cols = Int(meta.cols), rows = Int(meta.rows)
         var cells = last?.cells ?? []
+        // Find marks moved (new marks, or the view scrolled under them): every row again, so none stay behind.
+        var offset: UInt64 = 0
+        if !findMarks.isEmpty || marksChanged {
+            var total: UInt64 = 0, len: UInt64 = 0
+            _ = hive_scrollbar(term, &total, &offset, &len)
+        }
+        let marksMoved = marksChanged || (!findMarks.isEmpty && markedOffset != offset)
         let full = meta.dirty == UInt8(GHOSTTY_RENDER_STATE_DIRTY_FULL.rawValue) || cells.count != rows
-            || (cells.first?.count ?? -1) != cols
+            || (cells.first?.count ?? -1) != cols || marksMoved
         if full { cells = Array(repeating: [], count: rows) }
         var dirty = IndexSet()
 
@@ -436,6 +509,23 @@ public final class Mirror {
             y += 1
         }
         ghostty_render_state_clean(renderState)
+        if marksMoved || !findMarks.isEmpty {
+            // Marks are in row order: start at the first on screen, stop after the last.
+            var lo = 0, hi = findMarks.count
+            while lo < hi { let mid = (lo + hi) / 2; if findMarks[mid].row < Int(offset) { lo = mid + 1 } else { hi = mid } }
+            for i in lo..<findMarks.count {
+                let m = findMarks[i]
+                if m.row >= Int(offset) + rows { break }
+                let y = m.row - Int(offset)
+                guard y < cells.count else { continue }
+                for x in m.col..<min(m.col + m.cols, cells[y].count) where x >= 0 {
+                    cells[y][x].found = i == findCurrent ? 2 : 1
+                }
+                dirty.insert(y)
+            }
+            markedOffset = findMarks.isEmpty ? nil : offset
+            marksChanged = false
+        }
         generation += 1
         let f = PaneFrame(
             cols: cols, rows: rows, cells: cells,

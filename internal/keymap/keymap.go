@@ -277,6 +277,9 @@ func Defaults(clientKind string) []Binding {
 		d("shift+cmd+]", "client.next_tab", "Next Tab", nil),
 		d("shift+cmd+[", "client.previous_tab", "Previous Tab", nil),
 		d("cmd+/", "client.shortcuts", "Keyboard Shortcuts", nil),
+		d("cmd+f", "client.find", "Find…", nil),
+		d("cmd+g", "client.find_next", "Find Next", nil),
+		d("shift+cmd+g", "client.find_previous", "Find Previous", nil),
 		// Keys any layout types without Option: on a Portuguese keyboard
 		// [, ] and / need Option or Shift. Apps show the first binding of an
 		// action the keyboard in use can type.

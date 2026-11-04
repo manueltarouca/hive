@@ -17,6 +17,13 @@ public final class Engine {
         var framePending = false
         var pacer = FramePacer()
         var resyncs = 0
+        /// Find on this pane: the query and the current match, kept across
+        /// a new snapshot (a resize or a resync replaces the mirror).
+        var findQuery: String?
+        var findCurrent: Int?
+        var findMatches: [FindMatch] = []
+        /** Output arrived while find is open: search again shortly. */
+        var findStale = false
         init(onFrame: @escaping (PaneFrame) -> Void) { self.onFrame = onFrame }
     }
     private var panes: [String: Pane] = [:]
@@ -85,6 +92,7 @@ public final class Engine {
                 m.apply(theme: theme)
                 m.setDefaultCursorBlink(cursorBlink)
                 pane.mirror = m
+                if pane.findQuery != nil { refind(block, pane) }
                 pane.expected = seq
             } catch {
                 log("snapshot for \(block) failed: \(error)")
@@ -98,6 +106,15 @@ public final class Engine {
             }
             m.feed(data)
             pane.expected += UInt64(data.count)
+            // New output can move or remove what find marked: search again, at most every 150 ms.
+            if pane.findQuery != nil && !pane.findStale {
+                pane.findStale = true
+                queue.asyncAfter(deadline: .now() + 0.15) { [weak self, weak pane] in
+                    guard let self, let pane, self.panes[block] === pane, pane.findStale else { return }
+                    self.refind(block, pane)
+                    self.scheduleFrame(pane)
+                }
+            }
         case .resize(let seq, let cols, let rows, let cw, let ch):
             guard let m = pane.mirror else { return }
             guard seq == pane.expected else {
@@ -217,6 +234,62 @@ public final class Engine {
         guard let pane = panes[block], let m = pane.mirror else { return }
         m.scroll(rows: rows)
         scheduleFrame(pane)
+    }
+
+    /// Find's count and current match changed without the user (new output,
+    /// a new snapshot): block, count, current. On the engine's queue.
+    public var onFindChanged: ((String, Int, Int?) -> Void)?
+
+    /// Searches a block's scrollback and screen, marks the matches, makes the
+    /// one nearest the bottom current and scrolls it into view. An empty query
+    /// ends find. Returns the count and the current match.
+    @discardableResult
+    public func find(block: String, query: String) -> (count: Int, current: Int?) {
+        guard let pane = panes[block], let m = pane.mirror else { return (0, nil) }
+        pane.findQuery = query.isEmpty ? nil : query
+        pane.findStale = false
+        pane.findMatches = query.isEmpty ? [] : m.find(query)
+        pane.findCurrent = pane.findMatches.isEmpty ? nil : pane.findMatches.count - 1
+        show(pane, m, reveal: true)
+        return (pane.findMatches.count, pane.findCurrent)
+    }
+
+    /// The next (1) or previous (-1) match, wrapping around.
+    @discardableResult
+    public func stepFind(block: String, by: Int) -> Int? {
+        guard let pane = panes[block], let m = pane.mirror, !pane.findMatches.isEmpty else { return nil }
+        let n = pane.findMatches.count
+        pane.findCurrent = ((pane.findCurrent ?? (by > 0 ? -1 : n)) + by + n) % n
+        show(pane, m, reveal: true)
+        return pane.findCurrent
+    }
+
+    public func endFind(block: String) {
+        guard let pane = panes[block] else { return }
+        pane.findQuery = nil
+        pane.findMatches = []
+        pane.findCurrent = nil
+        pane.findStale = false
+        if let m = pane.mirror { show(pane, m, reveal: false) }
+    }
+
+    private func show(_ pane: Pane, _ m: Mirror, reveal: Bool) {
+        m.setFindMarks(pane.findMatches, current: pane.findCurrent)
+        if reveal, let c = pane.findCurrent, pane.findMatches.indices.contains(c) { m.reveal(pane.findMatches[c]) }
+        scheduleFrame(pane)
+    }
+
+    /// Searches again for the open query, keeping the current match on its
+    /// row when it's still there, and tells the app.
+    private func refind(_ block: String, _ pane: Pane) {
+        guard let q = pane.findQuery, let m = pane.mirror else { return }
+        pane.findStale = false
+        let was = pane.findCurrent.flatMap { pane.findMatches.indices.contains($0) ? pane.findMatches[$0] : nil }
+        pane.findMatches = m.find(q)
+        pane.findCurrent = was.flatMap { w in pane.findMatches.firstIndex { $0.row == w.row && $0.col == w.col } }
+            ?? (pane.findMatches.isEmpty ? nil : pane.findMatches.count - 1)
+        m.setFindMarks(pane.findMatches, current: pane.findCurrent)
+        onFindChanged?(block, pane.findMatches.count, pane.findCurrent)
     }
 
     /// The mirror's text, for tests and debugging.

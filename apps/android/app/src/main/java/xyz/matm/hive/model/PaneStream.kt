@@ -52,8 +52,16 @@ class PaneStream(val client: HiveClient, val blockID: String, theme: TermTheme, 
             is BlockUpdate.Snapshot -> {
                 mirror?.close()
                 mirror = Mirror.fromSnapshot(u.data, theme)
+                if (findQuery != null) refind()
             }
-            is BlockUpdate.Output -> mirror?.feed(u.data)
+            is BlockUpdate.Output -> {
+                mirror?.feed(u.data)
+                // New output can move what find marked: search again shortly.
+                if (findQuery != null && !findStale) {
+                    findStale = true
+                    main.postDelayed({ vt.execute { if (findStale) refind() } }, 150)
+                }
+            }
             is BlockUpdate.Resize -> {
                 cellWidth = u.cellWidth
                 cellHeight = u.cellHeight
@@ -140,6 +148,65 @@ class PaneStream(val client: HiveClient, val blockID: String, theme: TermTheme, 
             val uri = m.hyperlink(col, row)
             main.post { link(uri) }
         }
+    }
+
+    // Find: kept here so a new snapshot (a resize, a resync) is marked again.
+    private var findQuery: String? = null
+    private var matches: List<Mirror.FindMatch> = emptyList()
+    private var findCurrent = -1
+    private var findStale = false
+    /** Find searched again on its own (new output, a snapshot): count and current, on main. */
+    @Volatile var onFind: ((Int, Int) -> Unit)? = null
+
+    private fun refind() {
+        val q = findQuery ?: return
+        val m = mirror ?: return
+        findStale = false
+        val was = matches.getOrNull(findCurrent)
+        matches = m.find(q)
+        findCurrent = was?.let { w -> matches.indexOfFirst { it.row == w.row && it.col == w.col } }?.takeIf { it >= 0 } ?: matches.lastIndex
+        m.setFindMarks(matches, findCurrent)
+        redraw()
+        val n = matches.size
+        val c = findCurrent
+        main.post { onFind?.invoke(n, c) }
+    }
+
+    /** Searches the scrollback; the match nearest the bottom is current. [done] gets the count and the current one, on main. */
+    fun find(query: String, done: (Int, Int) -> Unit) = vt.execute {
+        val m = mirror ?: return@execute
+        matches = m.find(query)
+        findCurrent = matches.lastIndex
+        findQuery = query.ifEmpty { null }
+        mark(m)
+        val n = matches.size
+        val c = findCurrent
+        main.post { done(n, c) }
+    }
+
+    /** The next (1) or previous (-1) match, wrapping around. */
+    fun stepFind(by: Int, done: (Int) -> Unit) = vt.execute {
+        val m = mirror ?: return@execute
+        if (matches.isEmpty()) return@execute
+        val n = matches.size
+        findCurrent = ((findCurrent + by) % n + n) % n
+        mark(m)
+        val c = findCurrent
+        main.post { done(c) }
+    }
+
+    fun endFind() = vt.execute {
+        findQuery = null
+        matches = emptyList()
+        findCurrent = -1
+        mirror?.setFindMarks(emptyList(), -1)
+        redraw()
+    }
+
+    private fun mark(m: Mirror) {
+        m.setFindMarks(matches, findCurrent)
+        matches.getOrNull(findCurrent)?.let(m::reveal)
+        redraw()
     }
 
     /** The pane's text, for checks; on the vt thread. */

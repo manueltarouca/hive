@@ -263,7 +263,7 @@ struct ScriptDetail: View {
                     Text(script.on ? "On" : "Off").foregroundStyle(.secondary)
                     Toggle("On", isOn: Binding(get: { script.on }, set: { page.setOn(script, $0) }))
                         .toggleStyle(.switch).labelsHidden()
-                        .help(script.on ? "Turn it off: it stops, and its marks on panes go" : "Turn it on")
+                        .help(script.on ? "Turn Off: the script stops and its marks leave the panes" : "Turn On")
                 }
             }
             Text(script.stateText).font(.callout)
@@ -285,7 +285,7 @@ struct ScriptDetail: View {
                 // The decision this page is for: the one honey button.
                 Button("Allow") { page.allow(script) }.keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent).tint(style.accent.swiftUI)
-                Text("You can turn it off, or let it only watch, at any time.").font(.caption).foregroundStyle(.secondary)
+                Text("You can turn the script off, or let it only watch, at any time.").font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(14)
@@ -302,7 +302,7 @@ struct ScriptDetail: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Watch only")
-                        Text("It may look, mark panes and notify you. Every change it tries is refused, and listed below.")
+                        Text("The script can read terminals, mark panes and notify you. Anything else it tries is refused and listed below.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 16)
@@ -340,9 +340,9 @@ struct ScriptDetail: View {
 
     private var recent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("What it did").font(.headline)
+            Text("Recent activity").font(.headline)
             if page.activity.isEmpty {
-                Text("Nothing yet. Whatever it changes shows here: typing, opening or closing panes, asking the app to do something.")
+                Text("Nothing yet. Every change the script makes shows here: typing, opening or closing panes, and asking the app to do something.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             ForEach(page.activity) { e in

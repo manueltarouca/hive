@@ -245,6 +245,82 @@ final class AppModel: ObservableObject {
     @Published var style: Style = .light
     /// The settings file (~/.config/hive/config), read through the bundled hive.
     let settingsStore = SettingsStore()
+    /// Find in a pane: the block, what's typed, how many matches, which one is current.
+    struct FindState: Equatable {
+        var block: String
+        var query = ""
+        var count = 0
+        var current: Int?
+    }
+    @Published var finding: FindState?
+    /// Asks the find bar to take the keyboard (⌘F again on an open bar).
+    @Published var findFocus = 0
+    private var findSearch = 0
+    /// The newest search, readable from the vt queue.
+    private let findLatest = FindTicket()
+
+    /// Opens find on the focused pane, or puts the keyboard back in its field.
+    func startFind() {
+        guard let b = focusedBlock else { return }
+        if finding?.block != b {
+            endFind()
+            finding = FindState(block: b)
+            let e = engine
+            vt.async {
+                e.onFindChanged = { block, count, current in
+                    Task { @MainActor [weak self] in self?.findChanged(block: block, count: count, current: current) }
+                }
+            }
+        }
+        findFocus &+= 1
+    }
+
+    /// Searches as the query changes, once typing pauses. The match nearest
+    /// the bottom (the latest output) is current first.
+    func updateFind(_ query: String) {
+        guard var f = finding else { return }
+        f.query = query
+        finding = f
+        findSearch &+= 1
+        let ticket = findSearch, block = f.block, engine = engine, latest = findLatest
+        latest.set(ticket)
+        vt.asyncAfter(deadline: .now() + (query.isEmpty ? 0 : 0.08)) {
+            // A later keystroke replaced this search: skip the work.
+            guard latest.get() == ticket else { return }
+            let r = engine.find(block: block, query: query)
+            Task { @MainActor [weak self] in
+                guard let self, self.findSearch == ticket, self.finding?.block == block else { return }
+                self.finding?.count = r.count
+                self.finding?.current = r.current
+            }
+        }
+    }
+
+    /// Next (1) or previous (-1) match, wrapping around.
+    func stepFind(_ by: Int) {
+        guard let f = finding else { return }
+        let block = f.block, engine = engine
+        vt.async {
+            let c = engine.stepFind(block: block, by: by)
+            Task { @MainActor [weak self] in if self?.finding?.block == block, let c { self?.finding?.current = c } }
+        }
+    }
+
+    func endFind() {
+        guard let f = finding else { return }
+        finding = nil
+        findSearch &+= 1
+        let engine = engine
+        vt.async { engine.endFind(block: f.block) }
+    }
+
+    /// The engine searched again on its own (new output): the bar follows.
+    func findChanged(block: String, count: Int, current: Int?) {
+        guard finding?.block == block else { return }
+        finding?.count = count
+        finding?.current = current
+    }
+
     /// A close question is on screen.
     private var askingClose = false
     /// The screenshot loop's stand-in for a pointer: the shown tab it rests on.
@@ -1206,14 +1282,26 @@ final class AppModel: ObservableObject {
         var p: [String: JSON] = ["session_id": sid, "block_id": .string(b), "direction": horizontal ? "horizontal" : "vertical",
                                  "layout": AppModel.layout(cwd: currentCwd())]
         if let cols, let rows { p["cols"] = .number(Double(cols)); p["rows"] = .number(Double(rows)) }
+        // The server balances in the same change, so the new pane doesn't land at half and then jump.
+        if settings.balanceSplits { p["balance"] = true }
         call("session.new_split", .object(p))
+    }
+
+    /// balance-splits: evens out a tab's panes after the app opened or closed one.
+    func balance(_ window: String?) {
+        guard settings.balanceSplits, let window else { return }
+        call("session.balance_window", ["session_id": sid, "window_id": .string(window)])
     }
 
     func closePane() {
         guard let b = focusedBlock else { return }
+        // Two or more panes stay: they take the room evenly once it closes.
+        let rebalance = (active?.layout?.rects().count ?? 0) > 2 ? active?.id : nil
         let close = { [weak self] in
             guard let self else { return }
-            self.call("block.close", ["session_id": self.sid, "block_id": .string(b)])
+            self.call("block.close", ["session_id": self.sid, "block_id": .string(b)]) { [weak self] _ in
+                self?.balance(rebalance)
+            }
         }
         // The last pane takes its tab with it: ask as closing the tab would.
         guard let w = active, (w.layout?.rects().count ?? 1) <= 1 else { close(); return }
@@ -1238,9 +1326,14 @@ final class AppModel: ObservableObject {
     }
 
     func focus(block: String) {
-        guard block != focusedBlock else { return }
-        call("session.focus_block", ["session_id": sid, "block_id": .string(block)])
+        // Asked already (the pointer keeps moving over it): one call until the view says so.
+        guard block != focusedBlock, block != pendingFocus else { return }
+        pendingFocus = block
+        call("session.focus_block", ["session_id": sid, "block_id": .string(block)]) { [weak self] _ in
+            if self?.pendingFocus == block { self?.pendingFocus = nil }
+        }
     }
+    private var pendingFocus: String?
 
     func toggleZoom() {
         guard let b = focusedBlock else { return }
@@ -1461,4 +1554,12 @@ final class AppModel: ObservableObject {
             blocks[b]?.sizeOwner = clientID
         }
     }
+}
+
+/// A counter both the main thread and the vt queue read.
+final class FindTicket: @unchecked Sendable {
+    private let lock = NSLock()
+    private var n = 0
+    func set(_ v: Int) { lock.lock(); n = v; lock.unlock() }
+    func get() -> Int { lock.lock(); defer { lock.unlock() }; return n }
 }

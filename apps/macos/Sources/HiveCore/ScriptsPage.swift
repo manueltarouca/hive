@@ -37,11 +37,11 @@ public struct ScriptInfo: Equatable, Sendable, Identifiable {
     /// Its state in plain words.
     public var stateText: String {
         switch state {
-        case "running": return watching ? "Running, watch only" : "Running"
-        case "pending": return "Waiting for your OK"
+        case "running": return watching ? "Watching only" : "Running"
+        case "pending": return "Needs your OK"
         case "disabled": return "Turned off"
-        case "stopped": return "Stopped by itself"
-        case "quarantined": return "Paused: it ran too long too often"
+        case "stopped": return "Ended on its own"
+        case "quarantined": return "Paused after running too long, too often"
         case "failed": return error.isEmpty ? "Failed" : "Failed: " + (error.split(separator: "\n").first.map(String.init) ?? "")
         default: return state.capitalized
         }
@@ -56,7 +56,7 @@ public struct ScriptInfo: Equatable, Sendable, Identifiable {
     /// One line, when it asks for both: it can read and type.
     public var warning: String? {
         let p = Set(state == "pending" ? asks : permissions)
-        return p.contains("screen") && p.contains("input") ? "It can read your terminals and type into them, agents included." : nil
+        return p.contains("screen") && p.contains("input") ? "Can read your terminals and type into them, agents included." : nil
     }
 
     /// Permissions in plain words; read is every script's and goes unsaid.
@@ -139,12 +139,12 @@ public struct ActivityEntry: Equatable, Sendable, Identifiable {
         }
         let fromNote = principal.hasSuffix("(notification button)") ? " from a notification" : ""
         switch method {
-        case "script.grant": return "You allowed it" + fromNote
-        case "script.revoke": return "You took its permissions back" + fromNote
-        case "script.enable": return "You turned it on" + fromNote
-        case "script.disable": return "You turned it off" + fromNote
+        case "script.grant": return "You allowed the script" + fromNote
+        case "script.revoke": return "You took back its permissions" + fromNote
+        case "script.enable": return "You turned the script on" + fromNote
+        case "script.disable": return "You turned the script off" + fromNote
         case "script.set_mode":
-            return (summary.hasSuffix("watch") ? "You set it to watch only" : "You let it act again") + fromNote
+            return (summary.hasSuffix("watch") ? "You set the script to watch only" : "You let the script act again") + fromNote
         case "script.set_option":
             // "key = value"
             let parts = summary.components(separatedBy: " = ")
@@ -161,9 +161,9 @@ public struct ActivityEntry: Equatable, Sendable, Identifiable {
     public var problem: String? {
         switch result {
         case "ok", "": return nil
-        case "watching": return "Refused: watch only"
-        case "conflict": return "Not sent: it had moved on"
-        case "permission_denied": return "Refused: not allowed"
+        case "watching": return "Refused: the script can only watch"
+        case "conflict": return "Not sent: the pane had changed"
+        case "permission_denied": return "Refused: the script isn’t allowed to"
         default: return "Failed: " + result.replacingOccurrences(of: "_", with: " ")
         }
     }

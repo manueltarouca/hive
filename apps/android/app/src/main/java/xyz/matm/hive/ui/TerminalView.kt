@@ -286,6 +286,7 @@ class TerminalView(context: Context) : View(context) {
             }
         }
         canvas.restore()
+        drawFound(canvas, f)
         lit?.let { drawLit(canvas, it) }
         selection?.let { drawSelection(canvas, it) }
         // In the Mac's size, below its last row: the pane ends here.
@@ -293,6 +294,19 @@ class TerminalView(context: Context) : View(context) {
         if (!fitted && end < height - 24 * density) {
             canvas.drawLine(0f, end, width.toFloat(), end, edge)
             canvas.drawText("The pane ends here", width / 2f, end + (height - end) / 2, hint)
+        }
+    }
+
+    /** Find: matches in a soft yellow, the current one in honey with a line under it. */
+    private fun drawFound(canvas: Canvas, f: xyz.matm.hive.vt.Frame) {
+        for (m in f.found) {
+            val (r, c, n, cur) = m.toList()
+            fill.color = if (cur == 1) 0x88F2A93B.toInt() else 0x55F0C674
+            canvas.drawRect(sx(c), sy(r), sx(c + n), sy(r + 1), fill)
+            if (cur == 1) {
+                fill.color = handleColor
+                canvas.drawRect(sx(c), sy(r + 1) - 1.5f * density, sx(c + n), sy(r + 1), fill)
+            }
         }
     }
 

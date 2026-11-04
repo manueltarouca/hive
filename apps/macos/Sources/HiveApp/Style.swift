@@ -55,8 +55,10 @@ struct Style: Equatable {
                 RGB(0x46, 0x7E, 0xC4), RGB(0x9C, 0x67, 0xBA), RGB(0x37, 0x99, 0x9F), RGB(0xB5, 0xAD, 0xA0),
             ]))
 
+    /// dim-panes as a factor: light 1, more stronger, off none.
+    var dim: CGFloat = 1
     /// How strongly unfocused panes are tinted toward cardUnfocused.
-    var unfocusedTint: CGFloat { dark ? 0.35 : 0.30 }
+    var unfocusedTint: CGFloat { (dark ? 0.35 : 0.30) * dim }
 
     /// The color an unfocused pane ends up: the terminal background tinted
     /// exactly as the renderer does it, so card padding and terminal match.
@@ -81,4 +83,11 @@ struct Style: Equatable {
 
 extension NSColor {
     var swiftUI: Color { Color(nsColor: self) }
+
+}
+
+extension Style {
+    /// The factor for a dim-panes value.
+    /// "more" stays readable: unfocused text keeps WCAG AA contrast in both themes.
+    static func dim(_ v: String) -> CGFloat { v == "off" ? 0 : v == "more" ? 1.4 : 1 }
 }

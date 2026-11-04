@@ -17,6 +17,24 @@ patch, and this file lists it under "Changed" or "Removed".
   title bar and in the sidebar, and move with a short spring when they open,
   close or change places. The `motion` setting picks `snappy` (the default),
   `natural` or `off`; Reduce Motion always moves them at once.
+- Find in a pane: ⌘F on the Mac (Edit → Find…), and **⋯ → find** on the
+  phone and tablet. Matches in the scrollback are counted and marked, the
+  latest is current, ⌘G and ⇧⌘G (or the arrows) step through them, and the
+  marks follow new output.
+- Pane focus on the Mac: the honey edge glides to the pane you focus, the
+  others dim (`dim-panes`: `light`, `more`, `off`), splits even out when
+  the app opens or closes a pane (`balance-splits`; the server method
+  `session.balance_window`, and `balance` on `session.new_split`), and
+  `focus-follows-pointer` focuses the pane under the pointer.
+- A new Settings window on the Mac: a sidebar of pages (Server, Appearance,
+  Terminal, Panes, Notifications, Agents and Scripts, Hosts, Shortcuts,
+  Advanced), back and forward, and search that finds a setting by what it
+  does. The font shows in a small terminal and the theme as tiles; Claude
+  Code's hooks connect from the Agents page; Server shows how long the
+  server has run and turns on the tailnet listener.
+- The menu bar menu is shorter: the server and how long it has run (click
+  it for Settings), the agents that need you, how many are working, and the
+  app's and the server's versions with a button that copies both.
 - Closing a tab, or its last pane, asks first when a program other than the
   shell runs in it, and names it. The `confirm-close` setting picks
   `running` (the default), `always` or `never`; "Don't ask again" sets it
@@ -134,6 +152,9 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ### Changed
 
+- Scripts' wording on the Mac and the phone says what a script does
+  instead of "it": "Needs your OK", "Watching only", "Refused: the script
+  can only watch", "Not sent: the pane had changed".
 - The Mac sidebar is lighter: it shares the window's background with no
   dividing line, the tab in front has no outline, and titles use lighter
   weights. A tab's ⌘ number moved to its tooltip.
