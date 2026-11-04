@@ -1097,13 +1097,13 @@ def step_progress(srv):
     srv.hive("new", "prog", "--cwd", "/tmp")
     sid = srv.view("prog")["session_id"]
     srv.call("session.new_window", {"session_id": sid, "layout": {"cwd": "/tmp", "command": ["sh", "-c",
-        "printf '\\033]9;4;1;50\\033\\\\'; echo building; sleep 8; printf '\\033]9;4;0;0\\033\\\\'; exec cat"]}})
+        "printf '\\033]9;4;1;50\\033\\\\'; echo building; sleep 25; printf '\\033]9;4;0;0\\033\\\\'; exec cat"]}})
     open_switcher()
     tap("prog", exact=True)
     streaming()
     wait("50 percent", timeout=10)
     shot("progress-ring")
-    wait("50 percent", gone=True, timeout=15)
+    wait("50 percent", gone=True, timeout=40)
 
 
 def step_find(srv):
@@ -1475,7 +1475,7 @@ def step_away(srv):
     shot("back")
 
 
-STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_keys, step_select, step_files, step_find, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
+STEPS = [step_add_host, step_add_host_problem, step_switcher, step_type, step_paste, step_fit, step_two_devices, step_tabs, step_agent, step_stopped, step_notify, step_scripts, step_script_page, step_keys, step_select, step_files, step_find, step_progress, step_previews, step_settings, step_leave, step_code, step_hosts, step_pins, step_away]
 
 
 def main():

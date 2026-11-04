@@ -41,9 +41,9 @@ android {
             val m = Regex("""^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z]+\.(\d+))?""").find(v) ?: error("HIVE_VERSION: not a version: $v")
             val (a, b, c, rc) = m.destructured
             a.toInt() * 1_000_000 + b.toInt() * 10_000 + c.toInt() * 100 + (if (rc.isEmpty()) 99 else rc.toInt().coerceAtMost(98))
-        } ?: 10
+        } ?: 11
         // A release build takes the release's version (HIVE_VERSION, set by CI).
-        versionName = System.getenv("HIVE_VERSION") ?: "0.1.9"
+        versionName = System.getenv("HIVE_VERSION") ?: "0.1.10"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += listOf("-DHIVE_ROOT=${root.absolutePath}", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON") }
