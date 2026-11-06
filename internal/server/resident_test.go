@@ -57,7 +57,8 @@ func (h *residentHarness) script(name string) script.Resident {
 
 func (h *residentHarness) until(what string, cond func() bool) {
 	h.t.Helper()
-	for deadline := time.Now().Add(8 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+	// Generous: a script's start (bundle, runtime, setup) is slow on a loaded CI runner.
+	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
 		if cond() {
 			return
 		}

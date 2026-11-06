@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // procArgs reads a live process's arguments from kern.procargs2, empty
@@ -17,10 +18,12 @@ func TestProcArgs(t *testing.T) {
 	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
 	want := []string{"sleep", "30", ""}
 	var got []string
-	waitFor(t, "arguments readable", func() bool {
-		got = procArgs(cmd.Process.Pid)
-		return reflect.DeepEqual(got, want)
-	})
+	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if got = procArgs(cmd.Process.Pid); reflect.DeepEqual(got, want) {
+			return
+		}
+	}
+	t.Fatalf("procArgs = %q, want %q", got, want)
 }
 
 // A hook finds the agent it runs for past the shells between them.

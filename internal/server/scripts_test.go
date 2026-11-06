@@ -415,15 +415,24 @@ h.on("session_label_changed", async (ctx: any, ev: any) => {
 		if err != nil {
 			t.Fatal(err)
 		}
-		r := h.call("script.run", map[string]any{"code": js, "allow": []string{"control"}, "session_id": sid, "for": 1.5})
+		r := h.call("script.run", map[string]any{"code": js, "allow": []string{"control"}, "session_id": sid, "for": 30})
 		return r["run_id"].(string)
 	}
 	a, b := pingpong("a"), pingpong("b")
 	h.call("session.set_label", map[string]any{"session_id": sid, "label": "go"})
-	for _, id := range []string{a, b} {
-		h.call("script.result", map[string]any{"run_id": id, "timeout": 10})
+	// Wait for the chain, not a fixed time: a slow machine gets there later.
+	var label string
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		if label = h.call("session.view", map[string]any{"session_id": sid})["label"].(string); label == "a7" || label == "b7" {
+			break
+		}
 	}
-	label := h.call("session.view", map[string]any{"session_id": sid})["label"].(string)
+	// Past depth 7 nothing more happens, however long the scripts keep running.
+	time.Sleep(300 * time.Millisecond)
+	label = h.call("session.view", map[string]any{"session_id": sid})["label"].(string)
+	for _, id := range []string{a, b} {
+		h.call("script.stop", map[string]any{"run_id": id})
+	}
 	if label != "a7" && label != "b7" {
 		t.Fatalf("the chain ended at %q, want depth 7", label)
 	}
