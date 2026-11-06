@@ -63,6 +63,16 @@ func (h *residentHarness) until(what string, cond func() bool) {
 			return
 		}
 	}
+	// Say why: each script's state and log, which a CI run otherwise loses.
+	raw, _ := json.Marshal(h.call("script.list", nil))
+	h.t.Logf("scripts: %s", raw)
+	var out struct {
+		Scripts []struct{ Name string } `json:"scripts"`
+	}
+	_ = json.Unmarshal(raw, &out)
+	for _, sc := range out.Scripts {
+		h.t.Logf("%s log:\n%s", sc.Name, h.logs(sc.Name))
+	}
 	h.t.Fatalf("timed out: %s", what)
 }
 
