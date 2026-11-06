@@ -20,6 +20,8 @@ final class Reorder: ObservableObject {
     @Published private(set) var offset: CGFloat = 0
     /// The place it would land, in the shown order.
     @Published private(set) var target: Int?
+    /// Pulled off the row: it's being torn into its own window (TearDrag shows it under the pointer).
+    @Published private(set) var tearing: String?
     private var from = 0
     /// Each tab's extent along the axis, from the last layout at rest: start and length.
     var frames: [String: (start: CGFloat, length: CGFloat)] = [:]
@@ -39,7 +41,28 @@ final class Reorder: ObservableObject {
     static var live: [String: Reorder] = [:]
     #endif
 
-    var atRest: Bool { dragging == nil && settling == nil }
+    var atRest: Bool { dragging == nil && settling == nil && tearing == nil }
+
+    /// The dragged tab left its row: it springs back into its place and the drag goes on as a tear.
+    func startTear(_ id: String) {
+        guard dragging == id else { return }
+        tearing = id
+        withAnimation(Reorder.spring) {
+            target = nil
+            dragging = nil
+            settling = id
+            offset = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            if self?.settling == id { self?.settling = nil }
+        }
+    }
+
+    /// The tear is over (dropped or cancelled).
+    func endTear() {
+        tearing = nil
+        if let m = escape { NSEvent.removeMonitor(m); escape = nil }
+    }
 
     func begin(_ id: String, order: [String]) {
         guard dragging == nil, !cancelled, let i = order.firstIndex(of: id) else { return }
@@ -50,9 +73,14 @@ final class Reorder: ObservableObject {
         target = i
         // Escape puts it back, as in Finder and Safari.
         escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
-            guard e.keyCode == 53, let self, self.dragging != nil else { return e }
+            guard e.keyCode == 53, let self, self.dragging != nil || self.tearing != nil else { return e }
             self.cancelled = true
-            self.cancel()
+            if self.tearing != nil {
+                self.endTear()
+                TearDrag.shared.drop(commit: false)
+            } else {
+                self.cancel()
+            }
             return nil
         }
     }
@@ -106,6 +134,11 @@ final class Reorder: ObservableObject {
     func gestureEnded() {
         cancelled = false
         if dragging != nil { cancel() }
+        // The system took the gesture mid-tear: nothing tears off.
+        if tearing != nil {
+            endTear()
+            MainActor.assumeIsolated { TearDrag.shared.drop(commit: false) }
+        }
     }
 
     private func settle(_ id: String) {
@@ -136,8 +169,10 @@ private struct FrameKey: PreferenceKey {
 extension View {
     /// One tab in a reorderable row or column: reports where it is, moves aside for the dragged one,
     /// and follows the pointer while it is the one dragged. [commit]: where it landed, in the shown order.
-    func reorderable(_ id: String, in r: Reorder, order: @escaping () -> [String], space: String, commit: @escaping (String, Int) -> Void) -> some View {
-        modifier(ReorderItem(id: id, r: r, order: order, space: space, commit: commit))
+    /// [canTear]: whether pulling it off the row tears it into its own window.
+    func reorderable(_ id: String, in r: Reorder, order: @escaping () -> [String], space: String,
+                     canTear: @escaping () -> Bool = { false }, commit: @escaping (String, Int) -> Void) -> some View {
+        modifier(ReorderItem(id: id, r: r, order: order, space: space, canTear: canTear, commit: commit))
     }
 
     /// Collects the tabs' places for a Reorder (on the row or column that holds them). [order]: the
@@ -164,6 +199,7 @@ private struct ReorderItem: ViewModifier {
     @ObservedObject var r: Reorder
     let order: () -> [String]
     let space: String
+    let canTear: () -> Bool
     let commit: (String, Int) -> Void
     /// Pressed: false again however the gesture ends, the system cancelling it included (onEnded isn't called then).
     @GestureState private var pressed = false
@@ -187,12 +223,26 @@ private struct ReorderItem: ViewModifier {
                 DragGesture(minimumDistance: 5, coordinateSpace: .named(space))
                     .updating($pressed) { _, s, _ in s = true }
                     .onChanged { v in
-                        if r.dragging == nil { r.begin(id, order: order()) }
+                        if r.tearing == id { TearDrag.shared.move(); return }
+                        if r.dragging == nil, r.tearing == nil { r.begin(id, order: order()) }
                         guard r.dragging == id else { return }
+                        let across = r.horizontal ? v.translation.height : v.translation.width
+                        if TearOff.tears(across: across, horizontalRow: r.horizontal), canTear() {
+                            r.startTear(id)
+                            TearDrag.shared.begin(id)
+                            return
+                        }
                         r.move(by: r.horizontal ? v.translation.width : v.translation.height)
                     }
-                    .onEnded { _ in
-                        if r.dragging == id { r.finish(commit: commit) }
+                    .onEnded { v in
+                        if r.tearing == id {
+                            // Let go back over the row: it stays where it is.
+                            let across = r.horizontal ? v.translation.height : v.translation.width
+                            r.endTear()
+                            TearDrag.shared.drop(commit: TearOff.tears(across: across, horizontalRow: r.horizontal))
+                        } else if r.dragging == id {
+                            r.finish(commit: commit)
+                        }
                     }
             )
             .onChange(of: pressed) { _, now in if !now { r.gestureEnded() } }

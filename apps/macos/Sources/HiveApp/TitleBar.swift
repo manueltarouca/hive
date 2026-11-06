@@ -145,8 +145,9 @@ struct Tabs: View {
         HStack(spacing: 4) {
             // Pinned tabs first, as on the phone. Drag one to reorder: the others make room where it will land.
             ForEach(model.shownWindows, id: \.window.id) { t in
-                TabPill(model: model, window: t.window, index: t.index, active: t.window.id == model.active?.id, dragged: reorder.dragging == t.window.id)
-                    .reorderable(t.window.id, in: reorder, order: { model.shownWindows.map(\.window.id) }, space: "bar-tabs") { id, to in
+                TabPill(model: model, window: t.window, index: t.index, active: t.window.id == model.mainTab?.id, dragged: reorder.dragging == t.window.id)
+                    .reorderable(t.window.id, in: reorder, order: { model.shownWindows.map(\.window.id) }, space: "bar-tabs",
+                                 canTear: { model.canTearOff(t.window.id) }) { id, to in
                         model.moveShown(id, to: to)
                     }
                     .transition(TabMotion.transition(anchor: .leading))
@@ -177,6 +178,7 @@ struct TabPill: View {
         let s = model.style
         let parts = window.titleParts(model.blocks)
         let status = model.status(of: window)
+        let torn = model.isTorn(window.id)
         HStack(spacing: 7) {
             if window.pinned {
                 Image(systemName: "pin.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(s.accent.swiftUI)
@@ -202,8 +204,10 @@ struct TabPill: View {
             if let p = model.progress(of: window), !hover, status != "blocked", status != "stopped" { ProgressRing(state: p.state, value: p.value, style: s) }
             if let status, !hover { StatusBadge(state: status == "blocked" || status == "stopped" ? "blocked-dot" : status, style: s) }
         }
-        // Under the close button the name fades out, so nothing shifts.
-        .mask(TrailingFade(width: hover && !dragged ? 34 : 0))
+        // In its own window: it stays in its place, faded, with the way back.
+        .opacity(torn ? 0.45 : 1)
+        // Under the close (or return) button the name fades out, so nothing shifts.
+        .mask(TrailingFade(width: (hover || torn) && !dragged ? 34 : 0))
         .padding(.leading, 6).padding(.trailing, 10)
         .frame(minWidth: TabPill.minWidth, maxWidth: 210, minHeight: 28, maxHeight: 28, alignment: .leading)
         .background(
@@ -216,9 +220,18 @@ struct TabPill: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(dragged ? s.accent.swiftUI.opacity(0.8) : .clear, lineWidth: 1.5)
         )
+        .overlay(
+            // In its own window: an empty place, outlined, holding the way back.
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(torn && !dragged ? s.text.swiftUI.opacity(0.16) : .clear, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+        )
         // Pointing at a tab shows its close button over the end of the name.
         .overlay(alignment: .trailing) {
-            if hover && !dragged {
+            if torn && !dragged {
+                TabReturnButton(style: s) { model.bringBack(window.id) }
+                    .padding(.trailing, 5)
+                    .transition(.opacity)
+            } else if hover && !dragged {
                 TabCloseButton(style: s) { model.closeTab(window) }
                     .padding(.trailing, 5)
                     .transition(.opacity)
@@ -233,8 +246,13 @@ struct TabPill: View {
             Button(window.pinned ? "Unpin Tab" : "Pin Tab") { model.pinTab(window, !window.pinned) }
             Button("Move Tab Left") { model.moveTab(window.id, by: -1) }
             Button("Move Tab Right") { model.moveTab(window.id, by: 1) }
+            Divider()
+            TearOffMenuItem(model: model, window: window)
         }
         .accessibilityAction(named: "Close Tab") { model.closeTab(window) }
+        .accessibilityAction(named: torn ? "Return to Main Window" : "Move Tab to New Window") {
+            torn ? model.bringBack(window.id) : model.tearOff(window.id)
+        }
         .accessibilityAction(named: "Move Tab Left") { model.moveTab(window.id, by: -1) }
         .accessibilityAction(named: "Move Tab Right") { model.moveTab(window.id, by: 1) }
         .help("Tab \(index + 1) (⌘\(index + 1))")
@@ -284,6 +302,40 @@ struct TabCloseButton: View {
         .onHover { hover = $0 }
         .help("Close Tab")
         .accessibilityLabel("Close Tab")
+    }
+}
+
+/// A torn tab's way back to the main window, where the close button goes.
+struct TabReturnButton: View {
+    let style: Style
+    let action: () -> Void
+    @State private var hover = false
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.uturn.backward").font(.system(size: 8.5, weight: .bold))
+                .foregroundStyle(style.text.swiftUI.opacity(hover ? 0.95 : 0.7))
+                .frame(width: 16, height: 16)
+                .background(Circle().fill(style.text.swiftUI.opacity(hover ? 0.16 : 0.08)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help("Return to Main Window")
+        .accessibilityLabel("Return to Main Window")
+    }
+}
+
+/// "Move Tab to New Window", or "Return to Main Window" for a torn tab.
+struct TearOffMenuItem: View {
+    @ObservedObject var model: AppModel
+    let window: WindowInfo
+    var body: some View {
+        if model.isTorn(window.id) {
+            Button("Return to Main Window") { model.bringBack(window.id) }
+        } else {
+            Button("Move Tab to New Window") { model.tearOff(window.id) }
+                .disabled(!model.canTearOff(window.id))
+        }
     }
 }
 

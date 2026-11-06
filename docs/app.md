@@ -110,6 +110,26 @@ says which session.
 
 See [Agents](./agents) for how agents report their state.
 
+## Tabs in their own window
+
+Drag a tab down out of the title bar, or sideways out of the sidebar, and
+let go: it opens in its own window there. While you drag, a small picture
+of the tab follows the pointer. Let go over the tabs, or press Escape, and
+nothing changes. **Move Tab to New Window** (the Window menu, the palette, a
+tab's menu) does the same from the keyboard.
+
+The tab keeps its place in the main window, faded and outlined, with a
+return arrow. Click it to bring its window to the front. The arrow, the
+window's own return arrow, **Return Tab to Main Window** and the window's
+close button all put the tab back. None of them close the tab.
+
+Keys, the palette and the pane menus work in the window you're typing in.
+Focusing a pane there doesn't change the main window's tab, nor the tab
+other devices show. hive reopens these windows where you left them when it
+starts. They belong to the session in the main window: switching to
+another session or host puts them back. The last tab in the main window
+can't move out.
+
 ## The menu bar
 
 hive's three cells sit in the menu bar. The top cell fills while agents are

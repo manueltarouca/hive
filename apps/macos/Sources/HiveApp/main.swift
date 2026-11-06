@@ -52,6 +52,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     var window: NSWindow!
     var root: RootView!
     var panes: PanesView!
+    /// Tabs in their own windows, by window id.
+    var tornWindows: [String: TornWindow] = [:]
+    /// Every panes view: the main window's and the torn windows'.
+    var allPanes: [PanesView] { [panes] + tornWindows.values.map(\.panes) }
+    /// The window with panes that has the keyboard (a torn one), else the main window.
+    var paneWindow: NSWindow { model.scope.flatMap { tornWindows[$0]?.window } ?? window }
+    var keyPanes: PanesView { model.scope.flatMap { tornWindows[$0]?.panes } ?? panes }
     var renderer: Renderer!
     let palette = PalettePanel()
     let shortcuts = ShortcutsPanel()
@@ -126,13 +133,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         // From the menu bar hive isn't in front: bring it, with the window asked for.
         menuBar.showSettings = { [weak self] in NSApp.activate(); self?.showSettings() }
         menuBar.showShareHosts = { [weak self] in NSApp.activate(); self?.showShareHosts() }
-        model.windowOpen = { [weak self] in !NSApp.isHidden && (self?.window.isVisible ?? false) }
-        model.windowShown = { [weak self] in self?.window.occlusionState.contains(.visible) ?? false }
+        model.mainOpen = { [weak self] in !NSApp.isHidden && (self?.window.isVisible ?? false) }
+        model.tornOpen = { [weak self] id in
+            guard !NSApp.isHidden, let w = self?.tornWindows[id]?.window else { return false }
+            return w.isVisible && !w.isMiniaturized
+        }
+        model.windowOpen = { [weak self] in
+            guard let self else { return false }
+            return self.model.mainOpen() || self.tornWindows.keys.contains { self.model.tornOpen($0) }
+        }
+        model.windowShown = { [weak self] in
+            guard let self else { return false }
+            return ([self.window] + self.tornWindows.values.map(\.window)).contains { $0.occlusionState.contains(.visible) }
+        }
+        model.onTornChanged = { [weak self] in self?.syncTornWindows() }
+        TearDrag.shared.model = model
+        TearDrag.shared.renderer = renderer
+        TearDrag.shared.paneArea = { [weak self] in self?.panes.bounds.size ?? CGSize(width: 900, height: 560) }
+        model.showTornWindow = { [weak self] id in
+            NSApp.activate()
+            self?.tornWindows[id]?.show(activate: true)
+        }
+        model.showMainWindow = { [weak self] in self?.showMainWindow() }
         UNUserNotificationCenter.current().delegate = self
 
-        model.onFrame = { [weak self] block in self?.panes.redraw(block) }
+        model.onFrame = { [weak self] block in self?.allPanes.forEach { $0.redraw(block) } }
         model.openSettings = { [weak self] in self?.showSettings() }
-        model.onFlash = { [weak self] block in self?.panes.card(block)?.flash() }
+        model.onFlash = { [weak self] block in self?.allPanes.lazy.compactMap { $0.card(block) }.first?.flash() }
         // font-family and font-size apply live; a burst of changes (the size
         // stepper) swaps the font and re-sizes the panes once.
         model.settingsStore.$settings
@@ -168,13 +195,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             .store(in: &bag)
         model.contextActions = { [weak self] in self?.paneContextActions() ?? [] }
         model.onLayout = { [weak self] in
-            self?.panes.sync()
-            self?.panes.claimSizes()  // not interactive: a reload doesn't take another device's panes
+            for p in self?.allPanes ?? [] {
+                p.sync()
+                p.claimSizes()  // not interactive: a reload doesn't take another device's panes
+            }
         }
         // Only when another device holds a pane on screen: otherwise there's nothing to take back.
         model.onUserInput = { [weak self] in
-            guard let self, self.model.visibleBlocks.contains(where: { self.model.heldElsewhere($0.0) }) else { return }
-            self.panes.claimSizes(interactive: true)
+            guard let self, self.model.visibleBlocks(in: self.model.active).contains(where: { self.model.heldElsewhere($0.0) }) else { return }
+            self.keyPanes.claimSizes(interactive: true)
         }
         model.$style.sink { [weak self] s in self?.applyStyle(s) }.store(in: &bag)
         model.$sidebar.dropFirst().sink { [weak self] _ in
@@ -201,7 +230,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         DistributedNotificationCenter.default().publisher(for: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String))
             .receive(on: DispatchQueue.main).sink { [weak self] _ in self?.buildMenu() }.store(in: &bag)
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
-            guard let self, e.window === self.window, !self.model.keys.isEmpty, let c = KeyChord(event: e) else { return e }
+            guard let self, e.window === self.window || self.tornWindows.values.contains(where: { $0.window === e.window }),
+                  !self.model.keys.isEmpty, let c = KeyChord(event: e) else { return e }
             return self.model.handleKey(c) ? nil : e
         }
         followSystemAppearance()
@@ -250,6 +280,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 // A tab as if the pointer were on it (hover:N, N from 0), and closing the tab in front.
                 if what.hasPrefix("hover:"), let i = Int(what.dropFirst("hover:".count)) { self?.model.shotHover = i }
                 if what == "closetab" { self?.model.closeTab() }
+                // A tab in its own window (tear:N, N from 0 as shown), smaller than the main one so
+                // the overlay capture (the smallest window) is it; or its drag card held over the bar (tearcard:N).
+                if what.hasPrefix("tear:"), let self, let i = Int(what.dropFirst("tear:".count)), self.model.shownWindows.indices.contains(i) {
+                    let f = self.window.frame
+                    self.model.tearOff(self.model.shownWindows[i].window.id,
+                                       frame: NSRect(x: f.minX + 180, y: f.minY + 60, width: 900, height: 560))
+                }
+                // Torn off, then back a moment later (tearreturn:N): the main window shows it again.
+                if what.hasPrefix("tearreturn:"), let self, let i = Int(what.dropFirst("tearreturn:".count)), self.model.shownWindows.indices.contains(i) {
+                    let id = self.model.shownWindows[i].window.id
+                    self.model.tearOff(id)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.model.bringBack(id) }
+                }
+                #if DEBUG
+                if what.hasPrefix("tearcard:"), let self, let i = Int(what.dropFirst("tearcard:".count)), self.model.shownWindows.indices.contains(i) {
+                    let f = self.window.frame
+                    TearDrag.shared.showForShot(self.model.shownWindows[i].window.id, at: CGPoint(x: f.minX + 520, y: f.maxY - 140))
+                }
+                #endif
                 // A key pressed through the keymap (press:ctrl+a), for key hints.
                 if what.hasPrefix("press:"), let c = KeyChord.parse(String(what.dropFirst("press:".count)))?.first { _ = self?.model.handleKey(c) }
                 // Find open with a query typed (find:FAIL).
@@ -382,9 +431,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         // s, not model.style: @Published sends before the property changes,
         // so model.style still holds the old theme here.
         panes.restyle(s)
+        for t in tornWindows.values { t.apply(s) }
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
+        model.scope = nil
         model.markSeen()
         panes.claimSizes(interactive: true)  // back to this window: its panes are yours again
         panes.sync()
@@ -398,6 +449,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         if NSApp.isHidden || !window.isVisible { showMainWindow() }
         return true
+    }
+
+    /// Opens a window for each torn tab and closes those brought back.
+    func syncTornWindows() {
+        for (id, t) in tornWindows where !model.torn.contains(id) {
+            t.close()
+            tornWindows[id] = nil
+        }
+        for id in model.torn where tornWindows[id] == nil {
+            // A saved place on a display that's gone: beside the main window instead.
+            let saved = model.tornFrames[id].map(NSRectFromString)
+                .flatMap { f in f.isEmpty || !NSScreen.screens.contains { $0.visibleFrame.intersects(f) } ? nil : f }
+            let t = TornWindow(id: id, model: model, renderer: renderer, frame: saved ?? defaultTornFrame())
+            tornWindows[id] = t
+            // Torn off just now: it takes the keyboard. Reopened at launch: behind, as it was.
+            t.show(activate: model.tearingNow == id, below: model.tearingNow == id ? nil : window)
+        }
+        model.tearingNow = nil
+        // Their panes stream now that their windows are open.
+        model.attachVisible()
+    }
+
+    /// Beside the main window, its pane area's size.
+    private func defaultTornFrame() -> NSRect {
+        let screen = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let size = NSSize(width: max(560, min(panes.bounds.width, 1100)), height: max(380, min(panes.bounds.height + TitleBar.height, 760)))
+        let n = CGFloat(tornWindows.count)
+        let p = CGPoint(x: window.frame.minX + 60 + 28 * n, y: window.frame.maxY - 60 - 28 * n)
+        return TearOff.windowFrame(dropAt: CGPoint(x: p.x + 120, y: p.y - 19), size: size, screen: screen)
     }
 
     func showMainWindow() {
@@ -443,7 +523,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let host = info["host"] as? String
         await MainActor.run {
             if let a = self.model.agents.first(where: { $0.blockID == block && (host == nil || $0.host == host) }) { self.model.jump(to: a) }
-            self.showMainWindow()
+            // In a torn tab, jump brought its window forward.
+            if !(self.model.tab(of: block).map { self.model.isTorn($0.id) } ?? false) { self.showMainWindow() }
         }
     }
 
@@ -453,7 +534,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
 
     func showPalette(query: String = "") {
         for h in model.hosts where h.connected { model.reloadActions(h) }
-        palette.show(over: window, width: 460, placeholder: "Search commands…", style: model.style, query: query) { [weak self] q in
+        palette.show(over: paneWindow, width: 460, placeholder: "Search commands…", style: model.style, query: query) { [weak self] q in
             (self?.commands() ?? []).filter { fuzzy($0.title, q) }
         }
     }
@@ -509,7 +590,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }, onCreate: { [weak self] name in self?.model.newSession(label: name) })
     }
 
-    func toggleShortcuts() { shortcuts.toggle(over: window, style: model.style) }
+    func toggleShortcuts() { shortcuts.toggle(over: paneWindow, style: model.style) }
 
     func showSettings() { settingsWindow.show(model: model) }
     func showScripts(_ h: HostConnection? = nil, _ script: String? = nil) { scriptsWindow.show(model: model, host: h, script: script) }
@@ -520,7 +601,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let fonts = FontSet(family: s.fontFamily, pointSize: s.fontSize, scale: window.backingScaleFactor)
         model.settingsStore.fontProblem = fonts.problem
         renderer.setFonts(fonts)
-        panes.fontChanged()
+        for p in allPanes { p.fontChanged() }
         #if DEBUG
         NSLog("hive font: %@ %.1f -> cell %dx%d", s.fontFamily.isEmpty ? "bundled" : s.fontFamily, s.fontSize,
               renderer.fonts.cellWidth, renderer.fonts.cellHeight)
@@ -581,6 +662,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             PaletteItem(title: "Previous Tab", detail: k("Previous Tab"), symbol: "arrow.left") { m.selectWindow(offset: -1) },
             PaletteItem(title: "Move Tab Left", detail: "", symbol: "arrow.left.to.line") { if let w = m.active { m.moveTab(w.id, by: -1) } },
             PaletteItem(title: "Move Tab Right", detail: "", symbol: "arrow.right.to.line") { if let w = m.active { m.moveTab(w.id, by: 1) } },
+        ] + (m.scope.map { id in
+            [PaletteItem(title: "Return Tab to Main Window", detail: "", symbol: "arrow.uturn.backward") { m.bringBack(id) }]
+        } ?? (m.active.map { w in m.canTearOff(w.id) } == true ? [
+            PaletteItem(title: "Move Tab to New Window", detail: "", symbol: "macwindow.badge.plus") { if let w = m.active { m.tearOff(w.id) } },
+        ] : [])) + [
             PaletteItem(title: "Rename Session…", detail: m.sessionLabel, symbol: "pencil") { [weak self] in self?.prompt("Rename session", m.sessionLabel) { m.renameSession($0) } },
             PaletteItem(title: "Rename Tab…", detail: m.active?.label ?? "", symbol: "pencil") { [weak self] in self?.prompt("Rename tab", m.active?.label ?? "") { m.renameTab($0) } },
             PaletteItem(title: "Add Remote Host…", symbol: "globe") { [weak self] in DispatchQueue.main.async { self?.showAddHost() } },
@@ -721,7 +807,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     }
 
     private func split(_ horizontal: Bool) {
-        let s = panes.splitSize(horizontal: horizontal)
+        let s = keyPanes.splitSize(horizontal: horizontal)
         model.split(horizontal: horizontal, cols: s?.0, rows: s?.1)
     }
 
@@ -853,6 +939,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             // Reordering without dragging (the keyboard, VoiceOver): one place along the order shown.
             item("Move Tab Left", "") { if let w = m.active { m.moveTab(w.id, by: -1) } },
             item("Move Tab Right", "") { if let w = m.active { m.moveTab(w.id, by: 1) } },
+            item("Move Tab to New Window", "") { if let w = m.active { m.tearOff(w.id) } },
+            item("Return Tab to Main Window", "") { if let id = m.scope { m.bringBack(id) } },
             .separator(),
         ]
         for i in 1...9 {

@@ -371,7 +371,8 @@ final class PaneView: MTKView, NSTextInputClient {
     // MARK: keyboard
 
     override func becomeFirstResponder() -> Bool {
-        model.focus(block: blockID)
+        // Only in the window with the keyboard: another window's layout sync isn't the user.
+        if window?.isKeyWindow ?? false { model.focus(block: blockID) }
         return true
     }
 
@@ -467,7 +468,8 @@ struct PaneHeader: View {
 
     var body: some View {
         let info = model.blocks[blockID]
-        let focused = model.focusedBlock == blockID
+        let own = model.tab(of: blockID)
+        let focused = own?.focused == blockID
         let parts: (primary: String, secondary: String) = info?.titleParts ?? ("shell", "")
         let s = model.style
         HStack(spacing: 7) {
@@ -511,7 +513,7 @@ struct PaneHeader: View {
                 HStack(spacing: 12) {
                     HeaderButton(symbol: "rectangle.split.2x1", help: "Split right (⌘D)") { model.split(horizontal: true) }
                     HeaderButton(symbol: "rectangle.split.1x2", help: "Split down (⇧⌘D)") { model.split(horizontal: false) }
-                    HeaderButton(symbol: model.active?.zoomed == true ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                    HeaderButton(symbol: own?.zoomed == true ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                                  help: "Zoom (⇧⌘↩)") { model.toggleZoom() }
                     HeaderButton(symbol: "xmark", help: "Close (⌘W)") { model.closePane() }
                 }
@@ -713,7 +715,7 @@ final class CardView: NSView {
             let hadKeyboard = window?.firstResponder is NSText && (window?.firstResponder as? NSView)?.isDescendant(of: bar) == true
             bar.removeFromSuperview()
             findBar = nil
-            if hadKeyboard || model.focusedBlock == pane.blockID { window?.makeFirstResponder(pane) }
+            if hadKeyboard || model.tab(of: pane.blockID)?.focused == pane.blockID { window?.makeFirstResponder(pane) }
         }
     }
 
@@ -751,10 +753,16 @@ final class PanesView: NSView {
     private let ring = CALayer()
     private var ringFor: String?
     private var ringWindow: String?
+    /// The torn tab this view shows in its own window; nil: the main window's tab.
+    let tab: String?
+    /// The tab on screen here.
+    var shown: WindowInfo? { tab.map { id in model.windows.first { $0.id == id } } ?? model.mainTab }
+    private var visible: [(String, CGRect)] { model.visibleBlocks(in: shown) }
 
-    init(model: AppModel, renderer: Renderer) {
+    init(model: AppModel, renderer: Renderer, tab: String? = nil) {
         self.model = model
         self.renderer = renderer
+        self.tab = tab
         super.init(frame: .zero)
         wantsLayer = true
         ring.borderWidth = 1
@@ -771,7 +779,7 @@ final class PanesView: NSView {
 
     /// Rebuilds cards for the visible blocks and lays them out.
     func sync() {
-        let visible = model.visibleBlocks
+        let visible = self.visible
         let ids = Set(visible.map(\.0))
         for (id, c) in cards where !ids.contains(id) {
             c.removeFromSuperview()
@@ -784,7 +792,7 @@ final class PanesView: NSView {
         }
         needsLayout = true
         layoutSubtreeIfNeeded()
-        let focused = model.focusedBlock
+        let focused = shown?.focused
         for (id, c) in cards {
             c.apply(style: model.style, focused: id == focused)
             c.pane.needsDisplay = true
@@ -798,7 +806,7 @@ final class PanesView: NSView {
     /// Applies a theme to every card. Takes the style explicitly: a caller
     /// reacting to model.$style runs before model.style changes.
     func restyle(_ s: Style) {
-        let focused = model.focusedBlock
+        let focused = shown?.focused
         for (id, c) in cards {
             c.apply(style: s, focused: id == focused)
             c.pane.needsDisplay = true
@@ -813,14 +821,14 @@ final class PanesView: NSView {
         guard let layer else { return }
         if ring.superlayer !== layer { layer.addSublayer(ring) }
         ring.borderColor = style.accent.withAlphaComponent(0.55).cgColor
-        guard let f = model.focusedBlock, let c = cards[f] else {
+        guard let f = shown?.focused, let c = cards[f] else {
             ring.isHidden = true
             ringFor = nil
             return
         }
         let target = c.frame
         // Only focus moving within one tab glides; another tab, a resize or a zoom moves it at once.
-        let gliding = ringFor != nil && ringFor != f && ringWindow == model.active?.id && !ring.isHidden
+        let gliding = ringFor != nil && ringFor != f && ringWindow == shown?.id && !ring.isHidden
         let from = ring.presentation()?.frame ?? ring.frame
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -828,7 +836,7 @@ final class PanesView: NSView {
         ring.frame = target
         CATransaction.commit()
         ringFor = f
-        ringWindow = model.active?.id
+        ringWindow = shown?.id
         guard gliding, from != target,
               let sp = model.settings.motion.spring(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) else {
             ring.removeAllAnimations()
@@ -851,7 +859,7 @@ final class PanesView: NSView {
         super.layout()
         let area = bounds.insetBy(dx: gap, dy: 0)
         let areaRect = NSRect(x: area.minX, y: 0, width: area.width, height: bounds.height - gap)
-        for (id, f) in model.visibleBlocks {
+        for (id, f) in visible {
             guard let c = cards[id] else { continue }
             var r = NSRect(x: areaRect.minX + f.minX * areaRect.width, y: areaRect.minY + f.minY * areaRect.height,
                            width: f.width * areaRect.width, height: f.height * areaRect.height)
@@ -886,7 +894,7 @@ final class PanesView: NSView {
 
     /// The size a new split of the focused pane will get.
     func splitSize(horizontal: Bool) -> (Int, Int)? {
-        guard let f = model.focusedBlock, let p = cards[f]?.pane else { return nil }
+        guard let f = shown?.focused, let p = cards[f]?.pane else { return nil }
         let g = p.grid
         return horizontal ? (max(2, (g.cols - 3) / 2), g.rows) : (g.cols, max(2, (g.rows - 2) / 2))
     }

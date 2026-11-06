@@ -13,6 +13,14 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ### Added
 
+- On the Mac, drag a tab out of the title bar or the sidebar to open it in
+  its own window, or use **Move Tab to New Window**. A picture of the tab
+  follows the pointer while you drag. The tab stays in the main window,
+  faded, with a return arrow that brings it back. These windows reopen
+  where you left them when hive starts.
+- `session.focus_block` takes `activate: false`, to focus a block without
+  making its window the session's active one.
+
 - Tabs on the Mac show a close button while the pointer is on them, in the
   title bar and in the sidebar, and move with a short spring when they open,
   close or change places. The `motion` setting picks `snappy` (the default),

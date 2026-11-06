@@ -425,3 +425,37 @@ func TestWindowPositionsCountPinnedFirst(t *testing.T) {
 		t.Fatalf("window 1 = %v, want the pinned %s", res["id"], second)
 	}
 }
+
+// A window shown on its own (a tab torn off on the Mac) takes focus without
+// becoming the session's active window: the main window and other devices
+// stay where they are.
+func TestFocusBlockWithoutActivating(t *testing.T) {
+	h := start(t, t.TempDir(), nil)
+	defer h.stop()
+	created := h.call("session.create", map[string]any{"command": []string{"cat"}})
+	sid := created["session_id"].(string)
+	firstWin := created["window_id"].(string)
+	nw := h.call("session.new_window", map[string]any{"session_id": sid, "layout": map[string]any{"command": []string{"cat"}}})
+	second := nw["window_id"].(string)
+	h.call("session.focus_window", map[string]any{"session_id": sid, "window_id": firstWin})
+	split := strs(h.call("session.new_split", map[string]any{"session_id": sid, "block_id": strs(nw["block_ids"])[0],
+		"direction": "horizontal", "layout": map[string]any{"command": []string{"cat"}}})["block_ids"])[0]
+	h.call("session.focus_window", map[string]any{"session_id": sid, "window_id": firstWin})
+
+	h.call("session.focus_block", map[string]any{"session_id": sid, "block_id": split, "activate": false})
+	view := h.call("session.view", map[string]any{"session_id": sid})
+	if view["active_window_id"] != firstWin {
+		t.Fatalf("active = %v, want %s unchanged", view["active_window_id"], firstWin)
+	}
+	for _, w := range view["windows"].([]any) {
+		w := w.(map[string]any)
+		if w["window_id"] == second && w["focused_block_id"] != split {
+			t.Fatalf("second window focus = %v, want %s", w["focused_block_id"], split)
+		}
+	}
+	// Without the option it activates, as before.
+	h.call("session.focus_block", map[string]any{"session_id": sid, "block_id": split})
+	if v := h.call("session.view", map[string]any{"session_id": sid}); v["active_window_id"] != second {
+		t.Fatalf("active = %v, want %s", v["active_window_id"], second)
+	}
+}

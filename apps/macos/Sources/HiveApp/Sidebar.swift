@@ -27,7 +27,8 @@ struct AgentSidebar: View {
                         let i = t.index, w = t.window
                         // Drag to reorder: the others make room where it will land; pins stay first.
                         TabRow(model: model, window: w, index: i, dragged: reorder.dragging == w.id)
-                            .reorderable(w.id, in: reorder, order: { model.shownWindows.map(\.window.id) }, space: "sidebar-tabs") { id, to in
+                            .reorderable(w.id, in: reorder, order: { model.shownWindows.map(\.window.id) }, space: "sidebar-tabs",
+                                 canTear: { model.canTearOff(w.id) }) { id, to in
                                 model.moveShown(id, to: to)
                             }
                             .transition(TabMotion.transition(anchor: .top))
@@ -85,10 +86,11 @@ struct TabRow: View {
 
     var body: some View {
         let s = model.style
-        let active = window.id == model.active?.id
+        let active = window.id == model.mainTab?.id
         let info = window.focused.flatMap { model.blocks[$0] }
         let sum = model.summary(of: window)
         let blocked = sum.state == "blocked" || sum.state == "stopped"
+        let torn = model.isTorn(window.id)
         HStack(alignment: sum.detail == nil ? .center : .top, spacing: 10) {
             AppTile(program: model.program(of: window), behind: model.otherPrograms(of: window), style: s,
                     badge: blocked ? "blocked" : nil)
@@ -101,8 +103,10 @@ struct TabRow: View {
                     Text(sum.title).font(.system(size: 12.5, weight: active ? .medium : .regular))
                         .foregroundStyle(s.text.swiftUI.opacity(active ? 1 : 0.86)).lineLimit(1)
                     Spacer(minLength: 4)
-                    // Pointing at a row swaps its state for the close button.
-                    if hover && !dragged {
+                    // In its own window: the way back. Pointing at a row swaps its state for the close button.
+                    if torn && !dragged {
+                        TabReturnButton(style: s) { model.bringBack(window.id) }
+                    } else if hover && !dragged {
                         TabCloseButton(style: s) { model.closeTab(window) }
                             .transition(.opacity)
                     } else if let p = model.progress(of: window), !blocked {
@@ -122,12 +126,15 @@ struct TabRow: View {
                 }
             }
         }
+        .opacity(torn ? 0.45 : 1)
         .padding(.horizontal, 8).padding(.vertical, sum.detail == nil ? 7 : 8)
         // Dragged: lifted on the bar's own surface, outlined in honey, so it reads as the one moving.
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(dragged ? s.tabActive.swiftUI : active ? s.tabActive.swiftUI : (hover ? s.text.swiftUI.opacity(0.05) : .clear)))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
             .strokeBorder(dragged ? s.accent.swiftUI.opacity(0.8) : .clear, lineWidth: 1.5))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(torn && !dragged ? s.text.swiftUI.opacity(0.16) : .clear, style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
         .animation(.easeOut(duration: 0.12), value: hover)
         .contentShape(Rectangle())
         .onTapGesture { model.selectWindow(index: index) }
@@ -137,6 +144,11 @@ struct TabRow: View {
             Button(window.pinned ? "Unpin Tab" : "Pin Tab") { model.pinTab(window, !window.pinned) }
             Button("Move Tab Up") { model.moveTab(window.id, by: -1) }
             Button("Move Tab Down") { model.moveTab(window.id, by: 1) }
+            Divider()
+            TearOffMenuItem(model: model, window: window)
+        }
+        .accessibilityAction(named: torn ? "Return to Main Window" : "Move Tab to New Window") {
+            torn ? model.bringBack(window.id) : model.tearOff(window.id)
         }
         .accessibilityAction(named: "Close Tab") { model.closeTab(window) }
         .accessibilityAction(named: "Move Tab Up") { model.moveTab(window.id, by: -1) }

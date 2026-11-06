@@ -545,13 +545,20 @@ func (s *Server) registerMethods() {
 			return copyJSON(info)
 		}, api.Perm("read"))
 	api.Register(r, "session.focus_block", "Focus a block, and its window.",
-		func(ctx context.Context, in blockRef) (revisionOut, error) {
+		func(ctx context.Context, in struct {
+			SessionID string `json:"session_id" required:"true"`
+			BlockID   string `json:"block_id" required:"true"`
+			Activate  *bool  `json:"activate,omitempty" desc:"Also make its window the session's active one. Default true; false for a window shown on its own."`
+		}) (revisionOut, error) {
 			return s.withSession(in.SessionID, func(ss *session.Session) error {
 				w := ss.WindowOf(in.BlockID)
 				if w == nil {
 					return api.NotFound("block %s is not in session %s", in.BlockID, in.SessionID)
 				}
-				w.Focus, ss.Active = in.BlockID, w.ID
+				w.Focus = in.BlockID
+				if in.Activate == nil || *in.Activate {
+					ss.Active = w.ID
+				}
 				return nil
 			})
 		}, api.Perm("control"))

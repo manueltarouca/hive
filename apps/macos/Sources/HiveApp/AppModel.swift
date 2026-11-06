@@ -213,6 +213,22 @@ final class AppModel: ObservableObject {
     @Published var sessionLabel = ""
     @Published var windows: [WindowInfo] = []
     @Published var activeWindow: String?
+    /// Tabs of the current session in their own windows, in the order they were torn off.
+    @Published var torn: [String] = []
+    /// The torn tab whose window has the keyboard; nil while the main window has it.
+    @Published var scope: String?
+    /// The tab the main window shows (see MainTab).
+    @Published var mainWindow: String?
+    /// Where each torn tab's window is (NSStringFromRect), to reopen it there.
+    var tornFrames: [String: String] = [:]
+    /// The saved torn tabs wait for their session's first view.
+    var tornToRestore = TornTab.decode(AppModel.defaults.data(forKey: "tornTabs"))
+    /// Set by the app: open, close and order the torn tabs' windows.
+    var onTornChanged: (() -> Void)?
+    /// The tab being torn off by the user right now: its window takes the keyboard.
+    var tearingNow: String?
+    var showTornWindow: ((String) -> Void)?
+    var showMainWindow: (() -> Void)?
     @Published var blocks: [String: BlockInfo] = [:]
     /// Badges scripts put on the current host's panes.
     @Published var paneBadges = BadgeBook()
@@ -358,11 +374,15 @@ final class AppModel: ObservableObject {
     /// Runs after the layout changed, so the view can size the panes.
     var onLayout: (() -> Void)?
     private var attached: Set<String> = []
-    /// The window is open (not closed to the menu bar): set by the app.
+    /// A hive window with panes is open (not closed to the menu bar): set by the app.
     var windowOpen: () -> Bool = { true }
-    /// The window can be seen: open and not covered.
+    /// The main window is open: its tab's panes stream.
+    var mainOpen: () -> Bool = { true }
+    /// A torn tab's window is open.
+    var tornOpen: (String) -> Bool = { _ in false }
+    /// A hive window with panes can be seen: open and not covered.
     var windowShown: () -> Bool = { true }
-    /// You're looking at hive: it's in front and its window shows.
+    /// You're looking at hive: it's in front and one of its windows shows.
     var inFront: Bool { NSApp.isActive && windowShown() }
     /// The session the windows and blocks belong to.
     private var viewSession: String?
@@ -687,6 +707,8 @@ final class AppModel: ObservableObject {
     /// can still replace; the user's choice ends that.
     func select(session id: String?, restoring: Bool = false) {
         if !restoring { restoreSession = nil }
+        // v1: torn tabs belong to the session on screen; another session brings them back.
+        if id != currentSession { bringBackAll() }
         if let id, let s = sessions.first(where: { $0.id == id }), s.host != current.id, let h = host(id: s.host) {
             switchHost(to: h)
         }
@@ -703,6 +725,7 @@ final class AppModel: ObservableObject {
     /// Panes, input and calls go to another host from now on.
     func switchHost(to h: HostConnection) {
         guard h !== current else { return }
+        bringBackAll()
         actedChips.removeAll()
         let old = current.engine
         for b in attached { vt.async { old.detach(block: b) } }
@@ -752,6 +775,7 @@ final class AppModel: ObservableObject {
                                       home: h.isLocal ? nil : h.home)
             }
             blocks = info
+            tornReloaded(session: sid)
             // Closed panes leave nothing behind in the bell's rate limit.
             let live = Set(info.keys)
             bellPolicy.prune(keeping: live)
@@ -761,19 +785,30 @@ final class AppModel: ObservableObject {
         }
     }
 
-    var active: WindowInfo? { windows.first { $0.id == activeWindow } ?? windows.first }
+    /// The tab the main window shows: the session's active tab unless that one is in its own window.
+    var mainTab: WindowInfo? { windows.first { $0.id == mainWindow } }
+    /// The tab actions, keys and find work on: the torn tab whose window has the keyboard, else the main window's.
+    var active: WindowInfo? { scope.flatMap { s in windows.first { $0.id == s } } ?? mainTab }
     var focusedBlock: String? { active?.focused }
+    /// The tab a block is in.
+    func tab(of block: String) -> WindowInfo? { windows.first { isIn(block, $0) } }
 
-    /// Visible blocks: the active window's, or only the zoomed one.
-    var visibleBlocks: [(String, CGRect)] {
-        guard let w = active, let layout = w.layout else { return [] }
+    /// Visible blocks of the main window: its tab's, or only the zoomed one.
+    var visibleBlocks: [(String, CGRect)] { visibleBlocks(in: mainTab) }
+
+    /// A tab's visible blocks: all of them, or only the zoomed one.
+    func visibleBlocks(in w: WindowInfo?) -> [(String, CGRect)] {
+        guard let w, let layout = w.layout else { return [] }
         if w.zoomed, let f = w.focused { return [(f, CGRect(x: 0, y: 0, width: 1, height: 1))] }
         return layout.rects()
     }
 
-    private func attachVisible() {
+    func attachVisible() {
         // Closed to the menu bar: nothing streams for nobody.
-        let want = windowOpen() ? Set(visibleBlocks.map(\.0)) : []
+        var want = mainOpen() ? Set(visibleBlocks.map(\.0)) : []
+        for id in torn where tornOpen(id) {
+            want.formUnion(visibleBlocks(in: windows.first { $0.id == id }).map(\.0))
+        }
         let engine = engine
         for b in want.subtracting(attached) {
             vt.async {
@@ -870,7 +905,8 @@ final class AppModel: ObservableObject {
             scriptsChanged()
             guard let chip = ActedChip(ev["payload"]), let b = ev["payload"]["block_id"].string else { break }
             // On screen: a pane of the tab you're looking at.
-            let shown = Set(active?.layout?.rects().map(\.0) ?? [])
+            let shown = Set(([mainTab] + torn.map { id in windows.first { $0.id == id } }).compactMap { $0 }
+                .flatMap { $0.layout?.rects().map(\.0) ?? [] })
             if h === current, blocks[b] != nil {
                 actedChips[b] = chip // kept for the pane, also when you switch to its tab
                 DispatchQueue.main.asyncAfter(deadline: .now() + ActedChip.life) { [weak self] in
@@ -1257,8 +1293,9 @@ final class AppModel: ObservableObject {
     func markSeen() {
         // Only what's on screen now: the window showing, and the session
         // whose view arrived (not the one being left).
-        guard inFront, viewSession == currentSession, let w = active else { return }
-        let ids = Set(w.layout?.rects().map(\.0) ?? [])
+        guard inFront, viewSession == currentSession else { return }
+        let shown = [mainOpen() ? mainTab : nil] + torn.filter(tornOpen).map { id in windows.first { $0.id == id } }
+        let ids = Set(shown.compactMap { $0 }.flatMap { $0.layout?.rects().map(\.0) ?? [] })
         for a in agents where a.state == "done" && ids.contains(a.blockID) {
             if let d = a.updatedAt, seenDone[a.blockID] != d { seenDone[a.blockID] = d }
         }
@@ -1418,11 +1455,20 @@ final class AppModel: ObservableObject {
 
     func focus(block: String) {
         // Asked already (the pointer keeps moving over it): one call until the view says so.
-        guard block != focusedBlock, block != pendingFocus else { return }
+        let own = tab(of: block)
+        guard block != (own?.focused ?? focusedBlock), block != pendingFocus else { return }
         pendingFocus = block
-        call("session.focus_block", ["session_id": sid, "block_id": .string(block)]) { [weak self] _ in
-            if self?.pendingFocus == block { self?.pendingFocus = nil }
-        }
+        let p: JSON = ["session_id": sid, "block_id": .string(block)]
+        let done: @MainActor (Result<JSON, HiveError>) -> Void = { [weak self] _ in if self?.pendingFocus == block { self?.pendingFocus = nil } }
+        // A tab in its own window: focus there without making it the session's active tab, so the
+        // main window and other devices stay put. A server from before that option refuses it:
+        // focus as before (the main window keeps its tab anyway, see MainTab).
+        let h = current
+        guard let own, torn.contains(own.id), case .object(var o) = p else { h.call("session.focus_block", p, result: done); return }
+        o["activate"] = false
+        h.call("session.focus_block", .object(o), result: { r in
+            if case .failure = r { h.call("session.focus_block", p, result: done) } else { done(r) }
+        })
     }
     private var pendingFocus: String?
 
@@ -1440,12 +1486,16 @@ final class AppModel: ObservableObject {
     func selectWindow(index: Int) {
         let shown = shownWindows
         guard shown.indices.contains(index) else { return }
-        call("session.focus_window", ["session_id": sid, "window_id": .string(shown[index].window.id)])
+        let id = shown[index].window.id
+        if torn.contains(id) { showTornWindow?(id); return }
+        guard let session = currentSession else { return }
+        call("session.focus_window", ["session_id": .string(session), "window_id": .string(id)])
+        if scope != nil { showMainWindow?() }
     }
 
     func selectWindow(offset: Int) {
         let shown = shownWindows
-        guard !shown.isEmpty, let at = shown.firstIndex(where: { $0.window.id == active?.id }) else {
+        guard !shown.isEmpty, let at = shown.firstIndex(where: { $0.window.id == mainTab?.id }) else {
             call(offset > 0 ? "session.focus_next_window" : "session.focus_previous_window", ["session_id": sid])
             return
         }
@@ -1470,6 +1520,12 @@ final class AppModel: ObservableObject {
     }
 
     func jump(to agent: AgentInfo) {
+        // In a tab in its own window: that window, on the agent's pane.
+        if agent.host == current.id, agent.sessionID == currentSession, let w = tab(of: agent.blockID), isTorn(w.id) {
+            showTornWindow?(w.id)
+            focus(block: agent.blockID)
+            return
+        }
         // The agent's own host: a session list entry could be stale.
         if agent.host != current.id, let h = host(id: agent.host) { switchHost(to: h) }
         if currentSession != agent.sessionID {
