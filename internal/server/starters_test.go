@@ -92,8 +92,8 @@ export default () => ({ resets, same: settled(screen) === settled(later), order,
 // reports working, then error with the reason, then echoes what it gets.
 func limitAgent(h *residentHarness, reason string) (bid, sid string) {
 	msg := base64.StdEncoding.EncodeToString([]byte(reason))
-	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
-		`sleep 0.5; printf '\033]7501;state=error:app=claude-code:msg=` + msg + `\033\\'; exec cat`}})
+	created := h.call("session.create", map[string]any{"command": fakeAgent(h.t,
+		`nap 0.5; osc "state=error:app=claude-code:msg=`+msg+`";`)})
 	bid = strs(created["block_ids"])[0]
 	sid, _ = created["session_id"].(string)
 	h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working"})
@@ -198,8 +198,8 @@ func TestStarterLimitResume(t *testing.T) {
 	// Read off the screen: the hook never said done, the agent still says
 	// working, and Claude's banner is on screen.
 	h.call("script.set_option", map[string]any{"name": "limit-resume", "key": "auto", "value": true})
-	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
-		`sleep 0.5; printf '  ⎿  You'"'"'ve hit your session limit · resets in 0m\r\n'; exec cat`}})
+	created := h.call("session.create", map[string]any{"command": fakeAgent(t,
+		`nap 0.5; print "  ⎿  You've hit your session limit · resets in 0m\r\n";`)})
 	bid4 := strs(created["block_ids"])[0]
 	h.call("agent.report", map[string]any{"block_id": bid4, "harness": "claude", "state": "working"})
 	h.until("resumed from the banner", func() bool { return strings.Contains(h.screen(bid4), "resume") })

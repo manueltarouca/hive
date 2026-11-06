@@ -157,8 +157,8 @@ func TestAgentEndsWhenTheShellReturns(t *testing.T) {
 func TestAgentFollowsItsOwnStatus(t *testing.T) {
 	h := start(t, t.TempDir(), nil)
 	defer h.stop()
-	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
-		`sleep 0.6; printf '\033]7501;state=working:app=claude-code\033\\'; sleep 0.6; printf '\033]7501;state=idle:app=claude-code\033\\'; exec cat`}})
+	created := h.call("session.create", map[string]any{"command": fakeAgent(t,
+		`nap 0.6; osc "state=working:app=claude-code"; nap 0.6; osc "state=idle:app=claude-code";`)})
 	bid := strs(created["block_ids"])[0]
 	sid, _ := created["session_id"].(string)
 	h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working", "session_id": "s-osc"})
@@ -306,8 +306,8 @@ func TestAgentStoppedByAnErrorSaysSo(t *testing.T) {
 	h := start(t, t.TempDir(), nil)
 	defer h.stop()
 	msg := base64.StdEncoding.EncodeToString([]byte("You've hit your session limit · resets 3am"))
-	created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
-		`sleep 0.6; printf '\033]7501;state=error:app=claude-code:msg=` + msg + `\033\\'; sleep 1.2; printf '\033]7501;state=working:app=claude-code\033\\'; exec cat`}})
+	created := h.call("session.create", map[string]any{"command": fakeAgent(t,
+		`nap 0.6; osc "state=error:app=claude-code:msg=`+msg+`"; nap 1.2; osc "state=working:app=claude-code";`)})
 	bid := strs(created["block_ids"])[0]
 	sid, _ := created["session_id"].(string)
 	h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working"})
@@ -345,8 +345,8 @@ func TestAgentErrorSurvivesTheStopHook(t *testing.T) {
 	for _, hookFirst := range []bool{false, true} {
 		h := start(t, t.TempDir(), nil)
 		msg := base64.StdEncoding.EncodeToString([]byte("limit · resets 3am"))
-		created := h.call("session.create", map[string]any{"command": []string{"sh", "-c",
-			`sleep 0.8; printf '\033]7501;state=error:app=claude-code:msg=` + msg + `\033\\'; exec cat`}})
+		created := h.call("session.create", map[string]any{"command": fakeAgent(t,
+			`nap 0.8; osc "state=error:app=claude-code:msg=`+msg+`";`)})
 		bid := strs(created["block_ids"])[0]
 		sid, _ := created["session_id"].(string)
 		h.call("agent.report", map[string]any{"block_id": bid, "harness": "claude", "state": "working"})
@@ -404,4 +404,17 @@ func TestProgressInBlockView(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+// fakeAgent is a program that acts like a coding agent: it runs code (nap
+// SECONDS; osc "PROGRAM STATUS"), then echoes what it gets. It is perl, not
+// sh: a report while a shell is in front of the pane ends its agent, and on
+// a slow machine sh is in front longer than a test expects.
+func fakeAgent(t testing.TB, code string) []string {
+	t.Helper()
+	perl, err := exec.LookPath("perl")
+	if err != nil {
+		t.Skip("needs perl")
+	}
+	return []string{perl, "-e", `$| = 1; sub nap { select(undef, undef, undef, $_[0]) } sub osc { print "\e]7501;$_[0]\e\\" } ` + code + ` exec "cat";`}
 }
