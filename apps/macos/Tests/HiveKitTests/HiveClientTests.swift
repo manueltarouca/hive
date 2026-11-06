@@ -29,9 +29,12 @@ final class TestServer {
         for _ in 0..<200 where !FileManager.default.fileExists(atPath: socket) { usleep(20_000) }
     }
 
+    /// Never waits forever: waitUntilExit can miss the exit and hang the whole run.
     func stop() {
         process.terminate()
-        process.waitUntilExit()
+        let deadline = Date().addingTimeInterval(5)
+        while process.isRunning && Date() < deadline { usleep(20_000) }
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
     }
 }
 
