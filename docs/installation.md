@@ -161,6 +161,8 @@ Download the new release and replace the files: `hive` in `~/.local/bin`,
 `Hive.app` in `/Applications`. Then restart the server so it runs the new
 version, at a moment that suits you: `hive server stop`, then any `hive`
 command. Stopping the server ends its programs; shells and agents come back.
+On a Mac, open the new Hive once first, so the background server it starts
+is the new one.
 
 ## Uninstall
 

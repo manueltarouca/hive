@@ -94,8 +94,10 @@ Press ⇧⌘S to show the session's tabs as a list. A tab with a coding agent
 shows the agent's task and what it is doing:
 
 - **Working:** a honey hexagon.
-- **Blocked:** a Blocked badge, and the reason it is waiting.
+- **Needs you:** a coral badge, and the reason it is waiting.
 - **Done:** a green hexagon, until you look at the tab.
+- **Stopped:** the agent ended on an error, such as a usage limit, and
+  the reason.
 
 Right-click a tab for **Pin Tab**: pinned tabs come first, in the title bar,
 the sidebar and on the phone, and ⌘1…⌘9 count them first. Drag a tab among

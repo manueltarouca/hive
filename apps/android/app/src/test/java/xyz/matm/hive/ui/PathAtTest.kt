@@ -24,8 +24,8 @@ class PathAtTest {
 
     @Test fun joinsRowsTheTerminalWrapped() {
         // A path longer than the pane: 20 columns, wrapped twice.
-        val f = frame("see /Users/mt/code/p\\", "rojects/hive/apps/an\\", "droid/Desk.kt ok")
-        val whole = "/Users/mt/code/projects/hive/apps/android/Desk.kt"
+        val f = frame("see /Users/ana/src/p\\", "rojects/hive/apps/an\\", "droid/Desk.kt ok")
+        val whole = "/Users/ana/src/projects/hive/apps/android/Desk.kt"
         assertEquals(whole, PathAt.find(f, 6, 0))
         assertEquals(whole, PathAt.find(f, 3, 1))
         assertEquals(whole, PathAt.find(f, 2, 2))

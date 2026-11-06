@@ -75,6 +75,10 @@ Scripts (TypeScript, run by the server)
                              result as JSON (--allow: read,control,spawn...)
   script stop RUN_ID         stop a running script
   script ls                  the scripts folder's scripts, and one-shots
+  script show NAME           what a script does, asks for and offers
+  script watch|act NAME      let a script only watch, or act
+  script set NAME KEY=VALUE  change a script's settings
+  script add [NAME...]       list the starter scripts, or copy one in
   script grant NAME          let a script in the folder run, with the
                              permissions it asks for (revoke: take them)
   script enable|disable NAME turn a script on or off

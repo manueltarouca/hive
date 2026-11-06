@@ -67,7 +67,12 @@ if [ "$os" = macos ]; then
   # extended attributes first: they would ship as ._ files that break the
   # seal when the zip is opened with unzip.
   xattr -cr "$app"
-  codesign --force --deep --sign - "$app" >/dev/null
+  # Same requirement as bundle.sh: the bundle ID, not this build's hash, so
+  # what users grant Hive in System Settings still holds after an update.
+  id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
+  codesign --force --deep --sign - -r "=designated => identifier \"$id\"" "$app" >/dev/null
+  codesign -d -r- "$app" 2>&1 | grep -q "designated => identifier \"$id\"" \
+    || { echo "release: Hive.app's signature isn't tied to $id" >&2; exit 1; }
   zip="dist/Hive-$version-macos-$arch.zip"
   rm -f "$zip"
   ditto -c -k --keepParent --norsrc "$app" "$zip"

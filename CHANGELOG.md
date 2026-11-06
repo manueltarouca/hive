@@ -11,6 +11,22 @@ patch, and this file lists it under "Changed" or "Removed".
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-06
+
+Scripts the server runs, a Settings window on the Mac, notifications by
+state, tabs in their own windows, and the server as Hive's background item.
+
+### Downloads
+
+The same files as 0.1.0, with this version in their names:
+`hive-0.2.0-macos-arm64.tar.gz`, `hive-0.2.0-linux-amd64.tar.gz`,
+`Hive-0.2.0-macos-arm64.zip`, `hive-0.2.0-android.apk` and `SHA256SUMS`.
+The APK installs over 0.1.x.
+
+To update on a Mac, replace `hive` and `Hive.app`, open Hive once, then
+restart the server when it suits you (`hive server stop`, then any `hive`
+command). Stopping the server ends its programs; shells and agents come back.
+
 ### Added
 
 - On the Mac, drag a tab out of the title bar or the sidebar to open it in
@@ -20,7 +36,6 @@ patch, and this file lists it under "Changed" or "Removed".
   where you left them when hive starts.
 - `session.focus_block` takes `activate: false`, to focus a block without
   making its window the session's active one.
-
 - Tabs on the Mac show a close button while the pointer is on them, in the
   title bar and in the sidebar, and move with a short spring when they open,
   close or change places. The `motion` setting picks `snappy` (the default),
@@ -31,7 +46,8 @@ patch, and this file lists it under "Changed" or "Removed".
   `sound-stopped`), with a Play button in Settings; `dock-badge` counts
   the agents that need you on the Dock icon.
 - A program's progress (OSC 9;4) shows as a ring on its tab, in the title
-  bar and the sidebar on the Mac, and in the tab strip and sheet on the phone. The server keeps the last report in the block's view
+  bar and the sidebar on the Mac, and in the tab strip and sheet on the
+  phone. The server keeps the last report in the block's view
   (`progress`), so a client that connects later shows it too.
 - On screen, an agent waiting for you says "Needs you" instead of
   "Blocked", on the Mac and the phone. The API keeps `blocked`.
@@ -104,8 +120,6 @@ patch, and this file lists it under "Changed" or "Removed".
   Stopped. `agent.act` takes `expect_state`, to nudge an agent that is
   idle or done. Mac client action `client.reveal` brings a pane forward;
   `action.run` from the Mac carries the app's `client_id`.
-
-
 - Scripts: TypeScript or JavaScript the server runs, with the same methods
   and events as the CLI. `hive script run FILE` runs one once, with its log
   on stderr and its result on stdout; `hive script stop`, `hive script ls`,
@@ -186,7 +200,6 @@ patch, and this file lists it under "Changed" or "Removed".
 - The Mac sidebar is lighter: it shares the window's background with no
   dividing line, the tab in front has no outline, and titles use lighter
   weights. A tab's ⌘ number moved to its tooltip.
-
 - `client.perform` needs `control` for app actions that change your layout
   (new tabs, splits, closing, resizing); `ui` still covers showing things.
   A script can mark only its own notifications seen.
@@ -206,7 +219,6 @@ patch, and this file lists it under "Changed" or "Removed".
 - Day theme text reads at 4.5:1: muted is `#6F675C`, honey, coral and sage
   words use darker text colours, and words on honey are ink. Scripts' state
   colours follow the brand: honey running, coral waiting for your OK.
-
 - `session.new_split`, `session.move_block` and split layouts refuse a
   `ratio` outside 0 to 1 with `bad_request`. It used to become 0.5 without a
   word, so a percentage such as 30 split the pane in half. Leaving `ratio` out
@@ -280,5 +292,6 @@ pick them, or with `--always` at launch. See
 - **Agent skills** for Claude Code and other agents: `hive`, `hive-setup`
   and `hive-from-tmux`.
 
-[Unreleased]: https://github.com/manueltarouca/hive/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/manueltarouca/hive/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/manueltarouca/hive/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/manueltarouca/hive/releases/tag/v0.1.0

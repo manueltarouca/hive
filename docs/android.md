@@ -166,6 +166,10 @@ you what changed meanwhile.
 | Open panes fitted to the phone | A pane opens at the phone's size, instead of zoomed out to another device's |
 | Notifications | When an agent needs you or is done: when hive is in the background, always, or never |
 
+**Scripts**, below them, has a row per host. Open one to see that
+server's scripts and what each does, turn them on or off, grant what a
+script asks for, and change its settings.
+
 ## When a host is away
 
 A card over the pane says what's happening, as on the Mac:
