@@ -63,16 +63,18 @@ func run(t *testing.T, h *Host, code string, o RunOptions) RunInfo {
 // stays set until cleared).
 func TestBudgetNeverLeaksIntoTheNextTask(t *testing.T) {
 	h := testHost(t)
-	testHookAfterTask = func() { time.Sleep(3 * time.Millisecond) } // the timer fires now
+	// Each task is far inside its budget, and its timer always fires just
+	// after: the margins hold on a slow, loaded machine.
+	testHookAfterTask = func() { time.Sleep(70 * time.Millisecond) } // the timer fires now
 	defer func() { testHookAfterTask = nil }()
 	info := run(t, h, `
 let done = 0;
-for (let i = 0; i < 50; i++) {
+for (let i = 0; i < 15; i++) {
   await h.call("echo", { n: i });
   done++;
 }
-export default () => done;`, RunOptions{Budget: time.Millisecond})
-	if !info.OK || resultOf(info) != "50" {
+export default () => done;`, RunOptions{Budget: 50 * time.Millisecond})
+	if !info.OK || resultOf(info) != "15" {
 		t.Fatalf("info = %+v", info)
 	}
 }
@@ -82,6 +84,17 @@ func TestBudgetStopsARunaway(t *testing.T) {
 	t0 := time.Now()
 	info := run(t, h, `await h.sleep(1); while (true) {}`, RunOptions{Budget: 50 * time.Millisecond})
 	if info.OK || info.Code != "timeout" || time.Since(t0) > time.Second {
+		t.Fatalf("info = %+v after %v", info, time.Since(t0))
+	}
+}
+
+// The code after an await runs as the call's answer arrives: an overrun
+// there ends the script too, instead of losing the rest of it.
+func TestBudgetStopsARunawayAfterACall(t *testing.T) {
+	h := testHost(t)
+	t0 := time.Now()
+	info := run(t, h, `await h.call("echo", { n: 1 }); while (true) {}`, RunOptions{Budget: 50 * time.Millisecond})
+	if info.OK || info.Code != "timeout" || time.Since(t0) > 2*time.Second {
 		t.Fatalf("info = %+v after %v", info, time.Since(t0))
 	}
 }

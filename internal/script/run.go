@@ -647,12 +647,19 @@ func (r *Run) jsCall(method, argsJSON string) *goja.Promise {
 		out, err := r.host.call(r, method, argsJSON, depth)
 		r.post(func() {
 			r.pending--
+			// Settling runs the code after the await: the budget can stop
+			// it there, and that has to end the script like any overrun,
+			// not drop the rest of it on the floor.
+			var jsErr error
 			if err != nil {
 				b, _ := json.Marshal(asAPI(err))
-				_ = reject(string(b))
-				return
+				jsErr = reject(string(b))
+			} else {
+				jsErr = resolve(out)
 			}
-			_ = resolve(out)
+			if jsErr != nil {
+				r.handlerErr(jsErr)
+			}
 		})
 	}()
 	return p
@@ -740,8 +747,8 @@ func (r *Run) manifestRead() bool {
 // jsManifest reads a hive.script manifest and says whether setup may run.
 func (r *Run) jsManifest(manifestJSON string) bool {
 	var m struct {
-		Name        string   `json:"name"`
-		Description string   `json:"description"`
+		Name        string                     `json:"name"`
+		Description string                     `json:"description"`
 		Permissions []string                   `json:"permissions"`
 		Options     map[string]json.RawMessage `json:"options"`
 	}
